@@ -54,4 +54,5 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # 한국어 문장의 전각 문자 허
 [tool.mypy]
 strict = true
 python_version = "3.13"
-mypy_path = "src"
+mypy_path = ["src", "."]
+explicit_package_bases = true

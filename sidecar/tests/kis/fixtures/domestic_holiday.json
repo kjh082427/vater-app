@@ -1,0 +1,33 @@
+{
+ "ctx_area_nk": "20261126            ",
+ "ctx_area_fk": "20261103            ",
+ "output": [
+  {
+   "bass_dt": "20261103",
+   "wday_dvsn_cd": "03",
+   "bzdy_yn": "Y",
+   "tr_day_yn": "Y",
+   "opnd_yn": "Y",
+   "sttl_day_yn": "Y"
+  },
+  {
+   "bass_dt": "20261104",
+   "wday_dvsn_cd": "04",
+   "bzdy_yn": "Y",
+   "tr_day_yn": "Y",
+   "opnd_yn": "Y",
+   "sttl_day_yn": "Y"
+  },
+  {
+   "bass_dt": "20261105",
+   "wday_dvsn_cd": "05",
+   "bzdy_yn": "Y",
+   "tr_day_yn": "Y",
+   "opnd_yn": "Y",
+   "sttl_day_yn": "Y"
+  }
+ ],
+ "rt_cd": "0",
+ "msg_cd": "KIOK0500",
+ "msg1": "조회가 계속됩니다..다음버튼을 Click 하십시오.                                   "
+}
