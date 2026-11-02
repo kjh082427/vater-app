@@ -29,6 +29,9 @@ _KEY_VALUE = re.compile(
 )
 
 
+_reentry = threading.local()
+
+
 class _SecretCache:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -46,18 +49,29 @@ class _SecretCache:
             self._loaded_at = float("-inf")
 
     def values(self) -> list[str]:
+        """비밀키 목록을 돌려준다.
+
+        제공 함수(keyring 등)는 **잠금 밖에서** 부른다. 제공 함수가 스스로 로그를 남기면
+        그 로그가 다시 여기로 들어오는데(재진입), 그때는 갱신하지 않고 기존 값을 쓴다.
+        잠금을 쥔 채 부르면 같은 스레드가 같은 잠금을 다시 기다리며 멈춘다 (리뷰 Critical #1).
+        """
         with self._lock:
-            if time.monotonic() - self._loaded_at > CACHE_SECONDS:
-                try:
-                    raw = self._provider()
-                except Exception:
-                    raw = self._values
-                # 긴 값부터 가려야 짧은 값이 긴 값의 일부만 가리는 일이 없다.
-                self._values = sorted(
-                    {v for v in raw if len(v) >= MIN_SECRET_LEN}, key=len, reverse=True
-                )
-                self._loaded_at = time.monotonic()
-            return self._values
+            fresh = time.monotonic() - self._loaded_at <= CACHE_SECONDS
+            current, provider = self._values, self._provider
+        if fresh or getattr(_reentry, "refreshing", False):
+            return current
+        _reentry.refreshing = True
+        try:
+            raw = provider()
+        except Exception:  # 로그 때문에 앱이 죽으면 안 된다
+            return current
+        finally:
+            _reentry.refreshing = False
+        # 긴 값부터 가려야 짧은 값이 긴 값의 일부만 가리는 일이 없다.
+        updated = sorted({v for v in raw if len(v) >= MIN_SECRET_LEN}, key=len, reverse=True)
+        with self._lock:
+            self._values, self._loaded_at = updated, time.monotonic()
+        return updated
 
 
 _cache = _SecretCache()

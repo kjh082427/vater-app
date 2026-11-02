@@ -1,11 +1,12 @@
 """모든 오류 응답을 `{code, message, hint}` 형식으로 통일한다 (스펙 8장)."""
 
 import logging
-from typing import cast
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,24 @@ class VaterError(Exception):
         self.status = status
 
 
+class ErrorBody(BaseModel):
+    """모든 오류 응답의 형식. UI는 `code`로 안내 문구를 정한다."""
+
+    code: str
+    message: str
+    hint: str | None = None
+
+
+# 라우터에 붙여 OpenAPI 명세가 실제 오류 형식을 알리게 한다 (UI 타입 생성용).
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    401: {"model": ErrorBody, "description": "인증 실패 (AUTH_INVALID)"},
+    422: {"model": ErrorBody, "description": "요청 형식 오류 (REQUEST_INVALID 등)"},
+    500: {"model": ErrorBody, "description": "예상하지 못한 오류 (INTERNAL)"},
+}
+
+
 def error_body(code: str, message: str, hint: str | None = None) -> dict[str, str | None]:
-    return {"code": code, "message": message, "hint": hint}
+    return ErrorBody(code=code, message=message, hint=hint).model_dump()
 
 
 async def _vater_error(_: Request, exc: Exception) -> JSONResponse:

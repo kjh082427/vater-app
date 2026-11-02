@@ -1,6 +1,8 @@
 """비밀키는 쓰기·삭제만 가능하다. 값을 돌려주는 API는 없다 (스펙 2-3)."""
 
-from fastapi import APIRouter, Depends, Response
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Path, Response
 from pydantic import BaseModel, ConfigDict
 
 from vater_core.api.deps import AppDeps, get_deps
@@ -10,6 +12,10 @@ from vater_core.secrets.names import USER_SETTABLE, SecretName
 from vater_core.secrets.store import SecretStore
 
 router = APIRouter(prefix="/secrets", tags=["secrets"])
+
+# 명세에는 허용 이름 목록을 알리되, 검증은 핸들러가 한다.
+# (FastAPI 검증에 맡기면 틀린 이름이 422가 된다. 지금은 400 SECRET_NAME_INVALID로 답한다.)
+SecretPathName = Annotated[str, Path(json_schema_extra={"enum": [n.value for n in USER_SETTABLE]})]
 
 
 class SecretValue(BaseModel):
@@ -38,7 +44,7 @@ async def secret_status(store: SecretStore = Depends(get_store)) -> dict[str, bo
 
 @router.put("/{name}", status_code=204)
 async def put_secret(
-    name: str,
+    name: SecretPathName,
     body: SecretValue,
     store: SecretStore = Depends(get_store),  # noqa: B008
 ) -> Response:
@@ -52,7 +58,10 @@ async def put_secret(
 
 
 @router.delete("/{name}", status_code=204)
-async def delete_secret(name: str, store: SecretStore = Depends(get_store)) -> Response:  # noqa: B008
+async def delete_secret(
+    name: SecretPathName,
+    store: SecretStore = Depends(get_store),  # noqa: B008
+) -> Response:
     store.delete(_user_name(name))
     refresh_secret_cache()
     return Response(status_code=204)

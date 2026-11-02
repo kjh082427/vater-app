@@ -1,4 +1,5 @@
 import logging
+import threading
 from collections.abc import Iterator
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -58,6 +59,23 @@ def test_refresh_picks_up_new_secret(tmp_path: Path) -> None:
     refresh_secret_cache()
     logging.getLogger("vater_core.test").info("value late-secret-42")
     assert "late-secret-42" not in read_log(tmp_path)
+
+
+def test_provider_that_logs_does_not_deadlock(tmp_path: Path) -> None:
+    """Windows keyring은 비밀키를 읽는 도중 경고 로그를 남길 수 있다 (리뷰 Critical #1)."""
+
+    def noisy_provider() -> list[str]:
+        logging.getLogger("keyring.backends.Windows").warning("blob was UTF-8, not UTF-16")
+        return ["noisy-secret-1"]
+
+    setup_logging(tmp_path, noisy_provider)
+    t = threading.Thread(
+        target=lambda: logging.getLogger("vater_core.test").info("x noisy-secret-1"), daemon=True
+    )
+    t.start()
+    t.join(timeout=3)
+    assert not t.is_alive(), "logging call deadlocked"
+    assert "noisy-secret-1" not in read_log(tmp_path)
 
 
 def test_rotation_config(tmp_path: Path) -> None:

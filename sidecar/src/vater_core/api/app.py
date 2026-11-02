@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import vater_core
 from vater_core.api.auth import require_token
 from vater_core.api.deps import AppDeps
-from vater_core.api.errors import install_error_handlers
+from vater_core.api.errors import ERROR_RESPONSES, install_error_handlers
 from vater_core.api.routes import events, secrets, settings, system
 
 TAURI_ORIGINS = ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
@@ -18,7 +18,14 @@ def allowed_origins(dev: bool) -> list[str]:
 
 
 def create_app(deps: AppDeps) -> FastAPI:
-    app = FastAPI(title="Vater sidecar", version=vater_core.__version__)
+    # 문서 페이지는 개발 모드에서만 연다. 설치된 앱에서는 토큰 없이 열리면 안 된다.
+    app = FastAPI(
+        title="Vater sidecar",
+        version=vater_core.__version__,
+        docs_url="/docs" if deps.dev else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if deps.dev else None,
+    )
     app.state.deps = deps
     install_error_handlers(app)
     # CORS 사전 요청(OPTIONS)은 인증보다 먼저 미들웨어에서 처리된다.
@@ -29,7 +36,7 @@ def create_app(deps: AppDeps) -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
 
-    authed = APIRouter(dependencies=[Depends(require_token)])
+    authed = APIRouter(dependencies=[Depends(require_token)], responses=ERROR_RESPONSES)
     authed.include_router(system.router)
     authed.include_router(settings.router)
     authed.include_router(secrets.router)

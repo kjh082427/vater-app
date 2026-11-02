@@ -1,10 +1,14 @@
 """SQLite 연결과 순차 마이그레이션."""
 
+import logging
 import re
 import sqlite3
 from importlib import resources
 from pathlib import Path
 
+from vater_core.api.errors import VaterError
+
+logger = logging.getLogger(__name__)
 DB_FILE = "vater.db"
 _MIGRATION_NAME = re.compile(r"^(\d{3})_[a-z0-9_]+\.sql$")
 
@@ -30,9 +34,20 @@ def migrate(conn: sqlite3.Connection) -> int:
         if version <= current:
             continue
         # executescript는 먼저 커밋하므로, 스크립트 자체를 한 트랜잭션으로 감싼다.
-        conn.executescript(
-            f"BEGIN;\n{sql}\nINSERT INTO schema_version (version) VALUES ({version});\nCOMMIT;"
-        )
+        try:
+            conn.executescript(
+                f"BEGIN;\n{sql}\nINSERT INTO schema_version (version) VALUES ({version});\nCOMMIT;"
+            )
+        except sqlite3.Error as e:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            logger.exception("migration %03d failed", version)
+            raise VaterError(
+                "DB_MIGRATION_FAILED",
+                f"데이터베이스 업데이트({version:03d})에 실패했습니다.",
+                "앱을 다시 설치하거나 로그 폴더를 확인해 주세요.",
+                status=500,
+            ) from e
         current = version
     return current
 

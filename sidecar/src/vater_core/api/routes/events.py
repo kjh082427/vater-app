@@ -8,9 +8,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from vater_core.api.auth import require_token_or_query
 from vater_core.api.deps import AppDeps, get_deps
-from vater_core.api.errors import VaterError
+from vater_core.api.errors import ERROR_RESPONSES, VaterError
 
-router = APIRouter(tags=["events"], dependencies=[Depends(require_token_or_query)])
+router = APIRouter(
+    tags=["events"], dependencies=[Depends(require_token_or_query)], responses=ERROR_RESPONSES
+)
 PING_SECONDS = 15
 
 
