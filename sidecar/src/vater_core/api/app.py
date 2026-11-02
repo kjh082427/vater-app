@@ -7,7 +7,7 @@ import vater_core
 from vater_core.api.auth import require_token
 from vater_core.api.deps import AppDeps
 from vater_core.api.errors import install_error_handlers
-from vater_core.api.routes import secrets, settings, system
+from vater_core.api.routes import events, secrets, settings, system
 
 TAURI_ORIGINS = ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
 DEV_ORIGIN = "http://localhost:5173"
@@ -34,4 +34,6 @@ def create_app(deps: AppDeps) -> FastAPI:
     authed.include_router(settings.router)
     authed.include_router(secrets.router)
     app.include_router(authed)
+    # SSE는 브라우저 EventSource가 헤더를 못 붙이므로 쿼리 토큰도 받는 별도 인증을 쓴다.
+    app.include_router(events.router)
     return app

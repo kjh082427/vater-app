@@ -13,6 +13,7 @@ import uvicorn
 
 from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
+from vater_core.api.events import EventBus
 from vater_core.config import load_runtime
 from vater_core.secrets.store import select_secret_store
 from vater_core.stdout_events import emit
@@ -36,6 +37,7 @@ def main() -> None:
         data_dir=runtime.data_dir,
         db=open_db(runtime.data_dir),
         secrets=select_secret_store(os.environ, sys.platform),
+        events=EventBus(),
     )
     app = create_app(deps)
 

@@ -4,10 +4,10 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from fastapi import Request
 
+from vater_core.api.events import EventBus
 from vater_core.secrets.store import SecretStore
 
 
@@ -22,7 +22,7 @@ class AppDeps:
     data_dir: Path
     db: sqlite3.Connection | None = None
     secrets: SecretStore | None = None
-    events: Any = None  # EventBus (Task 6에서 타입 확정)
+    events: EventBus | None = None
     shutdown: Callable[[], None] = field(default=_noop)
 
 
