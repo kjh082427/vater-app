@@ -8,6 +8,8 @@ from typing import Any
 
 from fastapi import Request
 
+from vater_core.secrets.store import SecretStore
+
 
 def _noop() -> None:
     return None
@@ -19,7 +21,7 @@ class AppDeps:
     dev: bool
     data_dir: Path
     db: sqlite3.Connection | None = None
-    secrets: Any = None  # SecretStore (Task 5에서 타입 확정)
+    secrets: SecretStore | None = None
     events: Any = None  # EventBus (Task 6에서 타입 확정)
     shutdown: Callable[[], None] = field(default=_noop)
 

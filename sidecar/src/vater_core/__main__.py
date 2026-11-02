@@ -5,13 +5,16 @@
 """
 
 import asyncio
+import os
 import socket
+import sys
 
 import uvicorn
 
 from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
 from vater_core.config import load_runtime
+from vater_core.secrets.store import select_secret_store
 from vater_core.stdout_events import emit
 from vater_core.store.db import open_db
 
@@ -32,6 +35,7 @@ def main() -> None:
         dev=runtime.dev,
         data_dir=runtime.data_dir,
         db=open_db(runtime.data_dir),
+        secrets=select_secret_store(os.environ, sys.platform),
     )
     app = create_app(deps)
 
