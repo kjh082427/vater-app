@@ -29,6 +29,10 @@ SETTING_DEFS: dict[str, SettingDef] = {
     "general.autostart": SettingDef(bool, True),
     "general.close_to_tray": SettingDef(bool, True),
     "kis.server": SettingDef(str, "prod", choices=("prod", "vps")),
+    # 공식 샘플 간격(실전 0.05s, 모의 0.5s)보다 보수적으로 잡는다.
+    "kis.rate_per_sec.prod": SettingDef(int, 15, min=1, max=20),
+    "kis.rate_per_sec.vps": SettingDef(int, 2, min=1, max=5),
+    "kis.ws_max_subscriptions": SettingDef(int, 41, min=1, max=41),
     "llm.preset": SettingDef(str, "cloud", choices=("cloud", "local", "mixed")),
     "analysis.debate_rounds": SettingDef(int, 1, min=1, max=5),
     "alerts.poll_interval_sec": SettingDef(int, 30, min=10, max=600),
