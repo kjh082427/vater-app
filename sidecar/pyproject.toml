@@ -36,6 +36,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 addopts = "-m 'not kis_live and not llm'"  # 실연동은 -m kis_live 로 직접 실행
+filterwarnings = [
+    # stockstats(TradingAgents 의존성)가 쓰는 pandas 문법 경고. 동작에는 영향 없음
+    "ignore:The inplace keyword in DataFrame.set_index is deprecated:Warning",
+]
 markers = [
     "kis_live: 실제 한국투자증권 키가 필요한 테스트 (기본 제외)",
     "llm: 실제 LLM 호출이 필요한 테스트 (기본 제외)",
@@ -61,3 +65,8 @@ explicit_package_bases = true
 
 [tool.uv.sources]
 tradingagents = { git = "https://github.com/TauricResearch/TradingAgents", rev = "v0.7.1" }
+
+[[tool.mypy.overrides]]
+# 타입 정보를 제공하지 않는 라이브러리 (TradingAgents와 그 의존성)
+module = ["tradingagents.*", "stockstats", "langchain_core.*", "langgraph.*", "pandas"]
+ignore_missing_imports = true
