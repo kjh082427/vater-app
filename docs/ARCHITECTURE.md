@@ -16,7 +16,7 @@ Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python
 | 영역 | 폴더 | 브랜치 | PR | 여기를 고치면 |
 |---|---|---|---|---|
 | 기반 (API, 저장, 비밀키, 로그) | `sidecar/src/vater_core/{api,store,secrets}`, `__main__.py`, `logging_setup.py` | `core/foundation` | [#1](https://github.com/kjh082427/vater-app/pull/1) | API 인증, 오류 형식, DB 구조, 설정 항목, 키 저장 방식, 로그 마스킹 |
-| 한국투자증권 연동 | `sidecar/src/vater_core/kis` | `core/kis` | — | 시세 수신, 토큰, 호출 제한 |
+| 한국투자증권 연동 | `sidecar/src/vater_core/kis` (+ `api/routes/kis.py`, `store/migrations/002_symbols.sql`) | `core/kis` | [#2](https://github.com/kjh082427/vater-app/pull/2) | 토큰 캐시, 호출 제한, 시세·재무·뉴스·시장 데이터, 실시간 체결, 종목 검색. 실연동 사실은 `docs/kis-live-findings.md` |
 | LLM 관리 | `sidecar/src/vater_core/llm` | `core/llm` | — | 프리셋, 로컬 모델 추천·설치 |
 | AI 분석 | `sidecar/src/vater_core/analysis` | `core/analysis` | — | TradingAgents 실행 방식, 리포트 내용 |
 | 알림 | `sidecar/src/vater_core/alerts` | `core/alerts` | — | 지표 조건, 알림 규칙 |
