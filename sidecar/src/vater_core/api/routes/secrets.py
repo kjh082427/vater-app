@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 from vater_core.api.deps import AppDeps, get_deps
 from vater_core.api.errors import VaterError
+from vater_core.logging_setup import refresh_secret_cache
 from vater_core.secrets.names import USER_SETTABLE, SecretName
 from vater_core.secrets.store import SecretStore
 
@@ -46,10 +47,12 @@ async def put_secret(
     if not value:
         raise VaterError("SECRET_VALUE_EMPTY", "값이 비어 있습니다.")
     store.set(target, value)
+    refresh_secret_cache()  # 다음 로그부터 새 값을 가린다
     return Response(status_code=204)
 
 
 @router.delete("/{name}", status_code=204)
 async def delete_secret(name: str, store: SecretStore = Depends(get_store)) -> Response:  # noqa: B008
     store.delete(_user_name(name))
+    refresh_secret_cache()
     return Response(status_code=204)

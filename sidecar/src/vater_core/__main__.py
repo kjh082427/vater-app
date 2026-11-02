@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import logging
 import os
 import socket
 import sys
@@ -15,6 +16,7 @@ from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
 from vater_core.api.events import EventBus
 from vater_core.config import load_runtime
+from vater_core.logging_setup import setup_logging
 from vater_core.secrets.store import select_secret_store
 from vater_core.stdout_events import emit
 from vater_core.store.db import open_db
@@ -31,15 +33,18 @@ def bind_free_port() -> socket.socket:
 
 def main() -> None:
     runtime = load_runtime()
+    secrets = select_secret_store(os.environ, sys.platform)
+    setup_logging(runtime.data_dir, secrets.known_values)  # 가장 먼저: 이후 모든 로그를 마스킹
     deps = AppDeps(
         token=runtime.token,
         dev=runtime.dev,
         data_dir=runtime.data_dir,
         db=open_db(runtime.data_dir),
-        secrets=select_secret_store(os.environ, sys.platform),
+        secrets=secrets,
         events=EventBus(),
     )
     app = create_app(deps)
+    logging.getLogger(__name__).info("vater-core started (dev=%s)", runtime.dev)
 
     sock = bind_free_port()
     # log_config=None: uvicorn 로그가 stdout(이벤트 통로)에 섞이지 않게 한다.

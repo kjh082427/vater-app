@@ -1,6 +1,10 @@
 import json
+import logging
+from typing import Any
 
 import httpx
+
+from vater_core.logging_setup import setup_logging
 
 
 async def test_put_secret_is_write_only(client: httpx.AsyncClient) -> None:
@@ -29,6 +33,24 @@ async def test_internal_secrets_not_writable(client: httpx.AsyncClient) -> None:
     r = await client.put("/secrets/KIS_ACCESS_TOKEN", json={"value": "x"})
     assert r.status_code == 400 and r.json()["code"] == "SECRET_NAME_INVALID"
     assert "KIS_ACCESS_TOKEN" not in (await client.get("/secrets")).json()
+
+
+async def test_saved_secret_is_masked_in_logs_immediately(
+    client: httpx.AsyncClient, deps: Any
+) -> None:
+    setup_logging(deps.data_dir, deps.secrets.known_values)
+    log = logging.getLogger("vater_core.test")
+    log.info("warm up")  # 마스킹 캐시를 미리 채워 둔다
+    assert (await client.put("/secrets/KIS_APP_SECRET", json={"value": "fresh-sec-77"})).status_code
+    log.info("oops fresh-sec-77")
+    root = logging.getLogger()
+    for h in root.handlers:
+        h.flush()
+    text = (deps.data_dir / "logs" / "vater-core.log").read_text(encoding="utf-8")
+    for h in [h for h in root.handlers if getattr(h, "_vater", False)]:
+        root.removeHandler(h)
+        h.close()
+    assert "fresh-sec-77" not in text
 
 
 async def test_value_is_trimmed_and_deletable(client: httpx.AsyncClient) -> None:
