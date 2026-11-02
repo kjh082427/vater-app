@@ -16,7 +16,9 @@
       "min_vram_mb": 11500,
       "default_preset": "mixed",
       "recommended": "qwen3.5:9b",
-      "alternatives": ["gemma4:12b"],
+      "alternatives": [
+        "gemma4:12b"
+      ],
       "expected_minutes": null
     },
     {
@@ -25,7 +27,7 @@
       "min_vram_mb": 7500,
       "default_preset": "cloud",
       "recommended": "qwen3.5:4b",
-      "alternatives": ["qwen3.5:9b"],
+      "alternatives": [],
       "expected_minutes": 22
     },
     {
@@ -34,7 +36,9 @@
       "min_vram_mb": 0,
       "default_preset": "cloud",
       "recommended": null,
-      "alternatives": ["qwen3.5:2b"],
+      "alternatives": [
+        "qwen3.5:2b"
+      ],
       "expected_minutes": null
     }
   ],
@@ -53,7 +57,7 @@
       "size_gb": 3.32,
       "num_ctx": 16384,
       "min_vram_mb": 6000,
-      "note": "8GB GPU에서 끝까지 돌지만, 일부 보고서가 비거나 수치를 지어낼 수 있습니다."
+      "note": "8GB GPU에 다 올라가 끝까지 돌지만(약 22분), 보고서가 비거나 수치를 지어낼 수 있습니다(검증 실험 S1)."
     },
     {
       "tag": "qwen3.5:9b",
@@ -61,14 +65,14 @@
       "size_gb": 6.55,
       "num_ctx": 16384,
       "min_vram_mb": 11000,
-      "note": "8GB GPU에서는 일부가 CPU로 넘어가 분석 1건에 1시간 가까이 걸립니다."
+      "note": "12GB 이상 GPU용입니다. 8GB GPU에서는 1.1GB가 CPU로 넘어가 분석 1건에 약 56분 걸립니다(검증 실험 S1)."
     },
     {
       "tag": "gemma4:12b",
       "label": "Gemma 4 12B",
       "size_gb": 8.02,
       "num_ctx": 16384,
-      "min_vram_mb": 12000,
+      "min_vram_mb": 11000,
       "note": "12GB 이상 GPU용 대안입니다."
     },
     {

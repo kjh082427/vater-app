@@ -52,6 +52,22 @@ def test_cloud_providers_use_known_secrets() -> None:
         assert provider.base_url_secret == expected
 
 
+def test_nvidia_alternatives_fit_in_tier_vram() -> None:
+    """검증 실험 S1: 8GB에서 9b는 일부가 CPU로 넘어가 56분 걸린다 → 대안으로 권하지 않는다."""
+    cat = load_catalog()
+    for tier in cat.tiers:
+        if tier.id == "integrated":
+            continue  # 내장 GPU의 대안은 '실험용'이라고 표시한다
+        for tag in tier.alternatives:
+            assert cat.local(tag).min_vram_mb <= tier.min_vram_mb, (tier.id, tag)
+
+
+def test_8gb_defaults_to_cloud_after_s1() -> None:
+    tier = load_catalog().tier("nvidia_8")
+    assert tier.default_preset == "cloud" and tier.recommended == "qwen3.5:4b"
+    assert tier.alternatives == ()
+
+
 def test_integrated_defaults_to_cloud() -> None:
     tier = load_catalog().tier("integrated")
     assert tier.default_preset == "cloud" and tier.recommended is None
