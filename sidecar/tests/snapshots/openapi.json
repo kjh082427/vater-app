@@ -1,0 +1,548 @@
+{
+  "components": {
+    "schemas": {
+      "ErrorBody": {
+        "description": "모든 오류 응답의 형식. UI는 `code`로 안내 문구를 정한다.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "SecretValue": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "SecretValue",
+        "type": "object"
+      },
+      "ShutdownAccepted": {
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ShutdownAccepted",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Vater sidecar",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/events": {
+      "get": {
+        "operationId": "events_events_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/secrets": {
+      "get": {
+        "operationId": "secret_status_secrets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Secret Status Secrets Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Secret Status",
+        "tags": [
+          "secrets"
+        ]
+      }
+    },
+    "/secrets/{name}": {
+      "delete": {
+        "operationId": "delete_secret_secrets__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "enum": [
+                "KIS_APP_KEY",
+                "KIS_APP_SECRET",
+                "KIS_HTS_ID",
+                "LLM_ANTHROPIC_KEY",
+                "LLM_OPENAI_KEY",
+                "LLM_GOOGLE_KEY",
+                "LLM_COMPAT_KEY",
+                "LLM_COMPAT_BASE_URL"
+              ],
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Delete Secret",
+        "tags": [
+          "secrets"
+        ]
+      },
+      "put": {
+        "operationId": "put_secret_secrets__name__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "enum": [
+                "KIS_APP_KEY",
+                "KIS_APP_SECRET",
+                "KIS_HTS_ID",
+                "LLM_ANTHROPIC_KEY",
+                "LLM_OPENAI_KEY",
+                "LLM_GOOGLE_KEY",
+                "LLM_COMPAT_KEY",
+                "LLM_COMPAT_BASE_URL"
+              ],
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretValue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Put Secret",
+        "tags": [
+          "secrets"
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "operationId": "read_settings_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Settings Settings Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Read Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "update_settings_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Changes",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Settings Settings Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/shutdown": {
+      "post": {
+        "operationId": "shutdown_shutdown_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShutdownAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Shutdown",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}
