@@ -14,6 +14,6 @@
 
 ## 절대 규칙
 - **주문, 정정, 취소 API는 구현하지 않는다.** (`tests/test_readonly_guarantee.py`)
-- 비밀키(한투 키, LLM 키, 토큰)를 코드, DB, 로그, 커밋, 채팅에 남기지 않는다. 개발 중에는 git에서 제외된 `sidecar/.env`를 쓴다.
+- 비밀키(한투 키, LLM 키, 토큰)를 코드, DB, 로그, 커밋, 채팅에 남기지 않는다. 개발 중에는 git에서 제외된 저장소 루트 `.env`를 쓴다(형식은 `.env.example`). 키 값을 출력하거나 cat하지 않는다.
 - 새 스킬, 플러그인, MCP를 설치하면 `docs/TOOLING.md`에 기록한다.
 - 테스트를 먼저 쓴다 (superpowers:test-driven-development).

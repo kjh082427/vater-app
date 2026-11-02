@@ -82,6 +82,8 @@
 - Tauri가 시작되면 사이드카를 실행한다. 이때 일회용 토큰을 환경변수 `VATER_TOKEN`으로 넘긴다.
 - 사이드카는 포트 0으로 바인딩해 운영체제가 빈 포트를 정하게 한 뒤, stdout에 `{"type":"ready","port":N}`을 출력한다.
 - Tauri는 이 포트와 토큰을 Tauri 커맨드 `get_sidecar_info`로 UI에 넘긴다. UI는 모든 요청에 `Authorization: Bearer <token>` 헤더를 붙인다.
+  - 예외: 브라우저의 `EventSource`는 헤더를 붙일 수 없으므로 `GET /events`만 `?token=` 쿼리 파라미터로도 인증한다.
+- 사이드카는 Tauri 출처(`tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`)의 요청만 CORS로 허용한다. 개발 모드(`VATER_DEV=1`)에서는 `http://localhost:5173`도 허용한다.
 - **창을 닫으면 트레이로 숨긴다.** 처음 숨길 때 "Vater는 트레이에서 계속 실행됩니다" 알림을 한 번 보여준다. 완전히 끄려면 트레이 메뉴의 "종료"를 누르며, 이때 사이드카에 종료 요청을 보내고 5초 안에 끝나지 않으면 강제 종료한다.
 - 사이드카가 비정상 종료되면 Tauri가 자동으로 다시 실행한다. 10분 안에 3회를 넘으면 재시작을 멈추고 오류 화면을 띄운다.
 - 앱을 두 번 실행하면 새로 뜨지 않고 기존 창을 앞으로 가져온다(단일 인스턴스).
@@ -95,7 +97,7 @@
 ### 2-3. 사이드카 REST API (1차 버전)
 | 영역 | 엔드포인트 |
 |---|---|
-| 공통 | `GET /health`, `GET /events` (SSE) |
+| 공통 | `GET /health`, `GET /events` (SSE), `POST /shutdown` (정상 종료 요청) |
 | 종목 | `GET /symbols/search?q=` |
 | 감시·알림 | `GET/POST/DELETE /watchlist`, `GET/POST/PATCH/DELETE /alerts/rules`, `GET /alerts/events`, `POST /alerts/pause`, `POST /alerts/resume` |
 | 분석 | `POST /analyses`, `GET /analyses`, `GET /analyses/{id}`, `POST /analyses/{id}/cancel` |
