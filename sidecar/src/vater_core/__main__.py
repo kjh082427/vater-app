@@ -53,9 +53,16 @@ def main() -> None:
     def request_exit() -> None:
         server.should_exit = True
 
+    async def serve() -> None:
+        try:
+            await server.serve(sockets=[sock])
+        finally:
+            if deps.http is not None:  # 외부 API 연결을 정리하고 끝낸다
+                await deps.http.aclose()
+
     deps.shutdown = request_exit
     emit("ready", port=sock.getsockname()[1])
-    asyncio.run(server.serve(sockets=[sock]))
+    asyncio.run(serve())
 
 
 if __name__ == "__main__":

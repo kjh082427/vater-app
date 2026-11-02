@@ -8,8 +8,32 @@ from pydantic import BaseModel
 from vater_core.api.deps import AppDeps, get_deps
 from vater_core.api.errors import VaterError
 from vater_core.kis.master import search_symbols
+from vater_core.kis.quotes import domestic_price
+from vater_core.kis.services import require_kis
 
 router = APIRouter(tags=["kis"])
+SAMPLE_CODE = "005930"  # 연결 테스트용 (삼성전자)
+
+
+class KisSample(BaseModel):
+    code: str
+    price: float
+
+
+class KisTestResult(BaseModel):
+    ok: bool
+    server: str
+    sample: KisSample
+
+
+@router.post("/settings/kis/test")
+async def kis_connection_test(deps: AppDeps = Depends(get_deps)) -> KisTestResult:  # noqa: B008
+    """첫 실행 마법사의 '연결 테스트': 토큰을 받고 삼성전자 현재가를 조회해 본다."""
+    services = require_kis(deps)
+    quote = await domestic_price(services.client, SAMPLE_CODE)
+    return KisTestResult(
+        ok=True, server=services.server.value, sample=KisSample(code=SAMPLE_CODE, price=quote.price)
+    )
 
 
 class SymbolOut(BaseModel):

@@ -49,6 +49,46 @@
         "title": "Health",
         "type": "object"
       },
+      "KisSample": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "price"
+        ],
+        "title": "KisSample",
+        "type": "object"
+      },
+      "KisTestResult": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/KisSample"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server",
+          "sample"
+        ],
+        "title": "KisTestResult",
+        "type": "object"
+      },
       "SecretValue": {
         "additionalProperties": false,
         "properties": {
@@ -535,6 +575,58 @@
         "summary": "Update Settings",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/settings/kis/test": {
+      "post": {
+        "description": "첫 실행 마법사의 '연결 테스트': 토큰을 받고 삼성전자 현재가를 조회해 본다.",
+        "operationId": "kis_connection_test_settings_kis_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KisTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Kis Connection Test",
+        "tags": [
+          "kis"
         ]
       }
     },
