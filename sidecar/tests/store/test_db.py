@@ -7,6 +7,7 @@ from vater_core.api.errors import VaterError
 from vater_core.store import db
 from vater_core.store.db import migrate, open_db
 
+LATEST = max(v for v, _ in db._migrations())
 TABLES = {"settings", "watchlist", "alert_rules", "alert_events", "analyses", "briefings"}
 
 
@@ -26,25 +27,25 @@ def test_migrate_is_idempotent(tmp_path: Path) -> None:
     conn = open_db(tmp_path)
     v1 = migrate(conn)
     v2 = migrate(conn)
-    assert v1 == v2 == 1
+    assert v1 == v2 == LATEST
 
 
 def test_reopen_keeps_version(tmp_path: Path) -> None:
     open_db(tmp_path).close()
-    assert migrate(open_db(tmp_path)) == 1
+    assert migrate(open_db(tmp_path)) == LATEST
 
 
 def test_failed_migration_rolls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """깨진 마이그레이션이 트랜잭션을 연 채로 남기면 안 된다 (리뷰 Important #5)."""
     conn = open_db(tmp_path)
     good = db._migrations()
-    broken = (2, "CREATE TABLE half_done (x INTEGER);\nTHIS IS NOT SQL;")
+    broken = (LATEST + 1, "CREATE TABLE half_done (x INTEGER);\nTHIS IS NOT SQL;")
     monkeypatch.setattr(db, "_migrations", lambda: [*good, broken])
     with pytest.raises(VaterError) as e:
         migrate(conn)
     assert e.value.code == "DB_MIGRATION_FAILED"
     assert not conn.in_transaction
-    assert conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == 1
+    assert conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == LATEST
     names = {r[0] for r in conn.execute("select name from sqlite_master where type='table'")}
     assert "half_done" not in names
 
