@@ -34,3 +34,21 @@
   - 앱은 "최근 거래일" 분석이므로 현재값을 그대로 제공합니다. point-in-time 제약은 백테스트용이라 1차 버전 범위가 아닙니다.
 - DART 키가 없어서 DART 어댑터는 2차 버전에 그대로 둡니다.
 - 한투의 재무·뉴스 API를 실제로 쓸 수 있는지는 `core/kis` 첫 작업에서 확인합니다. 안 되면 국내 종목은 펀더멘털·뉴스 애널리스트를 끄고 차트·거시 분석만 합니다.
+
+---
+
+## S7. Windows PyInstaller onedir 빌드
+- **측정:** GitHub Actions `windows-latest`, 워크플로 `spike-pyinstaller` (실행 41484216852, 2026-11-02 16:43 UTC)
+- **방법:** `pyinstaller --noconfirm --onedir --name smoke --paths . pyinstaller_smoke/smoke_entry.py`. 실행 파일이 TradingAgents를 import하고, LLM 호출 없이 `TradingAgentsGraph`를 만든 뒤 `SMOKE OK`를 출력하는지 확인
+
+| 항목 | 결과 |
+|---|---|
+| 빌드 | ✅ **첫 시도에 성공.** `--hidden-import`나 `--collect-all` 같은 추가 옵션이 필요 없었음 |
+| 실행 | ✅ `SMOKE OK 15 2.2s` (그래프 노드 15개) |
+| 시작 시간 | 3.1초 (프로세스 시작부터 종료까지) |
+| onedir 크기 | **123.8MB** (스펙에서 예상한 수백 MB보다 작음) |
+| 빌드 시간 | 약 2분 (의존성 설치 포함) |
+
+**결론**
+- 스펙 11장의 "PyInstaller onedir + Tauri resources" 방식을 그대로 유지합니다. 내장 Python 방식으로 바꿀 필요가 없습니다.
+- **남은 위험:** 스모크는 그래프 생성까지만 확인했습니다. Gemini 클라이언트처럼 실행 중에 늦게 import되는 모듈과 데이터 조회 경로는 확인하지 않았습니다. 그래서 `shell/tauri` 단계의 Windows CI에서 실제 사이드카 실행 파일로 `/health`와 분석 1건(가짜 엔진)을 검증합니다.
