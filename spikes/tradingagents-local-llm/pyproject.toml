@@ -10,5 +10,8 @@ dependencies = [
     "python-dotenv",
 ]
 
+[dependency-groups]
+dev = ["pyinstaller"]
+
 [tool.uv]
 package = false

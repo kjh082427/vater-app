@@ -1,0 +1,45 @@
+# SPIKE: S7 검증용. TradingAgents를 포함한 PyInstaller onedir 빌드가 Windows에서 실행되는지 확인한다.
+name: spike-pyinstaller
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [spike/tradingagents-local-llm]
+    paths:
+      - "spikes/tradingagents-local-llm/**"
+      - ".github/workflows/spike-pyinstaller.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: spikes/tradingagents-local-llm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.13
+      - run: uv sync
+      - name: PyInstaller onedir
+        run: uv run pyinstaller --noconfirm --onedir --name smoke --paths . pyinstaller_smoke/smoke_entry.py
+      - name: Run smoke
+        shell: pwsh
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $out = & .\dist\smoke\smoke.exe 2>&1 | Out-String
+          $sw.Stop()
+          Write-Output $out
+          Write-Output ("wall: {0:N1}s" -f $sw.Elapsed.TotalSeconds)
+          if ($out -notmatch "SMOKE OK") { exit 1 }
+      - name: Size
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path dist/smoke) { "onedir size: {0:N1} MB" -f ((Get-ChildItem dist/smoke -Recurse | Measure-Object Length -Sum).Sum / 1MB) }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pyinstaller-warn
+          path: spikes/tradingagents-local-llm/build/smoke/warn-smoke.txt
+          if-no-files-found: ignore
