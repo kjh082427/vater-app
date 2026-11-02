@@ -58,6 +58,11 @@ def seed_symbols(conn: sqlite3.Connection) -> None:
 
 
 @pytest.fixture
+def seed() -> Callable[[sqlite3.Connection], None]:
+    return seed_symbols
+
+
+@pytest.fixture
 def db(tmp_path: Path) -> sqlite3.Connection:
     conn = open_db(tmp_path)
     seed_symbols(conn)
