@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import socket
+import sqlite3
 import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -15,6 +16,8 @@ from zoneinfo import ZoneInfo
 import httpx
 import uvicorn
 
+from vater_core.analysis.queue import get_analysis
+from vater_core.analysis.store import AnalysisRepo
 from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
 from vater_core.api.events import EventBus
@@ -36,6 +39,14 @@ def bind_free_port() -> socket.socket:
     return sock
 
 
+def recover_analyses(db: sqlite3.Connection) -> int:
+    """지난번에 끝나지 못한 분석을 '중단됨'으로 바꾼다. [다시 시도]하면 체크포인트로 이어진다."""
+    count = AnalysisRepo(db).recover_interrupted()
+    if count:
+        logging.getLogger(__name__).info("marked %d interrupted analyses", count)
+    return count
+
+
 def main() -> None:
     runtime = load_runtime()
     secrets = select_secret_store(os.environ, sys.platform)
@@ -49,6 +60,8 @@ def main() -> None:
         events=EventBus(),
         http=httpx.AsyncClient(timeout=15),
     )
+    if deps.db is not None:
+        recover_analyses(deps.db)
     app = create_app(deps)
     logging.getLogger(__name__).info("vater-core started (dev=%s)", runtime.dev)
 
@@ -69,11 +82,14 @@ def main() -> None:
             # 첫 실행에도 종목 검색이 되도록 시작하자마자 마스터를 받고, 이후 주기적으로 확인한다.
             today = lambda: datetime.now(KST).date()  # noqa: E731
             background.append(asyncio.create_task(keep_master_fresh(http, db, today=today)))
+        get_analysis(deps)  # 분석 작업 큐(워커 1개)를 띄운다. 제출이 없으면 아무 일도 하지 않는다
         try:
             await server.serve(sockets=[sock])
         finally:
             for task in background:
                 task.cancel()
+            if deps.analysis is not None:
+                await deps.analysis.stop()  # 실행 중인 분석은 기다리지 않는다
             await http.aclose()  # 외부 API 연결을 정리하고 끝낸다
 
     deps.shutdown = request_exit
