@@ -1,0 +1,65 @@
+{
+ "output1": {
+  "bstp_nmix_prpr": "5859.08",
+  "bstp_nmix_prdy_vrss": "128.34",
+  "prdy_vrss_sign": "2",
+  "bstp_nmix_prdy_ctrt": "2.24",
+  "acml_vol": "198130",
+  "acml_tr_pbmn": "15735807",
+  "bstp_nmix_oprc": "5637.77",
+  "bstp_nmix_hgpr": "5910.83",
+  "bstp_nmix_lwpr": "5616.50",
+  "prdy_vol": "228294",
+  "ascn_issu_cnt": "653",
+  "down_issu_cnt": "230",
+  "stnr_issu_cnt": "29",
+  "uplm_issu_cnt": "4",
+  "lslm_issu_cnt": "0",
+  "prdy_tr_pbmn": "20248472",
+  "dryy_bstp_nmix_hgpr_date": "20260619",
+  "dryy_bstp_nmix_hgpr": "9385.59",
+  "dryy_bstp_nmix_lwpr": "4216.68",
+  "dryy_bstp_nmix_lwpr_date": "20260102"
+ },
+ "output2": [
+  {
+   "bstp_cls_code": "0001",
+   "hts_kor_isnm": "종합",
+   "bstp_nmix_prpr": "5859.08",
+   "bstp_nmix_prdy_vrss": "128.34",
+   "prdy_vrss_sign": "2",
+   "bstp_nmix_prdy_ctrt": "2.24",
+   "acml_vol": "198130",
+   "acml_tr_pbmn": "15735807",
+   "acml_vol_rlim": "100.00",
+   "acml_tr_pbmn_rlim": ""
+  },
+  {
+   "bstp_cls_code": "0002",
+   "hts_kor_isnm": "대형주",
+   "bstp_nmix_prpr": "6376.71",
+   "bstp_nmix_prdy_vrss": "141.38",
+   "prdy_vrss_sign": "2",
+   "bstp_nmix_prdy_ctrt": "2.27",
+   "acml_vol": "80880",
+   "acml_tr_pbmn": "13574625",
+   "acml_vol_rlim": "40.82",
+   "acml_tr_pbmn_rlim": ""
+  },
+  {
+   "bstp_cls_code": "0003",
+   "hts_kor_isnm": "중형주",
+   "bstp_nmix_prpr": "3661.33",
+   "bstp_nmix_prdy_vrss": "72.14",
+   "prdy_vrss_sign": "2",
+   "bstp_nmix_prdy_ctrt": "2.01",
+   "acml_vol": "48770",
+   "acml_tr_pbmn": "1206927",
+   "acml_vol_rlim": "24.62",
+   "acml_tr_pbmn_rlim": ""
+  }
+ ],
+ "rt_cd": "0",
+ "msg_cd": "MCA00000",
+ "msg1": "정상처리 되었습니다."
+}

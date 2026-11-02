@@ -1,0 +1,52 @@
+{
+ "output": [
+  {
+   "stac_yymm": "202606",
+   "sale_account": "3053729.00",
+   "sale_cost": "1041590.00",
+   "sale_totl_prfi": "2012139",
+   "depr_cost": "99.99",
+   "sell_mang": "99.99",
+   "bsop_prti": "1467252.00",
+   "bsop_non_ernn": "99.99",
+   "bsop_non_expn": "99.99",
+   "op_prfi": "1532682.00",
+   "spec_prfi": "99.99",
+   "spec_loss": "99.99",
+   "thtr_ntin": "1188497.00"
+  },
+  {
+   "stac_yymm": "202512",
+   "sale_account": "3336059.00",
+   "sale_cost": "2022355.00",
+   "sale_totl_prfi": "1313704",
+   "depr_cost": "99.99",
+   "sell_mang": "99.99",
+   "bsop_prti": "436011.00",
+   "bsop_non_ernn": "99.99",
+   "bsop_non_expn": "99.99",
+   "op_prfi": "494815.00",
+   "spec_prfi": "99.99",
+   "spec_loss": "99.99",
+   "thtr_ntin": "452068.00"
+  },
+  {
+   "stac_yymm": "202412",
+   "sale_account": "3008709.00",
+   "sale_cost": "1865623.00",
+   "sale_totl_prfi": "1143086",
+   "depr_cost": "99.99",
+   "sell_mang": "99.99",
+   "bsop_prti": "327260.00",
+   "bsop_non_ernn": "99.99",
+   "bsop_non_expn": "99.99",
+   "op_prfi": "375297.00",
+   "spec_prfi": "99.99",
+   "spec_loss": "99.99",
+   "thtr_ntin": "344514.00"
+  }
+ ],
+ "rt_cd": "0",
+ "msg_cd": "MCA00000",
+ "msg1": "정상처리 되었습니다."
+}
