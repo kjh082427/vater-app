@@ -12,7 +12,8 @@ from vater_core.kis.config import Priority
 from vater_core.kis.models import Bar, num, signed_change, ymd
 
 DomesticMarket = Literal["KOSPI", "KOSDAQ"]
-OverseasIndexCode = Literal["SPX", "COMP", ".DJI"]  # S&P500, 나스닥 종합, 다우존스
+# S&P500, 나스닥 종합, 나스닥100. 다우존스 산업평균은 한투 해외지수 마스터에 없다(2026-11-03 확인).
+OverseasIndexCode = Literal["SPX", "COMP", "NDX"]
 
 _INDEX_CODE: dict[DomesticMarket, str] = {"KOSPI": "0001", "KOSDAQ": "1001"}
 _MARKET_CLS: dict[DomesticMarket, str] = {"KOSPI": "K", "KOSDAQ": "Q"}
@@ -127,13 +128,15 @@ async def fluctuation_rank(
     """등락률 순위(코스피+코스닥 전체).
 
     정렬 코드는 한 자리여야 한다. 공식 예제의 '0000'은 INVALID INPUT_FILED_SIZE로 거부된다.
+    실연동 결과 하락률은 코드 '1'에 상승 종목이 섞여 와서 '3'을 쓴다.
+    받은 뒤에도 방향에 맞는 종목만 남겨 다시 정렬한다.
     """
     params = {
         "fid_rsfl_rate2": "",
         "fid_cond_mrkt_div_code": "J",
         "fid_cond_scr_div_code": "20170",
         "fid_input_iscd": "0000",
-        "fid_rank_sort_cls_code": "0" if direction == "up" else "1",
+        "fid_rank_sort_cls_code": "0" if direction == "up" else "3",
         "fid_input_cnt_1": "0",
         "fid_prc_cls_code": "0",
         "fid_input_price_1": "",
@@ -147,7 +150,12 @@ async def fluctuation_rank(
     body = await c.get(
         "/uapi/domestic-stock/v1/ranking/fluctuation", "FHPST01700000", params, Priority.BRIEFING
     )
-    return [_rank(r) for r in body.get("output", [])[:limit]]
+    items = [_rank(r) for r in body.get("output", [])]
+    if direction == "up":
+        items = sorted((i for i in items if i.change_pct > 0), key=lambda i: -i.change_pct)
+    else:
+        items = sorted((i for i in items if i.change_pct < 0), key=lambda i: i.change_pct)
+    return items[:limit]
 
 
 async def trading_value_rank(c: KisClient, limit: int = 10) -> list[RankItem]:

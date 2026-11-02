@@ -56,13 +56,22 @@ async def test_sector_board(kis: KisClient, fixture: Fx) -> None:
 
 
 @respx.mock
-async def test_fluctuation_rank_down_uses_sort_code_1(kis: KisClient, fixture: Fx) -> None:
+async def test_fluctuation_rank_down_uses_code_3_and_drops_risers(
+    kis: KisClient, fixture: Fx
+) -> None:
+    """실연동: 정렬 코드 1은 상승 종목이 섞여 온다. 3을 쓰고, 받은 뒤에도 하락 종목만 남긴다."""
+    data = fixture("fluctuation_rank")
+    data["output"] = [
+        {**data["output"][0], "hts_kor_isnm": "A", "prdy_ctrt": "-50.00", "data_rank": "1"},
+        {**data["output"][0], "hts_kor_isnm": "B", "prdy_ctrt": "18.24", "data_rank": "2"},
+        {**data["output"][0], "hts_kor_isnm": "C", "prdy_ctrt": "-30.00", "data_rank": "3"},
+    ]
     route = respx.get(f"{HOST}/uapi/domestic-stock/v1/ranking/fluctuation").mock(
-        return_value=ok(fixture("fluctuation_rank"))
+        return_value=ok(data)
     )
-    items = await fluctuation_rank(kis, "down", limit=2)
-    assert len(items) == 2 and items[0].rank == 1 and items[0].code
-    assert route.calls[0].request.url.params["fid_rank_sort_cls_code"] == "1"
+    items = await fluctuation_rank(kis, "down", limit=5)
+    assert [i.name for i in items] == ["A", "C"]  # 상승 종목 B 제외, 많이 내린 순
+    assert route.calls[0].request.url.params["fid_rank_sort_cls_code"] == "3"
 
 
 @respx.mock

@@ -18,29 +18,39 @@ def domestic_record(code: str, price: str, pct: str, vol: str) -> list[str]:
 
 
 def us_record(symb: str, price: str, pct: str, vol: str) -> list[str]:
+    """실제 HDFSCNT0 원문(2026-11-03)과 같은 26개 필드.
+
+    0 RSYM, 1 SYMB, 7 KHMS(한국시각), 11 LAST, 14 RATE, 20 TVOL.
+    """
     rec = [
+        f"DNAS{symb}",
         symb,
         "4",
         "20261102",
         "20261102",
-        "143001",
+        "124637",
         "20261103",
-        "043001",
-        "0",
-        "0",
-        "0",
+        "024637",
+        "342.6700",
+        "343.7800",
+        "336.5206",
         price,
         "5",
-        "1",
+        "7.2300",
         pct,
-        "0",
-        "0",
-        "0",
-        "0",
-        "0",
+        "337.3800",
+        "337.4200",
+        "20",
+        "47",
+        "213",
         vol,
+        "5070372153",
+        "3704445",
+        "2135979",
+        "57.66",
+        "2",
     ]
-    return rec + ["0"] * (25 - len(rec))
+    return rec
 
 
 class FakeKis:
@@ -149,12 +159,12 @@ async def test_multi_record_message_yields_ticks(fake: tuple[FakeKis, str]) -> N
         )
         await f.current.send("0|H0STCNT0|002|" + "^".join(kr))
         await f.current.send(
-            "0|HDFSCNT0|001|" + "^".join(us_record("DNASAAPL", "338.10", "-1.90", "999"))
+            "0|HDFSCNT0|001|" + "^".join(us_record("AAPL", "337.4000", "-2.10", "14893876"))
         )
         await wait_for(lambda: len(ticks) == 3)
         assert ticks[0] == Tick("KR", "005930", 71200.0, 0.71, 1234567, "093001")
         assert ticks[1].price == 71300.0
-        assert ticks[2] == Tick("US", "AAPL", 338.10, -1.90, 999, "043001")
+        assert ticks[2] == Tick("US", "AAPL", 337.40, -2.10, 14893876, "024637")
     finally:
         task.cancel()
 

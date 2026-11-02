@@ -34,6 +34,7 @@ packages = ["src/vater_core"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+addopts = "-m 'not kis_live and not llm'"  # 실연동은 -m kis_live 로 직접 실행
 markers = [
     "kis_live: 실제 한국투자증권 키가 필요한 테스트 (기본 제외)",
     "llm: 실제 LLM 호출이 필요한 테스트 (기본 제외)",

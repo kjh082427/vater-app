@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 State = Literal["connecting", "connected", "reconnecting", "stopped"]
 DOMESTIC_TR, US_TR = "H0STCNT0", "HDFSCNT0"
-DOMESTIC_FIELDS, US_FIELDS = 46, 25
+DOMESTIC_FIELDS, US_FIELDS = 46, 26
 
 
 class ApprovalSource(Protocol):
@@ -172,8 +172,11 @@ class KisRealtime:
     def _parse(self, tr_id: str, rec: list[str]) -> Tick | None:
         if tr_id == DOMESTIC_TR and len(rec) > 13:
             return Tick("KR", rec[0], num(rec[2]), num(rec[5]), int(num(rec[13])), rec[1])
-        if tr_id == US_TR and len(rec) > 19:
+        if tr_id == US_TR and len(rec) > 20:
+            # 실제 원문(2026-11-03): 0 RSYM(DNASAAPL), 1 SYMB, 7 한국시각,
+            # 11 현재가, 14 등락률, 20 누적거래량.
+            # 공식 예제의 열 목록에는 맨 앞 RSYM이 빠져 있어 한 칸씩 밀린다.
             sub = self._subs.get((US_TR, rec[0]))
-            code = sub[1] if sub else rec[0][4:] if rec[0].startswith("D") else rec[0]
-            return Tick("US", code, num(rec[10]), num(rec[13]), int(num(rec[19])), rec[6])
+            code = sub[1] if sub else rec[1]
+            return Tick("US", code, num(rec[11]), num(rec[14]), int(num(rec[20])), rec[7])
         return None
