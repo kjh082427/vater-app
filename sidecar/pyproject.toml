@@ -48,7 +48,7 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003"]  # 한국어 문장의 전각 문자 허용
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S603", "S607"]
+"tests/**" = ["S101", "S105", "S106", "S107", "S603", "S607"]
 "src/vater_core/secrets/names.py" = ["S105"]  # 비밀키 '이름' 목록이지 값이 아니다
 
 [tool.mypy]
