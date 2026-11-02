@@ -52,6 +52,16 @@ def _request(p: CloudProvider, key: str, base_url: str | None) -> tuple[str, dic
     return f"{(base_url or '').rstrip('/')}/models", {"Authorization": f"Bearer {key}"}
 
 
+def _is_google_bad_key(r: httpx.Response) -> bool:
+    """Google은 틀린 키에 401 대신 400 `INVALID_ARGUMENT` / `API_KEY_INVALID`를 돌려준다."""
+    try:
+        error = r.json().get("error", {})
+    except (ValueError, AttributeError):
+        return False
+    reasons = {d.get("reason") for d in error.get("details", []) if isinstance(d, dict)}
+    return "API_KEY_INVALID" in reasons or error.get("status") == "INVALID_ARGUMENT"
+
+
 def _model_ids(p: CloudProvider, body: Any) -> set[str]:
     if p.id == "google":
         return {str(m.get("name", "")).removeprefix("models/") for m in body.get("models", [])}
@@ -80,7 +90,8 @@ async def check_cloud_key(
             hint="인터넷 연결이나 서버 주소를 확인하세요.",
             status=503,
         ) from e
-    if r.status_code in (401, 403):
+    bad_google_key = provider.id == "google" and r.status_code == 400 and _is_google_bad_key(r)
+    if r.status_code in (401, 403) or bad_google_key:
         raise VaterError(
             "LLM_KEY_INVALID",
             f"{provider.label} 키가 거부되었습니다.",

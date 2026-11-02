@@ -254,9 +254,15 @@ async def ollama_install(deps: AppDeps = Depends(get_deps)) -> StartedOut:  # no
         raise VaterError(
             "OLLAMA_INSTALL_IN_PROGRESS", "Ollama 설치가 이미 진행 중입니다.", status=409
         )
-    if await llm.ollama.version() is not None:
+    llm.installing = True  # await 전에 잡아야 동시에 두 번 눌러도 하나만 시작한다
+    try:
+        running = await llm.ollama.version() is not None
+    except BaseException:
+        llm.installing = False
+        raise
+    if running:
+        llm.installing = False
         return StartedOut(started=False)  # 이미 설치되어 실행 중
-    llm.installing = True
     llm.spawn(_install_job(deps, llm))
     return StartedOut(started=True)
 
@@ -308,9 +314,13 @@ async def model_pull(tag: str, deps: AppDeps = Depends(get_deps)) -> PullStarted
     model = llm.catalog.local(tag)  # 카탈로그에 없으면 404
     if tag in llm.pulls:
         raise VaterError("LLM_PULL_IN_PROGRESS", f"'{tag}' 모델을 이미 받고 있습니다.", status=409)
-    if await llm.ollama.version() is None:
-        raise not_running()
-    llm.pulls.add(tag)
+    llm.pulls.add(tag)  # await 전에 잡아야 동시에 두 번 눌러도 하나만 시작한다
+    try:
+        if await llm.ollama.version() is None:
+            raise not_running()
+    except BaseException:
+        llm.pulls.discard(tag)
+        raise
     llm.spawn(_pull_job(deps, llm, model))
     return PullStartedOut(started=True, variant=model.variant)
 

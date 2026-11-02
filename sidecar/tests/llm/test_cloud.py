@@ -93,6 +93,42 @@ async def test_invalid_key(http: httpx.AsyncClient, tmp_path: Path) -> None:
     assert (await expect_error(http, tmp_path, "LLM_KEY_INVALID")).status == 400
 
 
+GOOGLE_BAD_KEY = {
+    "error": {
+        "code": 400,
+        "message": "API key not valid. Please pass a valid API key.",
+        "status": "INVALID_ARGUMENT",
+        "details": [
+            {
+                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "reason": "API_KEY_INVALID",
+                "domain": "googleapis.com",
+                "metadata": {"service": "generativelanguage.googleapis.com"},
+            }
+        ],
+    }
+}
+
+
+@respx.mock
+async def test_google_invalid_key_is_400(http: httpx.AsyncClient, tmp_path: Path) -> None:
+    """리뷰 Important #2: Google은 틀린 키에 401이 아니라 400 API_KEY_INVALID를 준다."""
+    respx.get(GOOGLE).respond(400, json=GOOGLE_BAD_KEY)
+    provider = load_catalog().cloud["google"]
+    with pytest.raises(VaterError) as e:
+        await cloud_key_test(http, provider, secrets(tmp_path, LLM_GOOGLE_KEY=SECRET))
+    assert (e.value.code, e.value.status) == ("LLM_KEY_INVALID", 400)
+
+
+@respx.mock
+async def test_google_other_400_is_unreachable(http: httpx.AsyncClient, tmp_path: Path) -> None:
+    respx.get(GOOGLE).respond(400, text="<html>bad request</html>")
+    provider = load_catalog().cloud["google"]
+    with pytest.raises(VaterError) as e:
+        await cloud_key_test(http, provider, secrets(tmp_path, LLM_GOOGLE_KEY=SECRET))
+    assert e.value.code == "LLM_UNREACHABLE"
+
+
 @respx.mock
 async def test_unreachable(http: httpx.AsyncClient, tmp_path: Path) -> None:
     respx.get(OPENAI).mock(side_effect=httpx.ConnectError("no route"))

@@ -43,6 +43,7 @@ class FakeOllama:
         self.calls: list[tuple[str, str]] = []
 
     async def version(self) -> str | None:
+        await asyncio.sleep(0)  # 실제 클라이언트처럼 HTTP 왕복 동안 다른 요청이 끼어들 수 있다
         return "0.40.13" if self.running else None
 
     async def status(self) -> OllamaStatus:
@@ -233,6 +234,65 @@ async def test_duplicate_pull_conflict(client: httpx.AsyncClient, deps: AppDeps)
     assert r.status_code == 409 and r.json()["code"] == "LLM_PULL_IN_PROGRESS"
     gate.set()
     await pull_events_until_end(sub)
+
+
+async def test_concurrent_pull_requests_start_one_job(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    """리뷰 Important #1: 두 번 눌러도 받기 작업은 하나만 시작한다."""
+    gate = asyncio.Event()
+    ollama = FakeOllama(pull_lines=LINES, gate=gate)
+    install(deps, ollama)
+    assert deps.events is not None
+    sub = deps.events.subscribe()
+    first, second = await asyncio.gather(
+        client.post("/llm/models/qwen3.5:4b/pull"), client.post("/llm/models/qwen3.5:4b/pull")
+    )
+    assert sorted([first.status_code, second.status_code]) == [202, 409]
+    gate.set()
+    await pull_events_until_end(sub)
+    assert ollama.calls.count(("pull", "qwen3.5:4b")) == 1
+
+
+async def test_pull_slot_released_when_ollama_off(client: httpx.AsyncClient, deps: AppDeps) -> None:
+    ollama = FakeOllama(running=False)
+    install(deps, ollama)
+    assert (await client.post("/llm/models/qwen3.5:4b/pull")).status_code == 503
+    ollama.running = True
+    assert deps.llm is not None and deps.llm.pulls == set()
+
+
+async def test_concurrent_install_requests_start_one_job(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    gate = asyncio.Event()
+    started: list[int] = []
+
+    async def fake_install(*args: Any) -> None:
+        started.append(1)
+        await gate.wait()
+
+    install(deps, FakeOllama(running=False))
+    assert deps.llm is not None
+    deps.llm.platform = "win32"
+    deps.llm.install = fake_install
+    first, second = await asyncio.gather(
+        client.post("/llm/ollama/install"), client.post("/llm/ollama/install")
+    )
+    assert sorted([first.status_code, second.status_code]) == [202, 409]
+    gate.set()
+    await asyncio.gather(*deps.llm.tasks)
+    assert started == [1] and deps.llm.installing is False
+
+
+async def test_install_slot_released_when_already_running(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    install(deps, FakeOllama(running=True))
+    assert deps.llm is not None
+    deps.llm.platform = "win32"
+    r = await client.post("/llm/ollama/install")
+    assert r.json() == {"started": False} and deps.llm.installing is False
 
 
 async def test_pull_unknown_tag(client: httpx.AsyncClient, deps: AppDeps) -> None:

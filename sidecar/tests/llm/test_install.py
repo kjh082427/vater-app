@@ -1,3 +1,5 @@
+import json
+import subprocess
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -8,7 +10,7 @@ import respx
 
 from vater_core.api.errors import VaterError
 from vater_core.api.events import EventBus, Subscription
-from vater_core.llm.install import INSTALLER_URL, install_ollama
+from vater_core.llm.install import INSTALLER_URL, install_ollama, verify_authenticode
 
 
 class FakeOllama:
@@ -40,6 +42,51 @@ def stages(events: list[dict[str, Any]]) -> list[str]:
 async def http() -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient() as c:
         yield c
+
+
+def fake_powershell(stdout: str, seen: list[list[str]]) -> Any:
+    def run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        seen.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    return run
+
+
+def signature(status: str, subject: str) -> str:
+    return json.dumps({"Status": status, "Subject": subject})
+
+
+def test_verify_uses_system_powershell_by_absolute_path(tmp_path: Path) -> None:
+    """리뷰 Important #3: 이름으로 찾으면 앱 폴더의 가짜 powershell.exe가 먼저 잡힌다."""
+    seen: list[list[str]] = []
+    ok = verify_authenticode(
+        tmp_path / "OllamaSetup.exe",
+        run=fake_powershell(signature("Valid", "CN=Ollama Inc., O=Ollama Inc., C=US"), seen),
+        system_root=r"C:\Windows",
+    )
+    assert ok is True
+    assert seen[0][0] == r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+
+@pytest.mark.parametrize(
+    ("status", "subject", "ok"),
+    [
+        ("Valid", "CN=Ollama Inc., O=Ollama Inc., L=Palo Alto, S=California, C=US", True),
+        ("Valid", 'CN="Ollama, Inc.", O="Ollama, Inc.", C=US', True),
+        ("Valid", "CN=Evil Corp, O=Ollama Fans Ltd, C=US", False),  # 서명자(CN)가 아니면 안 된다
+        ("Valid", "CN=Evil Corp, OU=Ollama", False),
+        ("NotSigned", "CN=Ollama Inc.", False),
+        ("HashMismatch", "CN=Ollama Inc.", False),
+    ],
+)
+def test_signer_must_be_ollama(tmp_path: Path, status: str, subject: str, ok: bool) -> None:
+    seen: list[list[str]] = []
+    result = verify_authenticode(
+        tmp_path / "OllamaSetup.exe",
+        run=fake_powershell(signature(status, subject), seen),
+        system_root=r"C:\Windows",
+    )
+    assert result is ok
 
 
 @respx.mock

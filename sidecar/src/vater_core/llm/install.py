@@ -9,10 +9,11 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Protocol
 
 import httpx
@@ -41,11 +42,34 @@ class VersionSource(Protocol):
     async def version(self) -> str | None: ...
 
 
-def verify_authenticode(path: Path) -> bool:
-    """Windows 서명이 유효하고 서명자가 Ollama일 때만 True. 확인할 수 없으면 False."""
+_CN = re.compile(r'(?:^|,)\s*CN=(?:"([^"]*)"|([^,]*))')
+
+
+def signer_common_name(subject: str) -> str | None:
+    """인증서 주체 문자열(`CN=..., O=..., C=US`)에서 CN 값만 꺼낸다."""
+    m = _CN.search(subject)
+    if m is None:
+        return None
+    return (m.group(1) if m.group(1) is not None else m.group(2)).strip()
+
+
+def _powershell(system_root: str) -> str:
+    # 이름("powershell.exe")으로 찾으면 Windows는 앱 폴더와 현재 폴더를 먼저 뒤진다.
+    return str(
+        PureWindowsPath(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    )
+
+
+def verify_authenticode(
+    path: Path,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    system_root: str | None = None,
+) -> bool:
+    """Windows 서명이 유효하고 서명자(CN)가 Ollama일 때만 True. 확인할 수 없으면 False."""
+    root = system_root or os.environ.get("SYSTEMROOT", r"C:\Windows")
     try:
-        done = subprocess.run(  # noqa: S603
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", _PS_SCRIPT],  # noqa: S607
+        done = run(
+            [_powershell(root), "-NoProfile", "-NonInteractive", "-Command", _PS_SCRIPT],
             capture_output=True,
             text=True,
             timeout=30,
@@ -57,9 +81,10 @@ def verify_authenticode(path: Path) -> bool:
     except (OSError, subprocess.SubprocessError, ValueError):
         logger.warning("installer signature check could not run", exc_info=True)
         return False
-    ok = info.get("Status") == "Valid" and SIGNER in str(info.get("Subject", ""))
+    cn = signer_common_name(str(info.get("Subject", "")))
+    ok = info.get("Status") == "Valid" and cn is not None and cn.startswith(SIGNER)
     if not ok:
-        logger.warning("installer signature rejected: status=%s", info.get("Status"))
+        logger.warning("installer signature rejected: status=%s cn=%s", info.get("Status"), cn)
     return ok
 
 
