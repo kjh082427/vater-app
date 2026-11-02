@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from vater_core.kis.client import KisClient
+from vater_core.kis.client import KisApiError, KisClient
 from vater_core.kis.config import Priority
 from vater_core.kis.models import Bar, Quote, UsExchange, num, signed_change, ymd
 
@@ -139,4 +139,5 @@ async def is_domestic_trading_day(
     for row in body.get("output", []):
         if row.get("bass_dt") == key:
             return str(row.get("opnd_yn")) == "Y"
-    return False
+    # 응답에 그 날짜가 없으면 '휴장'이 아니라 '모름'이다. 호출자가 구분할 수 있게 오류로 알린다.
+    raise KisApiError("NO_HOLIDAY_ROW", f"휴장일 정보에 {day.isoformat()}가 없습니다.")

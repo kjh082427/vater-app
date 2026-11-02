@@ -7,10 +7,12 @@
 - 해외(nasmst.cod 등): 탭 구분. `[4]` 종목, `[6]` 한글명, `[7]` 영문명, `[8]` 유형(2 주식, 3 ETF).
 """
 
+import asyncio
 import io
 import logging
 import sqlite3
 import zipfile
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -22,6 +24,8 @@ from vater_core.kis.models import Market, UsExchange
 logger = logging.getLogger(__name__)
 
 MASTER_URL = "https://new.real.download.dws.co.kr/common/master/"
+CHECK_INTERVAL = 6 * 3600  # 몇 시간마다 날짜가 바뀌었는지 확인 (실제 다운로드는 하루 1번)
+RETRY_AFTER_FAILURE = 600  # 실패하면 10분 뒤 다시
 DomesticExchange = Literal["KOSPI", "KOSDAQ"]
 _SUFFIX: dict[DomesticExchange, int] = {"KOSPI": 227, "KOSDAQ": 221}
 # 그룹코드 → 종류. 그 밖(ETN, DR, 수익증권 등)은 검색 대상에서 뺀다.
@@ -138,3 +142,30 @@ def search_symbols(conn: sqlite3.Connection, q: str, limit: int = 20) -> list[Sy
 
     rows.sort(key=rank)
     return [Symbol(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows[:limit]]
+
+
+async def keep_master_fresh(
+    http: httpx.AsyncClient,
+    conn: sqlite3.Connection,
+    today: Callable[[], date],
+    refresh: Callable[
+        [httpx.AsyncClient, sqlite3.Connection, date], Awaitable[int]
+    ] = refresh_master,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+) -> None:
+    """앱이 켜져 있는 동안 종목 마스터를 최신으로 유지한다.
+
+    첫 실행에도 검색이 되게 시작하자마자 받는다.
+
+    이벤트 루프에서 돌기 때문에 DB 쓰기도 루프 스레드에서 일어난다(core/foundation 리뷰 규칙).
+    """
+    while True:
+        try:
+            await refresh(http, conn, today())
+            delay: float = CHECK_INTERVAL
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("symbol master refresh failed; retrying in %ss", RETRY_AFTER_FAILURE)
+            delay = RETRY_AFTER_FAILURE
+        await sleep(delay)

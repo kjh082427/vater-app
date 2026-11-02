@@ -4,7 +4,8 @@
 (비교 키가 달라졌을 때만). 키가 없으면 None.
 """
 
-from dataclasses import dataclass
+import hashlib
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -24,7 +25,7 @@ class KisServices:
     server: KisServer
     tokens: TokenManager
     client: KisClient
-    fingerprint: tuple[str, ...]
+    fingerprint: str = field(repr=False)  # 키·서버·한도의 해시 (원문을 들고 있지 않는다)
 
 
 def _http(deps: AppDeps) -> httpx.AsyncClient:
@@ -44,7 +45,8 @@ def get_kis(deps: AppDeps) -> KisServices | None:
     settings = SettingsRepo(deps.db)
     server = KisServer(settings.get("kis.server"))
     rate = int(settings.get(f"kis.rate_per_sec.{server.value}"))
-    fingerprint = (creds.app_key, creds.app_secret, server.value, str(rate))
+    raw = "\x1f".join((creds.app_key, creds.app_secret, server.value, str(rate)))
+    fingerprint = hashlib.sha256(raw.encode()).hexdigest()
     current: KisServices | None = deps.kis
     if current is not None and current.fingerprint == fingerprint:
         return current

@@ -3,9 +3,10 @@ from datetime import date
 from typing import Any
 
 import httpx
+import pytest
 import respx
 
-from vater_core.kis.client import KisClient
+from vater_core.kis.client import KisApiError, KisClient
 from vater_core.kis.config import REST_HOST, KisServer
 from vater_core.kis.models import Bar, signed_change
 from vater_core.kis.quotes import (
@@ -123,3 +124,13 @@ async def test_holiday(kis: KisClient, fixture: Fx) -> None:
     data["output"][0]["opnd_yn"] = "N"
     respx.get(f"{HOST}/uapi/domestic-stock/v1/quotations/chk-holiday").mock(return_value=ok(data))
     assert await is_domestic_trading_day(kis, date(2026, 11, 3)) is False
+
+
+@respx.mock
+async def test_trading_day_unknown_raises(kis: KisClient, fixture: Fx) -> None:
+    """응답에 그 날짜가 없으면 '휴장'이 아니라 '모름'이다 (리뷰 Important #7)."""
+    data = fixture("domestic_holiday")
+    data["output"] = []
+    respx.get(f"{HOST}/uapi/domestic-stock/v1/quotations/chk-holiday").mock(return_value=ok(data))
+    with pytest.raises(KisApiError):
+        await is_domestic_trading_day(kis, date(2026, 11, 3))

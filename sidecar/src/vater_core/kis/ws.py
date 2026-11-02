@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from websockets.asyncio.client import ClientConnection, connect
-from websockets.exceptions import WebSocketException
 
 from vater_core.kis.config import WS_HOST, KisServer
 from vater_core.kis.models import Market, UsExchange, num
@@ -56,6 +55,7 @@ class KisRealtime:
         max_subscriptions: int = 41,
         url: str | None = None,
         backoff: tuple[float, ...] = (1, 2, 4, 8, 16, 32, 60),
+        idle_timeout: float = 120.0,
     ) -> None:
         self._tokens = tokens
         self._url = url or WS_HOST[server]
@@ -63,6 +63,10 @@ class KisRealtime:
         self._on_state = on_state
         self._max = max_subscriptions
         self._backoff = backoff
+        # 이 시간 동안 아무 메시지(PINGPONG 포함)도 없으면 반쯤 끊긴 연결로 보고 다시 접속한다.
+        # (노트북 절전·Wi-Fi 전환 뒤에는 OS가 끊김을 늦게 알린다.)
+        self._idle_timeout = idle_timeout
+        self.subscription_errors: dict[tuple[str, str], str] = {}  # 구독 거부 사유 (UI·로그용)
         # (tr_id, tr_key) → (market, code). 삽입 순서대로 복원한다.
         self._subs: dict[tuple[str, str], tuple[Market, str]] = {}
         self._ws: ClientConnection | None = None
@@ -118,7 +122,11 @@ class KisRealtime:
         await ws.send(json.dumps(msg))
 
     async def run(self) -> None:
-        """취소될 때까지 접속을 유지한다."""
+        """취소될 때까지 접속을 유지한다. 어떤 오류에도 루프가 죽지 않는다(리뷰 Critical #2).
+
+        백오프는 접속 성공이 아니라 **첫 메시지를 받았을 때** 초기화한다. 접속만 받고 바로 끊는
+        서버(잘못된 승인키, 점검 시간)에 1초 간격으로 계속 붙는 폭주를 막는다(리뷰 Important #3).
+        """
         failures = 0
         self._set_state("connecting")
         try:
@@ -126,13 +134,25 @@ class KisRealtime:
                 try:
                     async with connect(self._url, ping_interval=None) as ws:
                         self._ws = ws
-                        failures = 0
                         self._set_state("connected")
                         for key in list(self._subs):
                             await self._send(ws, key, "1")
-                        async for raw in ws:
-                            await self._handle(ws, raw if isinstance(raw, str) else raw.decode())
-                except (OSError, WebSocketException) as e:
+                        while True:
+                            raw = await asyncio.wait_for(ws.recv(), timeout=self._idle_timeout)
+                            failures = 0
+                            try:
+                                await self._handle(
+                                    ws, raw if isinstance(raw, str) else raw.decode()
+                                )
+                            except Exception:  # 메시지 하나가 깨져도 루프는 계속 돈다
+                                logger.exception("bad KIS realtime message")
+                except asyncio.CancelledError:
+                    raise
+                except TimeoutError:
+                    logger.warning(
+                        "KIS websocket silent for %.0fs; reconnecting", self._idle_timeout
+                    )
+                except Exception as e:  # 연결 오류, 승인키 발급 실패 등 → 다시 접속
                     logger.warning("KIS websocket error: %s", e)
                 finally:
                     self._ws = None
@@ -147,11 +167,20 @@ class KisRealtime:
     async def _handle(self, ws: ClientConnection, raw: str) -> None:
         if raw.startswith("{"):
             try:
-                header = json.loads(raw).get("header", {})
+                msg = json.loads(raw)
             except ValueError:
                 return
+            header, body = msg.get("header", {}), msg.get("body") or {}
             if header.get("tr_id") == "PINGPONG":
                 await ws.send(raw)  # 받은 그대로 돌려보낸다
+                return
+            key = (str(header.get("tr_id", "")), str(header.get("tr_key", "")))
+            if body.get("rt_cd") not in (None, "0"):  # 구독 거부 (승인키 오류, 한도 초과 등)
+                reason = f"{body.get('msg_cd', '')}: {body.get('msg1', '')}"
+                self.subscription_errors[key] = reason
+                logger.warning("KIS realtime subscription rejected %s %s: %s", *key, reason)
+            elif body.get("rt_cd") == "0":
+                self.subscription_errors.pop(key, None)
             return
         parts = raw.split("|", 3)
         if len(parts) != 4:
@@ -167,7 +196,10 @@ class KisRealtime:
             rec = fields[i * width : (i + 1) * width]
             tick = self._parse(tr_id, rec)
             if tick is not None:
-                self._on_tick(tick)
+                try:
+                    self._on_tick(tick)
+                except Exception:  # 받는 쪽의 버그가 수신 루프를 죽이면 안 된다
+                    logger.exception("realtime tick consumer failed")
 
     def _parse(self, tr_id: str, rec: list[str]) -> Tick | None:
         if tr_id == DOMESTIC_TR and len(rec) > 13:

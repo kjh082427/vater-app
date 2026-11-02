@@ -24,7 +24,7 @@ def _noop() -> None:
 
 @dataclass
 class AppDeps:
-    token: str
+    token: str = field(repr=False)  # 사이드카 인증 토큰은 repr에 남기지 않는다
     dev: bool
     data_dir: Path
     db: sqlite3.Connection | None = None

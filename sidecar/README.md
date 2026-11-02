@@ -19,6 +19,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `VATER_DEV` | | `1`이면 개발 모드 (CORS에 `http://localhost:5173` 허용) |
 | `VATER_SECRET_BACKEND` | | `keyring`(Windows 기본) 또는 `envfile`(그 외 기본) |
 | `VATER_ENV_FILE` | | envfile 백엔드가 쓰는 파일. 기본 `./.env`. 개발 중에는 `../.env`(저장소 루트, git 제외) |
+| `VATER_BACKGROUND_JOBS` | | `0`이면 백그라운드 작업(종목 마스터 갱신 등)을 띄우지 않는다. 테스트용 |
 
 ## 구조
 | 폴더 / 파일 | 역할 |

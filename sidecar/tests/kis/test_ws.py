@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from websockets.asyncio.server import Server, ServerConnection, serve
 
+from vater_core.api.errors import VaterError
 from vater_core.kis.config import KisServer
 from vater_core.kis.ws import KisRealtime, Tick
 
@@ -61,10 +62,14 @@ class FakeKis:
         self.connections = 0
         self.current: ServerConnection | None = None
         self.drop_first = False
+        self.close_on_connect = False
 
     async def handler(self, ws: ServerConnection) -> None:
         self.connections += 1
         self.current = ws
+        if self.close_on_connect:  # 접속은 받고 아무것도 보내지 않은 채 바로 끊는다
+            await ws.close()
+            return
         if self.drop_first and self.connections == 1:
             await ws.recv()  # 첫 구독 하나를 받고 바로 끊는다
             await ws.close()
@@ -74,7 +79,13 @@ class FakeKis:
 
 
 class FakeApproval:
+    def __init__(self, fail_first: int = 0) -> None:
+        self.fail_first = fail_first
+
     async def approval_key(self) -> str:
+        if self.fail_first > 0:
+            self.fail_first -= 1
+            raise VaterError("KIS_UNREACHABLE", "승인키 발급 실패", status=503)
         return "appr-key"
 
 
@@ -87,15 +98,25 @@ async def fake() -> AsyncIterator[tuple[FakeKis, str]]:
         yield f, f"ws://127.0.0.1:{port}"
 
 
-def realtime(url: str, ticks: list[Tick], states: list[str], limit: int = 41) -> KisRealtime:
+def realtime(
+    url: str,
+    ticks: list[Tick],
+    states: list[str],
+    limit: int = 41,
+    approval: FakeApproval | None = None,
+    backoff: tuple[float, ...] = (0, 0, 0),
+    idle_timeout: float = 30,
+    on_tick: Any = None,
+) -> KisRealtime:
     return KisRealtime(
-        FakeApproval(),
+        approval or FakeApproval(),
         KisServer.PROD,
-        on_tick=ticks.append,
+        on_tick=on_tick or ticks.append,
         on_state=states.append,
         max_subscriptions=limit,
         url=url,
-        backoff=(0, 0, 0),
+        backoff=backoff,
+        idle_timeout=idle_timeout,
     )
 
 
@@ -203,5 +224,120 @@ async def test_unsubscribe_sends_tr_type_2(fake: tuple[FakeKis, str]) -> None:
         await rt.unsubscribe("KR", "005930")
         msg = await next_json(f)
         assert msg["header"]["tr_type"] == "2" and msg["body"]["input"]["tr_key"] == "005930"
+    finally:
+        task.cancel()
+
+
+# ── 리뷰 Critical #2, Important #3~#5 ──
+# 하루 종일 도는 트레이 앱에서 수신 루프가 죽거나 재접속이 폭주하면 안 된다.
+
+
+async def test_malformed_frame_does_not_kill_loop(fake: tuple[FakeKis, str]) -> None:
+    f, url = fake
+    ticks: list[Tick] = []
+    rt = realtime(url, ticks, [])
+    await rt.subscribe("KR", "005930")
+    task = asyncio.create_task(rt.run())
+    try:
+        await next_json(f)
+        assert f.current is not None
+        await f.current.send("0|H0STCNT0|xx|garbage")
+        await f.current.send("0|H0STCNT0|001|" + "^".join(domestic_record("005930", "1", "0", "1")))
+        await wait_for(lambda: len(ticks) == 1)
+        assert rt.state == "connected" and not task.done()
+    finally:
+        task.cancel()
+
+
+async def test_failing_callback_does_not_kill_loop(fake: tuple[FakeKis, str]) -> None:
+    f, url = fake
+    seen: list[Tick] = []
+
+    def flaky(t: Tick) -> None:
+        seen.append(t)
+        if len(seen) == 1:
+            raise RuntimeError("consumer bug")
+
+    rt = realtime(url, [], [], on_tick=flaky)
+    await rt.subscribe("KR", "005930")
+    task = asyncio.create_task(rt.run())
+    try:
+        await next_json(f)
+        assert f.current is not None
+        for price in ("1", "2"):
+            await f.current.send(
+                "0|H0STCNT0|001|" + "^".join(domestic_record("005930", price, "0", "1"))
+            )
+        await wait_for(lambda: len(seen) == 2)
+        assert not task.done()
+    finally:
+        task.cancel()
+
+
+async def test_approval_failure_is_retried(fake: tuple[FakeKis, str]) -> None:
+    f, url = fake
+    rt = realtime(url, [], [], approval=FakeApproval(fail_first=2))
+    await rt.subscribe("KR", "005930")
+    task = asyncio.create_task(rt.run())
+    try:
+        msg = await next_json(f)  # 두 번 실패한 뒤 결국 구독이 간다
+        assert msg["body"]["input"]["tr_key"] == "005930" and not task.done()
+    finally:
+        task.cancel()
+
+
+async def test_backoff_grows_when_server_closes_immediately(fake: tuple[FakeKis, str]) -> None:
+    f, url = fake
+    f.close_on_connect = True
+    rt = realtime(url, [], [], backoff=(0.05, 0.3, 1.0))
+    task = asyncio.create_task(rt.run())
+    try:
+        await asyncio.sleep(0.6)
+        assert 2 <= f.connections <= 3  # 0.05 → 0.3 → 1.0초로 늘어난다 (폭주 금지)
+    finally:
+        task.cancel()
+
+
+async def test_silent_connection_is_recycled(fake: tuple[FakeKis, str]) -> None:
+    f, url = fake
+    states: list[str] = []
+    rt = realtime(url, [], states, idle_timeout=0.2)
+    task = asyncio.create_task(rt.run())
+    try:
+        await wait_for(
+            lambda: f.connections >= 2
+        )  # 아무 메시지도 없으면 반쯤 끊긴 연결로 보고 다시 접속
+        assert "reconnecting" in states
+    finally:
+        task.cancel()
+
+
+async def test_subscription_rejection_is_logged(
+    fake: tuple[FakeKis, str], caplog: pytest.LogCaptureFixture
+) -> None:
+    f, url = fake
+    rt = realtime(url, [], [])
+    await rt.subscribe("KR", "005930")
+    task = asyncio.create_task(rt.run())
+    try:
+        await next_json(f)
+        assert f.current is not None
+        await f.current.send(
+            json.dumps(
+                {
+                    "header": {"tr_id": "H0STCNT0", "tr_key": "005930", "encrypt": "N"},
+                    "body": {
+                        "rt_cd": "1",
+                        "msg_cd": "OPSP0011",
+                        "msg1": "invalid approval : NOT FOUND",
+                    },
+                }
+            )
+        )
+        await wait_for(lambda: ("H0STCNT0", "005930") in rt.subscription_errors)
+        assert "invalid approval" in rt.subscription_errors[("H0STCNT0", "005930")]
+        assert any(
+            "invalid approval" in r.getMessage() for r in caplog.records if r.levelname == "WARNING"
+        )
     finally:
         task.cancel()

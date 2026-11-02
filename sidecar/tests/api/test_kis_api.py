@@ -82,3 +82,13 @@ def test_changing_keys_rebuilds_services(deps: Any) -> None:
     first = get_kis(deps)
     deps.secrets.set(SecretName.KIS_APP_KEY, "ak-2")
     assert get_kis(deps) is not first
+
+
+def test_reprs_do_not_leak_secrets(deps: Any) -> None:
+    """디버그 출력이나 예외 메시지로 키가 새면 안 된다 (리뷰 Important #6)."""
+    deps.secrets.set(SecretName.KIS_APP_KEY, "ak-visible-123")
+    deps.secrets.set(SecretName.KIS_APP_SECRET, "as-secret-456")
+    services = get_kis(deps)
+    for text in (repr(services), repr(deps)):
+        assert "as-secret-456" not in text and "ak-visible-123" not in text
+        assert "test-token" not in text  # 사이드카 인증 토큰도 마찬가지

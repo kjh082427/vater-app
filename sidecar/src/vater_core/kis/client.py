@@ -26,7 +26,7 @@ TOKEN_EXPIRED = "EGW00123"  # noqa: S105  (오류 코드이지 비밀값이 아�
 
 class TokenSource(Protocol):
     async def token(self) -> str: ...
-    async def invalidate(self) -> None: ...
+    async def invalidate(self, rejected: str | None = None) -> None: ...
 
 
 class KisApiError(VaterError):
@@ -66,9 +66,10 @@ class KisClient:
         refreshed = False
         while True:
             await self._limiter.acquire(priority)
+            sent_token = await self._tokens.token()
             headers = {
                 "content-type": "application/json; charset=utf-8",
-                "authorization": f"Bearer {await self._tokens.token()}",
+                "authorization": f"Bearer {sent_token}",
                 "appkey": self._creds.app_key,
                 "appsecret": self._creds.app_secret,
                 "tr_id": tr_id,
@@ -107,7 +108,7 @@ class KisClient:
             if msg_cd == TOKEN_EXPIRED or r.status_code == 401:
                 if not refreshed:
                     logger.info("KIS token rejected (%s); refreshing once", msg_cd or r.status_code)
-                    await self._tokens.invalidate()
+                    await self._tokens.invalidate(sent_token)
                     refreshed = True
                     continue
                 raise VaterError(

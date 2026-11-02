@@ -22,7 +22,7 @@ class FakeTokens:
     async def token(self) -> str:
         return self.current
 
-    async def invalidate(self) -> None:
+    async def invalidate(self, rejected: str | None = None) -> None:
         self.invalidated += 1
         self.current = "tok-2"
 

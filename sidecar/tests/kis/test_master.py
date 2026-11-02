@@ -1,15 +1,20 @@
+import asyncio
 import io
 import zipfile
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 import respx
 
 from vater_core.kis.master import (
+    CHECK_INTERVAL,
     MASTER_URL,
+    RETRY_AFTER_FAILURE,
     Symbol,
+    keep_master_fresh,
     parse_domestic,
     parse_overseas,
     refresh_master,
@@ -88,3 +93,27 @@ async def test_failed_download_keeps_old_data(tmp_path: Path) -> None:
         with pytest.raises(httpx.HTTPStatusError):
             await refresh_master(http, conn, date(2026, 11, 3))
     assert search_symbols(conn, "삼성전자")  # 이전 데이터 유지
+
+
+async def test_keep_master_fresh_survives_errors_and_repeats(tmp_path: Path) -> None:
+    """앱 시작 때 받고 주기적으로 다시 확인한다. 실패해도 멈추지 않는다 (리뷰 Important #8)."""
+    calls: list[date] = []
+
+    async def fake_refresh(http: Any, conn: Any, today: date) -> int:
+        calls.append(today)
+        if len(calls) == 1:
+            raise httpx.ConnectError("offline")
+        return 5
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        if len(sleeps) >= 3:
+            raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        await keep_master_fresh(None, None, today=lambda: date(2026, 11, 3),  # type: ignore[arg-type]
+                                refresh=fake_refresh, sleep=fake_sleep)  # fmt: skip
+    assert len(calls) == 3
+    assert sleeps[0] == RETRY_AFTER_FAILURE and sleeps[1] == CHECK_INTERVAL

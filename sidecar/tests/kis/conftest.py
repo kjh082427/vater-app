@@ -28,7 +28,7 @@ class StaticTokens:
     async def token(self) -> str:
         return "tok"
 
-    async def invalidate(self) -> None:
+    async def invalidate(self, rejected: str | None = None) -> None:
         return None
 
 

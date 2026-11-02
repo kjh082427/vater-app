@@ -88,10 +88,20 @@ class TokenManager:
                 return token
             return await self._issue_token()
 
-    async def invalidate(self) -> None:
-        """서버가 토큰 만료를 알렸을 때 부른다. 다음 `token()`에서 재발급한다."""
-        self._token = None
-        self._secrets.delete(SecretName.KIS_ACCESS_TOKEN)
+    async def invalidate(self, rejected: str | None = None) -> None:
+        """서버가 `rejected` 토큰을 만료로 거부했을 때 부른다. 다음 `token()`에서 재발급한다.
+
+        이미 다른 요청이 새 토큰을 받아 두었다면(현재 토큰 ≠ rejected) 아무것도 지우지 않는다.
+        동시에 거부된 요청들이 서로의 새 토큰을 지우며 재발급을 반복하는 것을 막는다
+        (발급마다 알림톡, 분당 1회 제한).
+        """
+        async with self._lock:
+            current = self._token or self._load(SecretName.KIS_ACCESS_TOKEN, "token", "expires_at")
+            if rejected is not None and current is not None and current[0] != rejected:
+                self._token = current
+                return
+            self._token = None
+            self._secrets.delete(SecretName.KIS_ACCESS_TOKEN)
 
     async def _issue_token(self) -> str:
         body = await self._post(
