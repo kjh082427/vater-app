@@ -4,7 +4,7 @@ import asyncio
 import sqlite3
 import threading
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -272,3 +272,67 @@ async def test_stop_does_not_wait_for_running_engine(deps: AppDeps) -> None:
     await wait_status(deps, aid, "running")
     await asyncio.wait_for(q.stop(), timeout=1.0)
     gate.set()
+
+
+async def test_future_date_rejected_at_submit(deps: AppDeps) -> None:
+    """리뷰 Important #2: 미래 기준일은 몇 분 뒤 (ValueError)가 아니라 바로 거부한다."""
+    q = make_queue(deps, FakeEngine(), [])
+    try:
+        with pytest.raises(VaterError) as e:
+            await q.submit("US", "AAPL", date.today() + timedelta(days=5), "cloud")
+        assert (e.value.code, e.value.status) == ("REQUEST_INVALID", 422)
+    finally:
+        await q.stop()
+    assert deps.db is not None and AnalysisRepo(deps.db).list() == []
+
+
+async def test_cancel_during_prepare_never_runs_engine(deps: AppDeps) -> None:
+    """리뷰 Important #3: 실행 직전 확인 중에 취소하면 엔진을 부르지 않는다."""
+    engine = FakeEngine()
+    q = make_queue(deps, engine, [])
+    release = asyncio.Event()
+    real_prepare = q._prepare
+    calls = 0
+
+    async def slow_prepare(*args: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:  # 워커가 실행 직전에 다시 확인하는 호출
+            await release.wait()
+        return await real_prepare(*args)
+
+    q._prepare = slow_prepare  # type: ignore[method-assign,assignment]
+    assert deps.events is not None
+    sub = deps.events.subscribe()
+    try:
+        aid = await q.submit("US", "AAPL", None, None)
+        while calls < 2:
+            await asyncio.sleep(0.01)
+        assert await q.cancel(aid) == "cancelled"
+        release.set()
+        await asyncio.sleep(0.1)
+    finally:
+        await q.stop()
+    assert engine.jobs == []
+    assert deps.db is not None and AnalysisRepo(deps.db).get(aid).status == "cancelled"
+    statuses = []
+    while not sub.queue.empty():
+        ev = sub.queue.get_nowait()
+        if ev.type == "analysis.status":
+            statuses.append(ev.data["status"])
+    assert statuses == ["queued", "cancelled"]  # '실행 중'으로 되돌아가지 않는다
+
+
+def test_abandoned_analysis_threads_are_reported() -> None:
+    """리뷰 Important #1: 종료할 때 남은 분석 스레드를 알아야 프로세스를 바로 끝낼 수 있다."""
+    from vater_core.analysis.queue import abandoned_analysis_threads
+
+    stop = threading.Event()
+    t = threading.Thread(target=stop.wait, name="vater-analysis", daemon=True)
+    t.start()
+    try:
+        assert abandoned_analysis_threads() == ["vater-analysis"]
+    finally:
+        stop.set()
+        t.join()
+    assert abandoned_analysis_threads() == []

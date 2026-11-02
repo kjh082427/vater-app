@@ -10,6 +10,7 @@
 """
 
 import copy
+import logging
 import os
 import threading
 import time
@@ -28,6 +29,9 @@ from vater_core.analysis.kis_vendor import (
 from vater_core.analysis.models import EngineJob, EngineResult, Progress
 from vater_core.analysis.summary import summarize
 from vater_core.analysis.symbols import analysts_for
+from vater_core.api.errors import VaterError
+
+logger = logging.getLogger(__name__)
 
 REPORT_KEYS = (
     "market_report",
@@ -39,6 +43,7 @@ REPORT_KEYS = (
     "final_trade_decision",
 )
 LLM_MAX_RETRIES = 2  # 스펙 8장: 클라우드 LLM 실패는 2회 재시도
+FINAL_NODE = "Portfolio Manager"
 _STAGES = {
     "Market Analyst": "analysts",
     "Sentiment Analyst": "analysts",
@@ -110,7 +115,8 @@ def consume(
                 out.timings[stage] = round(out.timings.get(stage, 0.0) + now - prev, 1)
             label = f"{ns.split(':')[0]}/{node}" if ns else node
             on_progress(Progress(stage=stage, node=label, elapsed_sec=round(now - t0, 1)))
-            if cancel.is_set():
+            # 마지막 노드(Portfolio Manager)가 끝난 뒤의 취소는 결과를 버리지 않는다.
+            if cancel.is_set() and node != FINAL_NODE:
                 raise Cancelled
         prev = now
     return out
@@ -120,6 +126,14 @@ def result_from_final(
     final: Mapping[str, Any], rating: str | None, timings: dict[str, float], tokens: dict[str, int]
 ) -> EngineResult:
     reports = {k: str(final.get(k) or "") for k in REPORT_KEYS}
+    if not reports["final_trade_decision"].strip():
+        # 이미 끝난 체크포인트를 이어 받으면 그래프가 아무것도 내보내지 않을 수 있다.
+        raise VaterError(
+            "ANALYSIS_INCOMPLETE",
+            "분석 결과(최종 결정)를 받지 못했습니다.",
+            hint="남아 있던 이전 기록을 지웠습니다. [다시 시도]하면 처음부터 분석합니다.",
+            status=500,
+        )
     return EngineResult(
         summary=summarize(reports["final_trade_decision"], rating),
         reports=reports,
@@ -193,6 +207,8 @@ class TradingAgentsEngine:
         cancel: threading.Event,
         kis: KisBridge | None,
     ) -> EngineResult:
+        if cancel.is_set():  # 실행 직전에 취소됐으면 LLM 클라이언트·그래프를 만들지 않는다
+            raise Cancelled
         from tradingagents.agents.rating import run_rating
         from tradingagents.dataflows.config import run_config_context
         from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -224,6 +240,8 @@ class TradingAgentsEngine:
                         thread_id
                     )
                 ctx = run_config_context(ta.config)
+                if cancel.is_set():  # 그래프를 만드는 사이에 취소됨
+                    raise Cancelled
                 stream = ctx.run(ta.graph.stream, ta.checkpoint_input(init), subgraphs=True, **args)
 
                 def steps() -> Iterator[Step]:
@@ -234,7 +252,14 @@ class TradingAgentsEngine:
                     outcome = consume(steps(), on_progress, cancel)
                 finally:
                     ctx.run(stream.close)
+                final = outcome.final
+                if not final.get("final_trade_decision") and thread_id is not None:
+                    # 이어 받은 실행이 이미 끝나 있었다: 저장된 마지막 상태를 읽는다.
+                    try:
+                        saved = ta.graph.get_state({"configurable": {"thread_id": thread_id}})
+                        final = {**(getattr(saved, "values", None) or {}), **final}
+                    except Exception:
+                        logger.warning("could not read checkpoint state", exc_info=True)
+            # 성공이든 빈 결과든 이 체크포인트는 더 쓸 일이 없다(빈 결과면 다음은 처음부터).
             ta.clear_checkpoint_on_success(ticker, day)
-        return result_from_final(
-            outcome.final, run_rating(outcome.final), outcome.timings, tokens.tokens
-        )
+        return result_from_final(final, run_rating(final), outcome.timings, tokens.tokens)

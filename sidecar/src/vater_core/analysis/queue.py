@@ -2,7 +2,9 @@
 
 - 시작 전 확인(키, 로컬 모델, 한투 키, 종목)은 `submit`에서 바로 한다. 실패하면 행을 만들지 않는다.
 - 엔진은 daemon 스레드에서 돈다. 앱을 끌 때 수십 분짜리 분석을 기다리지 않기 위해서다.
-  끊긴 분석은 다음 시작 때 `ANALYSIS_INTERRUPTED`가 되고, [다시 시도]하면 체크포인트로 이어진다.
+  TradingAgents 안의 스레드 풀은 daemon이 아니어서, 진입점은 남은 분석 스레드가 있으면
+  프로세스를 바로 끝낸다(`abandoned_analysis_threads`). 끊긴 분석은 다음 시작 때
+  `ANALYSIS_INTERRUPTED`가 되고, 같은 설정으로 [다시 시도]하면 체크포인트로 이어진다.
 - DB 쓰기는 모두 이벤트 루프에서 한다. 엔진 스레드는 진행 이벤트만 보낸다(`EventBus`는 스레드 안전).
 """
 
@@ -39,6 +41,7 @@ NY = ZoneInfo("America/New_York")
 KR_CLOSE = (15, 40)  # 장 마감(15:30) 뒤 일봉이 확정된 시각
 US_CLOSE = (16, 10)
 MAX_LOOKBACK_DAYS = 14
+THREAD_NAME = "vater-analysis"
 
 NotifyFn = Callable[[str, str, str], None]
 LatestDayFn = Callable[[Target], Awaitable[date]]
@@ -72,7 +75,7 @@ def _run_in_daemon_thread[T](fn: Callable[[], T]) -> "asyncio.Future[T]":
         if not loop.is_closed():
             loop.call_soon_threadsafe(settle, True, value)
 
-    threading.Thread(target=target, name="vater-analysis", daemon=True).start()
+    threading.Thread(target=target, name=THREAD_NAME, daemon=True).start()
     return future
 
 
@@ -160,6 +163,14 @@ class AnalysisQueue:
         self, market: str, code: str, as_of: date | None, preset: Preset | None
     ) -> int:
         target, run = await self._prepare(market, code, preset)
+        today = datetime.now(KST if target.domestic else NY).date()
+        if as_of is not None and as_of > today:
+            raise VaterError(
+                "REQUEST_INVALID",
+                f"기준일({as_of})이 오늘보다 늦습니다.",
+                hint="기준일을 비워 두면 최근 거래일로 분석합니다.",
+                status=422,
+            )
         day = as_of or await self._latest_day(target)
         aid = self._repo().create(target, day.isoformat(), run.preset)
         self._cancels[aid] = threading.Event()
@@ -241,6 +252,8 @@ class AnalysisQueue:
         self.running_id = aid
         try:
             target, run = await self._prepare(a.market, a.code, a.preset)
+            if cancel.is_set() or repo.get(aid).status != "queued":
+                return  # 확인하는 사이에 취소됨 (취소 쪽에서 상태와 이벤트를 이미 처리했다)
             models = {
                 "deep": {"provider": run.deep.provider, "model": run.deep.model},
                 "quick": {"provider": run.quick.provider, "model": run.quick.model},
@@ -288,6 +301,11 @@ class AnalysisQueue:
         error = {"code": code, "message": message, "hint": hint}
         self._publish("analysis.status", {"id": aid, "status": "failed", "error": error})
         self._notify("분석 실패", f"{name}: {message}", f"/analyses/{aid}")
+
+
+def abandoned_analysis_threads() -> list[str]:
+    """아직 돌고 있는 분석 스레드. 종료할 때 있으면 진입점이 프로세스를 바로 끝낸다."""
+    return [t.name for t in threading.enumerate() if t.name == THREAD_NAME and t.is_alive()]
 
 
 def get_analysis(deps: AppDeps) -> AnalysisQueue:

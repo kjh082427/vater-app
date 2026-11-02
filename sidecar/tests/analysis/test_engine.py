@@ -169,6 +169,40 @@ def test_result_from_final_state() -> None:
 
 
 def test_result_with_missing_reports() -> None:
-    r = result_from_final({"final_trade_decision": ""}, None, {}, {"in": 0, "out": 0})
+    final = {"final_trade_decision": "결정 근거만 있는 문단입니다."}
+    r = result_from_final(final, None, {}, {"in": 0, "out": 0})
     assert r.summary.decision == "REVIEW"
     assert r.reports["market_report"] == ""
+
+
+def test_result_without_decision_is_failure() -> None:
+    """리뷰 Important #4: 끝난 체크포인트를 이어 받아 빈 상태가 오면 '완료'로 저장하지 않는다."""
+    from vater_core.api.errors import VaterError
+
+    with pytest.raises(VaterError) as e:
+        result_from_final({}, None, {}, {"in": 0, "out": 0})
+    assert e.value.code == "ANALYSIS_INCOMPLETE"
+    assert "처음부터" in (e.value.hint or "")
+
+
+def test_cancel_on_final_node_still_completes() -> None:
+    """리뷰 Important #4: Portfolio Manager가 끝난 뒤에 온 취소는 결과를 버리지 않는다."""
+    cancel = threading.Event()
+
+    def on_progress(p: Progress) -> None:
+        if p.node == "Portfolio Manager":
+            cancel.set()  # 마지막 노드가 끝난 순간에 사용자가 취소를 눌렀다
+
+    outcome = consume(steps(), on_progress, cancel, Clock([float(i) for i in range(20)]))
+    assert outcome.final["final_trade_decision"] == "**Rating**: Hold"
+
+
+def test_engine_checks_cancel_before_building_graph(db: sqlite3.Connection, tmp_path: Path) -> None:
+    """리뷰 Important #3: 이미 취소됐으면 LLM 클라이언트·그래프를 만들지 않는다."""
+    from vater_core.analysis.engine import TradingAgentsEngine
+
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(Cancelled):
+        TradingAgentsEngine().run(job(db, tmp_path), lambda p: None, cancel, None)
+    assert not (tmp_path / "cache").exists()  # 아무것도 만들지 않았다

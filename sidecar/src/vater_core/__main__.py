@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import uvicorn
 
-from vater_core.analysis.queue import get_analysis
+from vater_core.analysis.queue import abandoned_analysis_threads, get_analysis
 from vater_core.analysis.store import AnalysisRepo
 from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
@@ -95,6 +95,13 @@ def main() -> None:
     deps.shutdown = request_exit
     emit("ready", port=sock.getsockname()[1])
     asyncio.run(serve())
+    if abandoned_analysis_threads():
+        # TradingAgents의 스레드 풀(daemon 아님)이 LLM 호출이 끝날 때까지 종료를 막지 않게 한다.
+        # 끊긴 분석은 다음 시작 때 '중단됨'이 되고 체크포인트로 이어서 실행할 수 있다.
+        logging.getLogger(__name__).info("exiting with an analysis still running")
+        logging.shutdown()
+        sys.stdout.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":
