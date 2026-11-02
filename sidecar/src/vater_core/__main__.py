@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 import httpx
 import uvicorn
 
+from vater_core.alerts.evaluator import record_event_alerts
+from vater_core.alerts.monitor import get_alerts
 from vater_core.analysis.queue import abandoned_analysis_threads, get_analysis
 from vater_core.analysis.store import AnalysisRepo
 from vater_core.api.app import create_app
@@ -82,12 +84,19 @@ def main() -> None:
             # 첫 실행에도 종목 검색이 되도록 시작하자마자 마스터를 받고, 이후 주기적으로 확인한다.
             today = lambda: datetime.now(KST).date()  # noqa: E731
             background.append(asyncio.create_task(keep_master_fresh(http, db, today=today)))
+            get_alerts(deps).start()  # 알림 감시 (장중 실시간·폴링, 장 마감 후 평가)
         get_analysis(deps)  # 분석 작업 큐(워커 1개)를 띄운다. 제출이 없으면 아무 일도 하지 않는다
+        # 분석 완료·실패를 알림 이력에 남긴다
+        stop_event_alerts = record_event_alerts(deps.events, db) if deps.events else None
         try:
             await server.serve(sockets=[sock])
         finally:
             for task in background:
                 task.cancel()
+            if stop_event_alerts is not None:
+                stop_event_alerts()
+            if deps.alerts is not None:
+                await deps.alerts.stop()
             if deps.analysis is not None:
                 await deps.analysis.stop()  # 실행 중인 분석은 기다리지 않는다
             await http.aclose()  # 외부 API 연결을 정리하고 끝낸다
