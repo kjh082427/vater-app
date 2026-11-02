@@ -17,7 +17,7 @@ Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python
 |---|---|---|---|---|
 | 기반 (API, 저장, 비밀키, 로그) | `sidecar/src/vater_core/{api,store,secrets}`, `__main__.py`, `logging_setup.py` | `core/foundation` | [#1](https://github.com/kjh082427/vater-app/pull/1) | API 인증, 오류 형식, DB 구조, 설정 항목, 키 저장 방식, 로그 마스킹 |
 | 한국투자증권 연동 | `sidecar/src/vater_core/kis` (+ `api/routes/kis.py`, `store/migrations/002_symbols.sql`) | `core/kis` | [#2](https://github.com/kjh082427/vater-app/pull/2) | 토큰 캐시, 호출 제한, 시세·재무·뉴스·시장 데이터, 실시간 체결, 종목 검색. 실연동 사실은 `docs/kis-live-findings.md` |
-| LLM 관리 | `sidecar/src/vater_core/llm` | `core/llm` | — | 프리셋, 로컬 모델 추천·설치 |
+| LLM 관리 | `sidecar/src/vater_core/llm` (+ `api/routes/llm.py`) | `core/llm` | [#4](https://github.com/kjh082427/vater-app/pull/4) | 하드웨어 등급, 모델 카탈로그(`catalog.json`), Ollama 상태·설치·모델 받기, 프리셋 → TradingAgents 설정, 클라우드 키 테스트 |
 | AI 분석 | `sidecar/src/vater_core/analysis` | `core/analysis` | — | TradingAgents 실행 방식, 리포트 내용 |
 | 알림 | `sidecar/src/vater_core/alerts` | `core/alerts` | — | 지표 조건, 알림 규칙 |
 | 일일 브리핑 | `sidecar/src/vater_core/briefing` | `core/briefing` | — | 브리핑 시간, 수집 데이터, 문장 형식 |
@@ -25,7 +25,7 @@ Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python
 | 디자인 시스템 | `apps/desktop/src/design-system` | `ui/design-system` | — | **색, 글꼴, 버튼 같은 겉모양** |
 | 화면 | `apps/desktop/src/screens` | `ui/screens` | — | **화면 배치와 흐름** |
 | 배포 | `.github/workflows`, `packaging/` | `infra/release` | — | 설치 파일, 자동 업데이트 |
-| 검증 실험 | `spikes/` | `spike/tradingagents-local-llm` | — | (앱 코드 아님, 실험 기록) |
+| 검증 실험 | `spikes/` | `spike/tradingagents-local-llm` | [#3](https://github.com/kjh082427/vater-app/pull/3) | (앱 코드 아님) 결과는 `spikes/tradingagents-local-llm/REPORT.md` |
 
 ## 브랜치 의존 관계
 
