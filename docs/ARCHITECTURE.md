@@ -1,0 +1,44 @@
+# 구조 지도
+
+앱의 각 영역이 **어느 폴더**에 있고, **어느 브랜치/PR**에서 만들어졌으며, **고치면 무엇이 바뀌는지** 정리한 문서입니다.
+브랜치가 merge될 때마다 갱신합니다. 상세 설계는 [설계 스펙](superpowers/specs/2026-11-02-vater-mvp-design.md)을 보세요.
+
+## 한눈에 보기
+
+```
+Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python 사이드카) ──► 한국투자증권 API
+        │                                          │                         ──► Yahoo 등 (TradingAgents)
+        └──── Windows 알림 ◄── stdout 이벤트 ───────┘                         ──► 클라우드 LLM / Ollama
+```
+
+## 영역별 지도
+
+| 영역 | 폴더 | 브랜치 | PR | 여기를 고치면 |
+|---|---|---|---|---|
+| 기반 (API, 저장, 비밀키) | `sidecar/src/vater_core/{api,store,secrets}` | `core/foundation` | — | API 인증, DB 구조, 키 저장 방식 |
+| 한국투자증권 연동 | `sidecar/src/vater_core/kis` | `core/kis` | — | 시세 수신, 토큰, 호출 제한 |
+| LLM 관리 | `sidecar/src/vater_core/llm` | `core/llm` | — | 프리셋, 로컬 모델 추천·설치 |
+| AI 분석 | `sidecar/src/vater_core/analysis` | `core/analysis` | — | TradingAgents 실행 방식, 리포트 내용 |
+| 알림 | `sidecar/src/vater_core/alerts` | `core/alerts` | — | 지표 조건, 알림 규칙 |
+| 일일 브리핑 | `sidecar/src/vater_core/briefing` | `core/briefing` | — | 브리핑 시간, 수집 데이터, 문장 형식 |
+| 데스크톱 셸 | `apps/desktop/src-tauri` | `shell/tauri` | — | 트레이, 알림 표시, 자동 실행, 사이드카 관리 |
+| 디자인 시스템 | `apps/desktop/src/design-system` | `ui/design-system` | — | **색, 글꼴, 버튼 같은 겉모양** |
+| 화면 | `apps/desktop/src/screens` | `ui/screens` | — | **화면 배치와 흐름** |
+| 배포 | `.github/workflows`, `packaging/` | `infra/release` | — | 설치 파일, 자동 업데이트 |
+| 검증 실험 | `spikes/` | `spike/tradingagents-local-llm` | — | (앱 코드 아님, 실험 기록) |
+
+## 브랜치 의존 관계
+
+```
+core/foundation ─┬─► core/kis ──┬─► core/alerts
+                 │              └─► core/briefing ◄─┐
+                 └─► core/llm ────► core/analysis   │
+                          └─────────────────────────┘
+core/* ─(OpenAPI → TS 타입)─► ui/screens ◄── ui/design-system
+core/* ─(PyInstaller)───────► shell/tauri ──► infra/release
+```
+
+## 규칙
+- 앱 영역 1개 = 브랜치 1개 = 폴더 1개.
+- PR은 merge 커밋으로 합치고, 브랜치는 지우지 않습니다.
+- 나중에 수정할 때는 같은 접두어로 새 브랜치를 만듭니다 (예: `ui/redesign-v2`).

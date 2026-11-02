@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Rust / Tauri
+target/
+apps/desktop/src-tauri/gen/
+
+# Secrets & local data
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+logs/
+
+# Spike outputs (raw run logs; summaries are committed)
+spikes/**/runs/
+
+# Claude local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
