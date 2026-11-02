@@ -11,6 +11,7 @@ dependencies = [
     "keyring",
     "httpx>=0.28.1",
     "websockets>=17.4",
+    "tradingagents",
 ]
 
 [dependency-groups]
@@ -57,3 +58,6 @@ strict = true
 python_version = "3.13"
 mypy_path = ["src", "."]
 explicit_package_bases = true
+
+[tool.uv.sources]
+tradingagents = { git = "https://github.com/TauricResearch/TradingAgents", rev = "v0.7.1" }
