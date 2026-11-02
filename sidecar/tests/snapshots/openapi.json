@@ -49,6 +49,46 @@
         "title": "Health",
         "type": "object"
       },
+      "KisSample": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "price"
+        ],
+        "title": "KisSample",
+        "type": "object"
+      },
+      "KisTestResult": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "sample": {
+            "$ref": "#/components/schemas/KisSample"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server",
+          "sample"
+        ],
+        "title": "KisTestResult",
+        "type": "object"
+      },
       "SecretValue": {
         "additionalProperties": false,
         "properties": {
@@ -74,6 +114,51 @@
           "status"
         ],
         "title": "ShutdownAccepted",
+        "type": "object"
+      },
+      "SymbolOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          }
+        },
+        "required": [
+          "market",
+          "code",
+          "exchange",
+          "name",
+          "name_en",
+          "kind"
+        ],
+        "title": "SymbolOut",
         "type": "object"
       }
     }
@@ -493,6 +578,58 @@
         ]
       }
     },
+    "/settings/kis/test": {
+      "post": {
+        "description": "첫 실행 마법사의 '연결 테스트': 토큰을 받고 삼성전자 현재가를 조회해 본다.",
+        "operationId": "kis_connection_test_settings_kis_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KisTestResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Kis Connection Test",
+        "tags": [
+          "kis"
+        ]
+      }
+    },
     "/shutdown": {
       "post": {
         "operationId": "shutdown_shutdown_post",
@@ -541,6 +678,76 @@
         "summary": "Shutdown",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/symbols/search": {
+      "get": {
+        "operationId": "symbols_search_symbols_search_get",
+        "parameters": [
+          {
+            "description": "종목명, 영문명 또는 코드",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "종목명, 영문명 또는 코드",
+              "maxLength": 50,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SymbolOut"
+                  },
+                  "title": "Response Symbols Search Symbols Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Symbols Search",
+        "tags": [
+          "kis"
         ]
       }
     }

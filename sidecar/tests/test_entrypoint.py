@@ -23,7 +23,12 @@ def test_resolve_data_dir_linux_default() -> None:
 
 
 def test_entrypoint_announces_port_and_serves(tmp_path: Path) -> None:
-    env = {**os.environ, "VATER_TOKEN": "t0k", "VATER_DATA_DIR": str(tmp_path)}
+    env = {
+        **os.environ,
+        "VATER_TOKEN": "t0k",
+        "VATER_DATA_DIR": str(tmp_path),
+        "VATER_BACKGROUND_JOBS": "0",
+    }  # 테스트에서 인터넷(종목 마스터)을 쓰지 않는다
     p = subprocess.Popen(
         [sys.executable, "-m", "vater_core"], env=env, stdout=subprocess.PIPE, text=True
     )
