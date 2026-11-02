@@ -142,15 +142,22 @@ def main() -> int:
     rec["output_language_guess"] = {k: hangul_ratio(v) for k, v in reports.items() if v}
     rec["llm_calls"] = stats.llm_calls
     rec["tokens"] = {"in": stats.tokens_in, "out": stats.tokens_out} if stats.llm_calls else None
-    rec["tool_calls"] = stats.tool_calls
+    rec["tool_calls"] = stats.tool_calls  # 그래프 안 도구는 LLM 콜백으로 잡히지 않는다 → tool_rounds 참고
     rec["tool_errors"] = stats.tool_errors[:20]
+    rounds: dict[str, int] = {}
+    for ev in rec["node_events"]:
+        if ev["ns"]:
+            analyst = ev["ns"].split(":")[0]
+            rounds.setdefault(analyst, 0)
+            rounds[analyst] += ev["node"] == "tools"
+    rec["tool_rounds"] = rounds  # 애널리스트별 도구 호출 라운드 수 (0이면 데이터 없이 작성)
 
     RUNS.mkdir(exist_ok=True)
     stem = f"run-{time.strftime('%Y%m%d-%H%M%S')}-{a.ticker}-{a.preset}{'-ckpt' if a.checkpoint else ''}"
     (RUNS / f"{stem}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=2))
     (RUNS / f"{stem}-reports.md").write_text("\n\n".join(f"# {k}\n\n{v}" for k, v in reports.items()))
     print(json.dumps({k: rec[k] for k in ("status", "wall_sec", "decision_parsed", "llm_calls", "tokens",
-                                           "tool_calls", "empty_reports", "no_data_mentions")}, ensure_ascii=False))
+                                           "tool_rounds", "empty_reports", "no_data_mentions")}, ensure_ascii=False))
     print("saved:", RUNS / f"{stem}.json")
     return 0 if rec["status"] == "done" else 1
 

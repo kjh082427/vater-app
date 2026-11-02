@@ -37,6 +37,38 @@
 
 ---
 
+## S3·S4·S6. 출력 언어, 결정값, 진행 스트리밍
+- **측정:** `run_spike.py --ticker AAPL --preset local-4b --lang Korean` (실행 `run-20261103-020336-AAPL-local-4b`)
+
+### S3. 한국어 출력
+- `DEFAULT_CONFIG["output_language"]`로 설정합니다(기본값 `"English"`). 설정하면 **뒤쪽 단계는 한국어로** 나옵니다.
+
+| 보고서 | 한글 비율 |
+|---|---|
+| 뉴스 | 63% |
+| 리서치 매니저 투자 계획 | 53% |
+| 트레이더 | 73% |
+| 최종 결정 | 61% |
+| **감성·재무 애널리스트** | **0% (영어)** |
+
+- 나머지 비율은 "Gross Profit Margin" 같은 영어 용어라 정상 범위입니다.
+- **결론:** 한국어 요약 단계를 따로 만들지 않고 `output_language="Korean"`을 씁니다. 다만 일부 애널리스트 보고서는 영어로 나오므로, UI에서는 **최종 결정과 3줄 요약을 한국어로 우선 보여주고**, 애널리스트 원문 탭에는 "원문(영어일 수 있음)"이라고 표시합니다.
+
+### S4. 결정값 체계
+- 5단계 등급 **Buy / Overweight / Hold / Underweight / Sell**입니다. 읽어낼 수 없으면 `REVIEW`가 됩니다(`tradingagents.agents.rating.run_rating`).
+- 한국어 출력에서도 결정문 첫 줄이 `**Rating**: Sell`처럼 영어로 유지돼서 **추출이 정상**입니다.
+- **결론:** UI 결정 배지는 5단계와 "검토 필요(REVIEW)"를 합쳐 6개 상태입니다. 한국어 표기는 매수 / 비중확대 / 보유 / 비중축소 / 매도 / 검토 필요입니다.
+
+### S6. 진행 스트리밍
+- `TradingAgentsGraph.graph.stream(입력, subgraphs=True, stream_mode=["updates", "values"])`를 `run_config_context(config)` 안에서 돌리면 노드 단위 이벤트를 받을 수 있습니다.
+- 애널리스트는 각자 서브그래프에서 돌기 때문에 namespace(`"Market Analyst:<uuid>"`)로 누구의 단계인지 구분됩니다. `agent`와 `tools` 노드가 번갈아 나오므로 도구 호출 라운드도 셀 수 있습니다.
+- 최상위 노드는 `Bull Researcher`, `Bear Researcher`, `Research Manager`, `Trader`, `Aggressive Analyst`, `Conservative Analyst`, `Neutral Analyst`, `Portfolio Manager` 순서로 나옵니다.
+- 애널리스트 4명은 **병렬로** 실행됩니다.
+- **결론:** 스펙 5장의 노드 단위 타임라인을 그대로 구현할 수 있습니다. `analysis/engine.py`는 위 방식으로 진행 이벤트를 `EventBus`에 발행합니다.
+- 참고: 토큰 수는 LLM 클라이언트 콜백(`usage_metadata`)으로 집계됩니다. 도구 호출은 콜백으로 잡히지 않아서 노드 이벤트로 셉니다.
+
+---
+
 ## S7. Windows PyInstaller onedir 빌드
 - **측정:** GitHub Actions `windows-latest`, 워크플로 `spike-pyinstaller` (실행 41484216852, 2026-11-02 16:43 UTC)
 - **방법:** `pyinstaller --noconfirm --onedir --name smoke --paths . pyinstaller_smoke/smoke_entry.py`. 실행 파일이 TradingAgents를 import하고, LLM 호출 없이 `TradingAgentsGraph`를 만든 뒤 `SMOKE OK`를 출력하는지 확인
