@@ -12,7 +12,7 @@ import sys
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
@@ -79,6 +79,20 @@ class PullProgress:
     status: str
     completed: int | None
     total: int | None
+
+
+class OllamaApi(Protocol):
+    """라우트와 분석 엔진이 쓰는 부분. 테스트에서는 가짜로 바꿔 끼운다."""
+
+    async def version(self) -> str | None: ...
+    async def status(self) -> OllamaStatus: ...
+    async def models(self) -> tuple[InstalledModel, ...]: ...
+    async def loaded(self) -> tuple[LoadedModel, ...]: ...
+    def pull(self, tag: str) -> AsyncIterator[PullProgress]: ...
+    async def create_variant(self, model: LocalModel) -> str: ...
+    async def delete(self, name: str, missing_ok: bool = False) -> None: ...
+    async def start(self) -> bool: ...
+    async def require_model(self, name: str) -> None: ...
 
 
 def default_exe_candidates() -> list[Path]:

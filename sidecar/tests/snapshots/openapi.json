@@ -1,6 +1,173 @@
 {
   "components": {
     "schemas": {
+      "CatalogOut": {
+        "properties": {
+          "cloud": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CloudProviderOut"
+            },
+            "title": "Cloud",
+            "type": "object"
+          },
+          "local_models": {
+            "items": {
+              "$ref": "#/components/schemas/LocalModelOut"
+            },
+            "title": "Local Models",
+            "type": "array"
+          },
+          "tiers": {
+            "items": {
+              "$ref": "#/components/schemas/TierOut"
+            },
+            "title": "Tiers",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "tiers",
+          "local_models",
+          "cloud"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
+      "CheckOut": {
+        "properties": {
+          "deep": {
+            "$ref": "#/components/schemas/TierChoiceOut"
+          },
+          "offloaded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offloaded"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "quick": {
+            "$ref": "#/components/schemas/TierChoiceOut"
+          }
+        },
+        "required": [
+          "ok",
+          "preset",
+          "deep",
+          "quick",
+          "offloaded"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
+      "CloudProviderOut": {
+        "properties": {
+          "base_url_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url Secret"
+          },
+          "deep": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep"
+          },
+          "free_tier": {
+            "title": "Free Tier",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quick": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quick"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "secret",
+          "base_url_secret",
+          "deep",
+          "quick",
+          "free_tier"
+        ],
+        "title": "CloudProviderOut",
+        "type": "object"
+      },
+      "CloudTestOut": {
+        "properties": {
+          "defaults_available": {
+            "title": "Defaults Available",
+            "type": "boolean"
+          },
+          "model_count": {
+            "title": "Model Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "ok",
+          "model_count",
+          "defaults_available"
+        ],
+        "title": "CloudTestOut",
+        "type": "object"
+      },
       "ErrorBody": {
         "description": "모든 오류 응답의 형식. UI는 `code`로 안내 문구를 정한다.",
         "properties": {
@@ -31,6 +198,98 @@
         "title": "ErrorBody",
         "type": "object"
       },
+      "GpuOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "vram_mb": {
+            "title": "Vram Mb",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "vram_mb"
+        ],
+        "title": "GpuOut",
+        "type": "object"
+      },
+      "HardwareOut": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/LocalModelOut"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "default_preset": {
+            "title": "Default Preset",
+            "type": "string"
+          },
+          "expected_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Minutes"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuOut"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "ram_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Mb"
+          },
+          "recommended": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalModelOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "tier_label": {
+            "title": "Tier Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gpus",
+          "ram_mb",
+          "tier",
+          "tier_label",
+          "recommended",
+          "alternatives",
+          "default_preset",
+          "expected_minutes"
+        ],
+        "title": "HardwareOut",
+        "type": "object"
+      },
       "Health": {
         "properties": {
           "status": {
@@ -47,6 +306,24 @@
           "version"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "InstalledOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size"
+        ],
+        "title": "InstalledOut",
         "type": "object"
       },
       "KisSample": {
@@ -89,6 +366,154 @@
         "title": "KisTestResult",
         "type": "object"
       },
+      "LoadedOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "offloaded": {
+            "title": "Offloaded",
+            "type": "boolean"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "size_vram": {
+            "title": "Size Vram",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size",
+          "size_vram",
+          "offloaded"
+        ],
+        "title": "LoadedOut",
+        "type": "object"
+      },
+      "LocalModelOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "min_vram_mb": {
+            "title": "Min Vram Mb",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "num_ctx": {
+            "title": "Num Ctx",
+            "type": "integer"
+          },
+          "size_gb": {
+            "title": "Size Gb",
+            "type": "number"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "variant": {
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "label",
+          "size_gb",
+          "num_ctx",
+          "min_vram_mb",
+          "note",
+          "variant"
+        ],
+        "title": "LocalModelOut",
+        "type": "object"
+      },
+      "OllamaStatusOut": {
+        "properties": {
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "loaded": {
+            "items": {
+              "$ref": "#/components/schemas/LoadedOut"
+            },
+            "title": "Loaded",
+            "type": "array"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/InstalledOut"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "installed",
+          "running",
+          "version",
+          "models",
+          "loaded"
+        ],
+        "title": "OllamaStatusOut",
+        "type": "object"
+      },
+      "PullStartedOut": {
+        "properties": {
+          "started": {
+            "title": "Started",
+            "type": "boolean"
+          },
+          "variant": {
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "started",
+          "variant"
+        ],
+        "title": "PullStartedOut",
+        "type": "object"
+      },
+      "RunningOut": {
+        "properties": {
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running"
+        ],
+        "title": "RunningOut",
+        "type": "object"
+      },
       "SecretValue": {
         "additionalProperties": false,
         "properties": {
@@ -114,6 +539,19 @@
           "status"
         ],
         "title": "ShutdownAccepted",
+        "type": "object"
+      },
+      "StartedOut": {
+        "properties": {
+          "started": {
+            "title": "Started",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
+        ],
+        "title": "StartedOut",
         "type": "object"
       },
       "SymbolOut": {
@@ -159,6 +597,84 @@
           "kind"
         ],
         "title": "SymbolOut",
+        "type": "object"
+      },
+      "TierChoiceOut": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ],
+        "title": "TierChoiceOut",
+        "type": "object"
+      },
+      "TierOut": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "default_preset": {
+            "title": "Default Preset",
+            "type": "string"
+          },
+          "expected_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Minutes"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "min_vram_mb": {
+            "title": "Min Vram Mb",
+            "type": "integer"
+          },
+          "recommended": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "min_vram_mb",
+          "default_preset",
+          "recommended",
+          "alternatives",
+          "expected_minutes"
+        ],
+        "title": "TierOut",
         "type": "object"
       }
     }
@@ -266,6 +782,465 @@
         "summary": "Health",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/llm/catalog": {
+      "get": {
+        "operationId": "llm_catalog_llm_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Llm Catalog",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/check": {
+      "get": {
+        "description": "분석을 시작하기 전에 키·로컬 모델·Ollama 상태를 확인한다.",
+        "operationId": "llm_check_llm_check_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cloud",
+                    "local",
+                    "mixed"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Preset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Llm Check",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/hardware": {
+      "get": {
+        "operationId": "llm_hardware_llm_hardware_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardwareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Llm Hardware",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/models/{tag}": {
+      "delete": {
+        "operationId": "model_delete_llm_models__tag__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag",
+            "required": true,
+            "schema": {
+              "title": "Tag",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Model Delete",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/models/{tag}/pull": {
+      "post": {
+        "operationId": "model_pull_llm_models__tag__pull_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag",
+            "required": true,
+            "schema": {
+              "title": "Tag",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullStartedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Model Pull",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/ollama/install": {
+      "post": {
+        "operationId": "ollama_install_llm_ollama_install_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Ollama Install",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/ollama/start": {
+      "post": {
+        "operationId": "ollama_start_llm_ollama_start_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunningOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Ollama Start",
+        "tags": [
+          "llm"
+        ]
+      }
+    },
+    "/llm/ollama/status": {
+      "get": {
+        "operationId": "ollama_status_llm_ollama_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OllamaStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Ollama Status",
+        "tags": [
+          "llm"
         ]
       }
     },
@@ -627,6 +1602,81 @@
         "summary": "Kis Connection Test",
         "tags": [
           "kis"
+        ]
+      }
+    },
+    "/settings/llm/test": {
+      "post": {
+        "operationId": "cloud_key_test_settings_llm_test_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "google",
+                    "anthropic",
+                    "openai",
+                    "compat"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloudTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Cloud Key Test",
+        "tags": [
+          "llm"
         ]
       }
     },
