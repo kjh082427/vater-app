@@ -9,6 +9,13 @@
 | 2026-11-02 | `impeccable` 플러그인 (+ 마켓플레이스) | 4.8.0 | 프로젝트 (`.claude/settings.json`) | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | UI 품질 점검: critique, audit, polish, PRODUCT.md, DESIGN.md | 훅 3개(세션 시작, 파일 수정 직후, 응답 종료). 처음 실행할 때 GitHub Releases에서 엔진 실행 파일을 받아 sha256으로 검증. 스크립트에서 텔레메트리는 보이지 않음 |
 | 2026-11-02 | `taste-skill` 플러그인 (+ 마켓플레이스) | 2.1.5 | 사용자 전체 | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 앱 화면 아트 디렉션 | Node 22 이상과 Chromium이 필요(브라우저 점검용) |
 
+## 개발 도구 (Claude가 설치)
+| 날짜 | 도구 | 버전 | 위치 | 용도 | 참고 |
+|---|---|---|---|---|---|
+| 2026-11-03 | uv (+ uvx) | 0.13.6 | `~/.local/bin` | Python 버전·의존성 관리 | GitHub Releases 공식 바이너리, sha256 검증 (`curl \| sh` 설치 스크립트는 worktree 격리 규칙 때문에 쓰지 않음) |
+| 2026-11-03 | Python | 3.13 | uv 관리 폴더 | 검증 실험·사이드카 실행 | `uv python install 3.13` |
+| 2026-11-03 | Ollama 모델 | `qwen3.5:4b`, `qwen3.5:9b` | Windows Ollama | 로컬 LLM 검증 | Ollama 0.40.13은 사용자가 설치 |
+
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |
 |---|---|---|

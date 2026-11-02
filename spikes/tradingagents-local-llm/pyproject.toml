@@ -1,0 +1,14 @@
+# SPIKE: throwaway code, not part of the app
+[project]
+name = "vater-spike-tradingagents"
+version = "0.0.0"
+description = "검증 실험: TradingAgents + 로컬 LLM (버리는 코드)"
+requires-python = "==3.13.*"
+dependencies = [
+    "tradingagents @ git+https://github.com/TauricResearch/TradingAgents@v0.7.1",
+    "httpx",
+    "python-dotenv",
+]
+
+[tool.uv]
+package = false
