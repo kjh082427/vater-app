@@ -5,8 +5,11 @@ on:
   workflow_dispatch:
   push:
     branches: [spike/tradingagents-local-llm]
-    paths:
-      - "spikes/tradingagents-local-llm/**"
+    paths:  # 빌드에 영향을 주는 파일만 (보고서 수정으로 Windows 러너를 쓰지 않게)
+      - "spikes/tradingagents-local-llm/pyinstaller_smoke/**"
+      - "spikes/tradingagents-local-llm/presets.py"
+      - "spikes/tradingagents-local-llm/pyproject.toml"
+      - "spikes/tradingagents-local-llm/uv.lock"
       - ".github/workflows/spike-pyinstaller.yml"
 
 jobs:
