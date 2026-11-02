@@ -113,3 +113,17 @@ def test_bars_upsert_history_last_day(db: sqlite3.Connection) -> None:
     assert h.close == (105.0, 113.0) and h.volume == (1000.0, 2100.0)
     assert bars.last_day("KR", "005930") == date(2026, 11, 2)
     assert bars.history("KR", "005930", limit=1).days == (date(2026, 11, 2),)
+
+
+def test_re_enabling_a_rule_resets_its_baseline(db: sqlite3.Connection) -> None:
+    # 꺼 둔 동안 조건이 참이 됐어도, 다시 켜는 순간 바로 울리지 않게 기준값을 새로 잡는다
+    item = WatchlistRepo(db).add(resolve_target(db, "KR", "005930"))
+    rules = RuleRepo(db)
+    r = rules.create(item.id, "price_above", {"price": 1}, "realtime", True)
+    rules.set_state(r.id, False)
+    rules.update(r.id, enabled=False)
+    assert rules.get(r.id).last_state is False  # 끌 때는 그대로
+
+    assert rules.update(r.id, enabled=True).last_state is None
+    rules.set_state(r.id, True)
+    assert rules.update(r.id, enabled=True).last_state is True  # 이미 켜진 규칙은 그대로

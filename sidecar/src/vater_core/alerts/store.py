@@ -158,7 +158,7 @@ class RuleRepo:
         timing: str | None = None,
         enabled: bool | None = None,
     ) -> Rule:
-        self.get(id)
+        before = self.get(id)
         with self._conn:
             if params is not None:  # 조건이 바뀌면 기준값을 다시 잡는다
                 self._conn.execute(
@@ -174,6 +174,8 @@ class RuleRepo:
                 self._conn.execute(
                     "UPDATE alert_rules SET enabled = ? WHERE id = ?", (int(enabled), id)
                 )
+            if enabled and not before.enabled:  # 다시 켜면 꺼 둔 동안의 변화로 바로 울리지 않게
+                self._conn.execute("UPDATE alert_rules SET last_state = NULL WHERE id = ?", (id,))
         return self.get(id)
 
     def delete(self, id: int) -> None:
