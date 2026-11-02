@@ -7,7 +7,7 @@ import vater_core
 from vater_core.api.auth import require_token
 from vater_core.api.deps import AppDeps
 from vater_core.api.errors import install_error_handlers
-from vater_core.api.routes import system
+from vater_core.api.routes import settings, system
 
 TAURI_ORIGINS = ("tauri://localhost", "http://tauri.localhost", "https://tauri.localhost")
 DEV_ORIGIN = "http://localhost:5173"
@@ -31,5 +31,6 @@ def create_app(deps: AppDeps) -> FastAPI:
 
     authed = APIRouter(dependencies=[Depends(require_token)])
     authed.include_router(system.router)
+    authed.include_router(settings.router)
     app.include_router(authed)
     return app

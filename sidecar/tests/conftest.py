@@ -8,13 +8,15 @@ from fastapi import FastAPI
 from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
+from vater_core.store.db import open_db
 
 TEST_TOKEN = "test-token"
 
 
 @pytest.fixture
 def deps(tmp_path: Path) -> AppDeps:
-    return AppDeps(token=TEST_TOKEN, dev=False, data_dir=tmp_path / "data")
+    data_dir = tmp_path / "data"
+    return AppDeps(token=TEST_TOKEN, dev=False, data_dir=data_dir, db=open_db(data_dir))
 
 
 @pytest.fixture

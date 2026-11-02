@@ -13,6 +13,7 @@ from vater_core.api.app import create_app
 from vater_core.api.deps import AppDeps
 from vater_core.config import load_runtime
 from vater_core.stdout_events import emit
+from vater_core.store.db import open_db
 
 HOST = "127.0.0.1"  # 다른 주소는 설정으로도 허용하지 않는다
 
@@ -26,7 +27,12 @@ def bind_free_port() -> socket.socket:
 
 def main() -> None:
     runtime = load_runtime()
-    deps = AppDeps(token=runtime.token, dev=runtime.dev, data_dir=runtime.data_dir)
+    deps = AppDeps(
+        token=runtime.token,
+        dev=runtime.dev,
+        data_dir=runtime.data_dir,
+        db=open_db(runtime.data_dir),
+    )
     app = create_app(deps)
 
     sock = bind_free_port()
