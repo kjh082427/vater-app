@@ -32,6 +32,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `src/vater_core/store/` | SQLite 연결, 순차 마이그레이션(`migrations/NNN_*.sql`), 설정 |
 | `src/vater_core/secrets/` | 비밀키 저장(keyring / envfile). 값을 돌려주는 API는 없다 |
 | `src/vater_core/kis/` | 한국투자증권 연동(**조회 전용**) — 아래 표 |
+| `src/vater_core/llm/` | LLM 엔진 관리(하드웨어, 카탈로그, Ollama, 프리셋) — 아래 표 |
 
 ### `kis/` 한국투자증권 연동
 | 파일 | 역할 |
@@ -49,13 +50,29 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 실연동으로 확인한 사실(필드 위치, 정렬 코드, 단위 등)은 [`docs/kis-live-findings.md`](../docs/kis-live-findings.md)에 있다.
 
+### `llm/` LLM 엔진 관리
+| 파일 | 역할 |
+|---|---|
+| `catalog.json`, `catalog.py` | 하드웨어 등급(NVIDIA 24GB·12GB·8GB, 내장 GPU)별 기본 프리셋과 추천 모델, 로컬 모델 5개, 클라우드 제공자 4개. 기본값의 근거는 검증 실험 보고서 |
+| `hardware.py` | `nvidia-smi`(5초 제한)와 RAM으로 등급을 정한다. 실패하면 내장 GPU로 본다 |
+| `ollama.py` | Ollama 상태·시작·모델 받기·`num_ctx` 고정 변형(`<tag>-16k`)·삭제. 꺼져 있는 것은 오류가 아니라 상태다 |
+| `install.py` | 공식 `OllamaSetup.exe`를 받아 **Authenticode 서명을 확인한 뒤에만** 실행하고, 켜질 때까지 기다린다(Windows) |
+| `presets.py` | 프리셋(cloud/local/mixed) → TradingAgents 설정 덮어쓰기 + 환경변수. **API 키는 환경변수로만** 넘긴다 |
+| `cloud.py` | 클라우드 키 연결 테스트(토큰을 쓰지 않는 모델 목록 API, 키는 헤더로만) |
+| `state.py` | 진행 중인 모델 받기·설치 작업, 하드웨어 감지 캐시 |
+
+진행 이벤트(SSE): `llm.pull` `{tag, status, completed, total, percent}` → `done`/`error`, `llm.install` `{stage: download|verify|launch|waiting|done|error}`
+
 ## API (현재)
 `GET /health` · `POST /shutdown` · `GET/PATCH /settings` · `GET /secrets` · `PUT/DELETE /secrets/{name}` · `GET /events` (SSE) · `GET /symbols/search?q=` · `POST /settings/kis/test`
+
+LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `POST /llm/ollama/start` · `POST /llm/ollama/install` · `POST /llm/models/{tag}/pull` · `DELETE /llm/models/{tag}` · `GET /llm/check?preset=` · `POST /settings/llm/test?provider=`
 
 ## 테스트와 검사
 ```bash
 uv run pytest -q                    # 실제 키·LLM이 필요한 테스트는 기본 제외 (kis_live, llm)
 uv run pytest -m kis_live -q -s     # 한투 실연동 (루트 .env 키 읽기, 토큰 캐시 ~/.local/share/vater/dev-kis-cache.env)
+uv run pytest -m llm tests/llm_live -q -s   # GPU·Ollama·클라우드 키 실연동 (없으면 skip)
 uv run ruff check . && uv run ruff format --check . && uv run mypy src tests
 UPDATE_SNAPSHOTS=1 uv run pytest tests/test_openapi_snapshot.py   # API를 의도적으로 바꿨을 때
 ```
