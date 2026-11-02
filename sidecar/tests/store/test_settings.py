@@ -35,6 +35,20 @@ def test_settings_rejects_unknown_and_invalid(tmp_path: Path) -> None:
     assert code_of(repo, {"briefing.us.time": "7:00"}) == "SETTING_INVALID"
 
 
+def test_llm_setting_defaults(tmp_path: Path) -> None:
+    all_ = SettingsRepo(open_db(tmp_path)).get_all()
+    assert all_["llm.local_model"] == ""
+    assert all_["llm.cloud_provider"] == "google"
+    assert all_["llm.cloud_deep_model"] == "" and all_["llm.cloud_quick_model"] == ""
+    assert all_["llm.output_language"] == "Korean"
+
+
+def test_local_model_must_be_catalog_tag(tmp_path: Path) -> None:
+    repo = SettingsRepo(open_db(tmp_path))
+    assert repo.update({"llm.local_model": "qwen3.5:4b"})["llm.local_model"] == "qwen3.5:4b"
+    assert code_of(repo, {"llm.local_model": "evil:1b"}) == "SETTING_INVALID"
+
+
 def test_bool_and_int_are_not_interchangeable(tmp_path: Path) -> None:
     repo = SettingsRepo(open_db(tmp_path))
     assert code_of(repo, {"analysis.debate_rounds": True}) == "SETTING_INVALID"

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from vater_core.api.errors import VaterError
+from vater_core.llm.catalog import catalog_tags
 
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -34,6 +35,14 @@ SETTING_DEFS: dict[str, SettingDef] = {
     "kis.rate_per_sec.vps": SettingDef(int, 2, min=1, max=5),
     "kis.ws_max_subscriptions": SettingDef(int, 41, min=1, max=41),
     "llm.preset": SettingDef(str, "cloud", choices=("cloud", "local", "mixed")),
+    # 빈 문자열 = 아직 고르지 않음(로컬 모델) / 카탈로그 기본값 사용(클라우드 모델)
+    "llm.local_model": SettingDef(str, "", choices=("", *catalog_tags())),
+    "llm.cloud_provider": SettingDef(
+        str, "google", choices=("google", "anthropic", "openai", "compat")
+    ),
+    "llm.cloud_deep_model": SettingDef(str, ""),
+    "llm.cloud_quick_model": SettingDef(str, ""),
+    "llm.output_language": SettingDef(str, "Korean", choices=("Korean", "English")),
     "analysis.debate_rounds": SettingDef(int, 1, min=1, max=5),
     "alerts.poll_interval_sec": SettingDef(int, 30, min=10, max=600),
     "briefing.kr.enabled": SettingDef(bool, True),
