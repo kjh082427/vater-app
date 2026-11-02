@@ -1,0 +1,125 @@
+{
+  "version": "2026-11-03",
+  "tiers": [
+    {
+      "id": "nvidia_24",
+      "label": "NVIDIA GPU (VRAM 24GB 이상)",
+      "min_vram_mb": 23000,
+      "default_preset": "mixed",
+      "recommended": "qwen3.8:27b",
+      "alternatives": [],
+      "expected_minutes": null
+    },
+    {
+      "id": "nvidia_12",
+      "label": "NVIDIA GPU (VRAM 12~16GB)",
+      "min_vram_mb": 11500,
+      "default_preset": "mixed",
+      "recommended": "qwen3.5:9b",
+      "alternatives": [
+        "gemma4:12b"
+      ],
+      "expected_minutes": null
+    },
+    {
+      "id": "nvidia_8",
+      "label": "NVIDIA GPU (VRAM 8GB)",
+      "min_vram_mb": 7500,
+      "default_preset": "cloud",
+      "recommended": "qwen3.5:4b",
+      "alternatives": [],
+      "expected_minutes": 22
+    },
+    {
+      "id": "integrated",
+      "label": "내장 GPU 또는 VRAM 8GB 미만",
+      "min_vram_mb": 0,
+      "default_preset": "cloud",
+      "recommended": null,
+      "alternatives": [
+        "qwen3.5:2b"
+      ],
+      "expected_minutes": null
+    }
+  ],
+  "local_models": [
+    {
+      "tag": "qwen3.5:2b",
+      "label": "Qwen 3.5 2B",
+      "size_gb": 2.68,
+      "num_ctx": 16384,
+      "min_vram_mb": 4000,
+      "note": "실험용. 분석 품질이 낮고 CPU에서는 매우 느립니다."
+    },
+    {
+      "tag": "qwen3.5:4b",
+      "label": "Qwen 3.5 4B",
+      "size_gb": 3.32,
+      "num_ctx": 16384,
+      "min_vram_mb": 6000,
+      "note": "8GB GPU에 다 올라가 끝까지 돌지만(약 22분), 보고서가 비거나 수치를 지어낼 수 있습니다(검증 실험 S1)."
+    },
+    {
+      "tag": "qwen3.5:9b",
+      "label": "Qwen 3.5 9B",
+      "size_gb": 6.55,
+      "num_ctx": 16384,
+      "min_vram_mb": 11000,
+      "note": "12GB 이상 GPU용입니다. 8GB GPU에서는 1.1GB가 CPU로 넘어가 분석 1건에 약 56분 걸립니다(검증 실험 S1)."
+    },
+    {
+      "tag": "gemma4:12b",
+      "label": "Gemma 4 12B",
+      "size_gb": 8.02,
+      "num_ctx": 16384,
+      "min_vram_mb": 11000,
+      "note": "12GB 이상 GPU용 대안입니다."
+    },
+    {
+      "tag": "qwen3.8:27b",
+      "label": "Qwen 3.8 27B",
+      "size_gb": 17.74,
+      "num_ctx": 32768,
+      "min_vram_mb": 22000,
+      "note": "24GB 이상 GPU용입니다."
+    }
+  ],
+  "cloud": {
+    "google": {
+      "label": "Google Gemini",
+      "ta_provider": "google",
+      "secret": "LLM_GOOGLE_KEY",
+      "base_url_secret": null,
+      "deep": "gemini-3.8-flash",
+      "quick": "gemini-3.5-flash-lite",
+      "free_tier": true
+    },
+    "anthropic": {
+      "label": "Anthropic Claude",
+      "ta_provider": "anthropic",
+      "secret": "LLM_ANTHROPIC_KEY",
+      "base_url_secret": null,
+      "deep": "claude-sonnet-5-5",
+      "quick": "claude-haiku-5-5",
+      "free_tier": false
+    },
+    "openai": {
+      "label": "OpenAI",
+      "ta_provider": "openai",
+      "secret": "LLM_OPENAI_KEY",
+      "base_url_secret": null,
+      "deep": "gpt-6-sol",
+      "quick": "gpt-6-luna",
+      "free_tier": false
+    },
+    "compat": {
+      "label": "OpenAI 호환 서버 (기타)",
+      "ta_provider": "openai_compatible",
+      "secret": "LLM_COMPAT_KEY",
+      "base_url_secret": "LLM_COMPAT_BASE_URL",
+      "deep": null,
+      "quick": null,
+      "free_tier": false
+    }
+  }
+}
