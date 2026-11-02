@@ -33,6 +33,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `src/vater_core/secrets/` | 비밀키 저장(keyring / envfile). 값을 돌려주는 API는 없다 |
 | `src/vater_core/kis/` | 한국투자증권 연동(**조회 전용**) — 아래 표 |
 | `src/vater_core/llm/` | LLM 엔진 관리(하드웨어, 카탈로그, Ollama, 프리셋) — 아래 표 |
+| `src/vater_core/analysis/` | AI 종목 분석(TradingAgents 실행, 작업 큐, 국내 데이터 공급자 `kis`) — 아래 표 |
 
 ### `kis/` 한국투자증권 연동
 | 파일 | 역할 |
@@ -63,8 +64,22 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 진행 이벤트(SSE): `llm.pull` `{tag, status, completed, total, percent}` → `done`/`error`, `llm.install` `{stage: download|verify|launch|waiting|done|error}`
 
+### `analysis/` AI 종목 분석
+| 파일 | 역할 |
+|---|---|
+| `symbols.py` | 종목 → TradingAgents 티커(코스피 `.KS`, 코스닥 `.KQ`), 국내는 소셜 애널리스트 제외 |
+| `kis_vendor.py` | **국내 종목용 데이터 공급자 `kis`**: 한투 일봉·기술 지표(stockstats)·재무·뉴스 제목. 워커 스레드에서 이벤트 루프의 한투 클라이언트를 부른다 |
+| `engine.py` | TradingAgents 실행 경계(체크포인트, 노드 스트림, 결정). TradingAgents는 이 파일과 `kis_vendor.py`에서만 import한다 |
+| `queue.py` | 한 번에 1건씩 처리하는 작업 큐. 시작 전 확인, 취소, 다시 시도, 완료 알림. 엔진은 daemon 스레드에서 돈다 |
+| `store.py`, `models.py` | `analyses` 테이블, 엔진·큐·저장소가 함께 쓰는 형식 |
+| `summary.py` | 최종 결정문 → 결정 배지(6개), 3줄 요약, 목표가, 기간 |
+
+진행 이벤트(SSE): `analysis.status` `{id, status, decision?, error?}`, `analysis.progress` `{id, stage, node, elapsed_sec}` (stage: analysts → research → trader → risk → portfolio)
+
 ## API (현재)
 `GET /health` · `POST /shutdown` · `GET/PATCH /settings` · `GET /secrets` · `PUT/DELETE /secrets/{name}` · `GET /events` (SSE) · `GET /symbols/search?q=` · `POST /settings/kis/test`
+
+분석: `POST /analyses` · `GET /analyses?market=&code=` · `GET /analyses/{id}` · `POST /analyses/{id}/cancel` · `POST /analyses/{id}/retry`
 
 LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `POST /llm/ollama/start` · `POST /llm/ollama/install` · `POST /llm/models/{tag}/pull` · `DELETE /llm/models/{tag}` · `GET /llm/check?preset=` · `POST /settings/llm/test?provider=`
 
@@ -73,6 +88,7 @@ LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `P
 uv run pytest -q                    # 실제 키·LLM이 필요한 테스트는 기본 제외 (kis_live, llm)
 uv run pytest -m kis_live -q -s     # 한투 실연동 (루트 .env 키 읽기, 토큰 캐시 ~/.local/share/vater/dev-kis-cache.env)
 uv run pytest -m llm tests/llm_live -q -s   # GPU·Ollama·클라우드 키 실연동 (없으면 skip)
+uv run pytest -m llm tests/analysis_live -q -s   # 실제 분석 2건(국내·미국, Gemini + 한투), 약 30분
 uv run ruff check . && uv run ruff format --check . && uv run mypy src tests
 UPDATE_SNAPSHOTS=1 uv run pytest tests/test_openapi_snapshot.py   # API를 의도적으로 바꿨을 때
 ```
