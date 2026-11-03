@@ -22,7 +22,7 @@ Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python
 | 알림 | `sidecar/src/vater_core/alerts` (+ `api/routes/{watchlist,alerts}.py`, `store/migrations/003_daily_bars.sql`) | `core/alerts` | [#6](https://github.com/kjh082427/vater-app/pull/6) | 알림 규칙 종류·기본값, 지표 계산, 상태 전이·하루 1번 쿨다운, 장 운영 시간·휴장일, 실시간·폴링 감시, 마감 평가 |
 | 일일 브리핑 | `sidecar/src/vater_core/briefing` | `core/briefing` | — | 브리핑 시간, 수집 데이터, 문장 형식 |
 | 데스크톱 셸 | `apps/desktop/src-tauri` | `shell/tauri` | — | 트레이, 알림 표시, 자동 실행, 사이드카 관리 |
-| 디자인 시스템 | `apps/desktop/src/design-system` | `ui/design-system` | — | **색, 글꼴, 버튼 같은 겉모양** |
+| 디자인 시스템 | `apps/desktop/src/design-system` (+ `apps/desktop` 뼈대: `package.json`, `vite.config.ts`, `gallery.html`) | `ui/design-system` | — | **색, 글꼴, 버튼 같은 겉모양**, 숫자 표기(`format/money.ts`). 규칙은 저장소 루트 `DESIGN.md`, 견본은 `gallery.html` |
 | 화면 | `apps/desktop/src/screens` | `ui/screens` | — | **화면 배치와 흐름** |
 | 배포 | `.github/workflows`, `packaging/` | `infra/release` | — | 설치 파일, 자동 업데이트 |
 | 검증 실험 | `spikes/` | `spike/tradingagents-local-llm` | [#3](https://github.com/kjh082427/vater-app/pull/3) | (앱 코드 아님) 결과는 `spikes/tradingagents-local-llm/REPORT.md` |

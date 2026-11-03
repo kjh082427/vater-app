@@ -1,0 +1,525 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T03:24:21+00:00",
+  "title": "Design System: Vater",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "종이",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "chrome": {
+        "role": "neutral",
+        "displayName": "크롬",
+        "canonical": "oklch(97.3% 0.003 106.4)",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252524",
+          "#424240",
+          "#616160",
+          "#828281",
+          "#a5a5a3",
+          "#c9c9c7",
+          "#eeeeec"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "호버",
+        "canonical": "oklch(95.7% 0.004 106.5)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252523",
+          "#424240",
+          "#61615f",
+          "#828280",
+          "#a5a5a2",
+          "#c9c9c6",
+          "#efefec"
+        ]
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "현재 위치",
+        "canonical": "oklch(93.3% 0.005 106.5)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252522",
+          "#42423f",
+          "#61615e",
+          "#82827f",
+          "#a5a5a1",
+          "#c9c9c5",
+          "#efefeb"
+        ]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "글자 선택",
+        "canonical": "oklch(90.7% 0.034 97.7)",
+        "tonalRamp": [
+          "#0c0b06",
+          "#27251b",
+          "#454233",
+          "#66624e",
+          "#87836e",
+          "#a9a594",
+          "#ccc9bc",
+          "#f0efe6"
+        ]
+      },
+      "rule-section": {
+        "role": "primary",
+        "displayName": "구역 먹선",
+        "canonical": "oklch(19.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "경계선",
+        "canonical": "oklch(91.2% 0.005 106.5)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252522",
+          "#42423f",
+          "#61615e",
+          "#82827f",
+          "#a5a5a1",
+          "#c9c9c5",
+          "#efefeb"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "행 구분선",
+        "canonical": "oklch(94.2% 0.005 106.5)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252522",
+          "#42423f",
+          "#61615e",
+          "#82827f",
+          "#a5a5a1",
+          "#c9c9c5",
+          "#efefeb"
+        ]
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "버튼 테두리",
+        "canonical": "oklch(81.9% 0.007 106.6)",
+        "tonalRamp": [
+          "#0b0b08",
+          "#252521",
+          "#42423e",
+          "#61615d",
+          "#83837e",
+          "#a5a5a0",
+          "#c9c9c4",
+          "#efefea"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "먹",
+        "canonical": "oklch(19.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "보조 글자",
+        "canonical": "oklch(39.7% 0.003 106.5)",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252523",
+          "#424240",
+          "#61615f",
+          "#828280",
+          "#a5a5a3",
+          "#c9c9c7",
+          "#efefec"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "셋째 글자",
+        "canonical": "oklch(48.5% 0.005 106.6)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#252523",
+          "#42423f",
+          "#61615e",
+          "#82827f",
+          "#a5a5a2",
+          "#c9c9c6",
+          "#efefeb"
+        ]
+      },
+      "ink-hover": {
+        "role": "primary",
+        "displayName": "먹 호버",
+        "canonical": "oklch(32.0% 0.003 106.6)",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#252523",
+          "#424240",
+          "#61615f",
+          "#828280",
+          "#a5a5a3",
+          "#c9c9c7",
+          "#efefec"
+        ]
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "먹 위 글자",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "up": {
+        "role": "secondary",
+        "displayName": "상승 빨강",
+        "canonical": "oklch(54.1% 0.192 25.1)",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0006",
+          "#7c0f16",
+          "#af2328",
+          "#d74c49",
+          "#f17e77",
+          "#fdb4ad",
+          "#fee9e6"
+        ]
+      },
+      "down": {
+        "role": "secondary",
+        "displayName": "하락 파랑",
+        "canonical": "oklch(48.4% 0.174 261.1)",
+        "tonalRamp": [
+          "#000924",
+          "#062153",
+          "#153d85",
+          "#275cba",
+          "#487fe1",
+          "#76a5f6",
+          "#adcafd",
+          "#e6effd"
+        ]
+      },
+      "caution": {
+        "role": "tertiary",
+        "displayName": "황토",
+        "canonical": "oklch(62.6% 0.125 70.4)",
+        "tonalRamp": [
+          "#140800",
+          "#361f01",
+          "#5b3a0b",
+          "#865509",
+          "#ad7528",
+          "#ca9b63",
+          "#e7c298",
+          "#feebd5"
+        ]
+      },
+      "caution-bg": {
+        "role": "tertiary",
+        "displayName": "황토 바탕",
+        "canonical": "oklch(96.9% 0.038 89.1)",
+        "tonalRamp": [
+          "#0d0b05",
+          "#292519",
+          "#484131",
+          "#69614a",
+          "#8b826b",
+          "#aca591",
+          "#cfc9ba",
+          "#f2eee4"
+        ]
+      },
+      "caution-ink": {
+        "role": "tertiary",
+        "displayName": "황토 글자",
+        "canonical": "oklch(43.1% 0.093 71.6)",
+        "tonalRamp": [
+          "#140800",
+          "#342004",
+          "#583b12",
+          "#7f5824",
+          "#a27a47",
+          "#c09e75",
+          "#dfc4a5",
+          "#fdebd7"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "포커스 링",
+        "canonical": "oklch(19.1% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "screen-title": {
+        "displayName": "화면 제목",
+        "purpose": "화면마다 하나(h1)."
+      },
+      "ai-lead": {
+        "displayName": "AI 첫 문장",
+        "purpose": "브리핑 첫 문장, 분석 요약 첫 줄. Hahmlet."
+      },
+      "section-title": {
+        "displayName": "구역 제목",
+        "purpose": "2px 먹선 아래 구역 머리(h2)."
+      },
+      "ai-body": {
+        "displayName": "AI 본문",
+        "purpose": "AI가 쓴 이어지는 문장과 보고서. Hahmlet, 한 줄 최대 40rem."
+      },
+      "body": {
+        "displayName": "본문",
+        "purpose": "화면 글자, 목록, 설명."
+      },
+      "numeric": {
+        "displayName": "숫자",
+        "purpose": "표와 줄 안의 모든 숫자. 고정폭(tnum), 오른쪽 정렬."
+      },
+      "label": {
+        "displayName": "버튼 글자",
+        "purpose": "버튼, 배너."
+      },
+      "meta": {
+        "displayName": "보조 정보",
+        "purpose": "구역 보조 정보, 표 머리, 상태 표시줄. 최소 크기."
+      },
+      "wordmark": {
+        "displayName": "워드마크",
+        "purpose": "사이드바의 Vater만. Hahmlet."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "duration-fast",
+        "value": "120ms",
+        "purpose": "버튼·메뉴·행의 색 전환."
+      },
+      {
+        "name": "duration-base",
+        "value": "180ms",
+        "purpose": "조금 큰 상태 전환."
+      },
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "모든 상태 전환. 움직임 줄이기 설정에서는 시간이 0."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "min-window",
+        "value": "64rem x 43.75rem (1024x700)"
+      },
+      {
+        "name": "two-up-collapse",
+        "value": "container max-width 52rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "먹으로 채운 주 버튼. 한 화면에 하나.",
+      "html": "<button class=\"ds-btn ds-btn-primary\" type=\"button\">새 분석</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 0.375rem; height: 2rem; padding: 0 0.75rem; border: 1px solid var(--color-control); border-radius: 4px; background: var(--color-paper); color: var(--color-ink); font: 500 0.8125rem/1 var(--font-sans); cursor: pointer; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1), border-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; } .ds-btn-primary { border-color: var(--color-ink); background: var(--color-ink); color: var(--color-on-ink); } .ds-btn-primary:hover { border-color: var(--color-ink-hover); background: var(--color-ink-hover); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "테두리 버튼(기본).",
+      "html": "<button class=\"ds-btn2\" type=\"button\">진행 보기</button>",
+      "css": ".ds-btn2 { display: inline-flex; align-items: center; height: 2rem; padding: 0 0.75rem; border: 1px solid var(--color-control); border-radius: 4px; background: var(--color-paper); color: var(--color-ink); font: 500 0.8125rem/1 var(--font-sans); cursor: pointer; transition: border-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-btn2:hover { border-color: var(--color-ink-2); } .ds-btn2:active { background: var(--color-hover); } .ds-btn2:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "밑줄 글자 버튼. 구역 머리의 작은 행동.",
+      "html": "<button class=\"ds-btn-quiet\" type=\"button\">종목 추가</button>",
+      "css": ".ds-btn-quiet { height: 2rem; padding: 0 0.25rem; border: 0; background: transparent; color: var(--color-ink); font: 500 0.8125rem/1 var(--font-sans); text-decoration: underline; text-decoration-color: var(--color-control); text-underline-offset: 4px; cursor: pointer; } .ds-btn-quiet:hover { text-decoration-color: var(--color-ink); } .ds-btn-quiet:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "크롬 바탕 사이드바의 주 메뉴. 현재 화면은 한 단계 어두운 바탕과 굵은 글자.",
+      "html": "<nav class=\"ds-side\" aria-label=\"주 메뉴\"><span class=\"ds-wordmark\">Vater</span><a class=\"ds-nav\" href=\"#\" aria-current=\"page\">홈</a><a class=\"ds-nav\" href=\"#\">분석</a><a class=\"ds-nav\" href=\"#\">감시·알림<span class=\"ds-badge\">새 2</span></a><a class=\"ds-nav\" href=\"#\">브리핑</a><a class=\"ds-nav\" href=\"#\">설정</a></nav>",
+      "css": ".ds-side { display: grid; gap: 2px; width: 13.5rem; padding: 1.25rem 0.75rem; background: var(--color-chrome); border-right: 1px solid var(--color-line); font: 400 0.875rem/1.25rem var(--font-sans); } .ds-wordmark { padding: 0 0.625rem 1.25rem; font: 600 1.375rem/1.75rem var(--font-serif); letter-spacing: -0.01em; color: var(--color-ink); } .ds-nav { display: flex; align-items: center; height: 2.25rem; padding: 0 0.625rem; border-radius: 4px; color: var(--color-ink-2); text-decoration: none; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1); } .ds-nav:hover { background: var(--color-hover); color: var(--color-ink); } .ds-nav[aria-current='page'] { background: var(--color-selected); color: var(--color-ink); font-weight: 600; } .ds-nav:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; } .ds-badge { margin-left: auto; font-size: 0.75rem; font-weight: 700; color: var(--color-ink); }"
+    },
+    {
+      "name": "Segment Tabs",
+      "kind": "nav",
+      "refersTo": "tab-segment",
+      "description": "구역 머리의 작은 전환(국내/미국). 선택은 먹 바탕.",
+      "html": "<div class=\"ds-seg\" role=\"tablist\" aria-label=\"시장\"><button class=\"ds-seg-tab\" role=\"tab\" aria-selected=\"true\">국내</button><button class=\"ds-seg-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">미국</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; } .ds-seg-tab { height: 1.625rem; padding: 0 0.625rem; border: 1px solid var(--color-line); border-radius: 4px; background: var(--color-paper); color: var(--color-ink-2); font: 400 0.75rem/1 var(--font-sans); cursor: pointer; } .ds-seg-tab:hover { border-color: var(--color-control); color: var(--color-ink); } .ds-seg-tab[aria-selected='true'] { border-color: var(--color-ink); background: var(--color-ink); color: var(--color-on-ink); font-weight: 600; } .ds-seg-tab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Market Chip",
+      "kind": "chip",
+      "refersTo": "market-chip",
+      "description": "시장 개장 상태. 장중은 채운 점, 마감은 빈 원.",
+      "html": "<span class=\"ds-chip\"><i class=\"ds-dot\"></i><b>국내 장중</b> 15:30 마감</span> <span class=\"ds-chip\"><i class=\"ds-dot ds-dot-off\"></i><b>미국 마감</b> 23:30 개장</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 0.375rem; height: 1.625rem; padding: 0 0.625rem; border-radius: 4px; background: var(--color-chrome); color: var(--color-ink-2); font: 400 0.75rem/1rem var(--font-sans); font-variant-numeric: tabular-nums; } .ds-chip b { color: var(--color-ink); font-weight: 600; } .ds-dot { width: 0.4375rem; height: 0.4375rem; border-radius: 999px; background: var(--color-ink); } .ds-dot-off { background: transparent; border: 1.5px solid var(--color-ink-3); }"
+    },
+    {
+      "name": "Section",
+      "kind": "card",
+      "refersTo": "section",
+      "description": "카드 대신 쓰는 그릇: 위쪽 2px 먹선 + 36px 머리 + 본문. 대표 장치.",
+      "html": "<section class=\"ds-sec\"><div class=\"ds-sec-h\"><h2>감시 종목</h2><span class=\"ds-meta\">5종목</span><button class=\"ds-sec-act\" type=\"button\">종목 추가</button></div><div class=\"ds-row\"><b>삼성전자</b><span class=\"ds-num\">71,400원</span><span class=\"ds-num ds-up\">+1,200</span><span class=\"ds-num ds-up\">+1.71%</span></div><div class=\"ds-row\"><b>SK하이닉스</b><span class=\"ds-num\">198,700원</span><span class=\"ds-num ds-down\">−3,300</span><span class=\"ds-num ds-down\">−1.63%</span></div></section>",
+      "css": ".ds-sec { border-top: 2px solid var(--color-rule-section); padding-top: 0.25rem; font: 400 0.875rem/1.25rem var(--font-sans); color: var(--color-ink); } .ds-sec-h { display: flex; align-items: center; gap: 0.625rem; min-height: 2.25rem; } .ds-sec-h h2 { margin: 0; font-size: 0.9375rem; font-weight: 700; } .ds-meta { font-size: 0.75rem; color: var(--color-ink-3); } .ds-sec-act { margin-left: auto; border: 0; background: none; font: 500 0.8125rem var(--font-sans); text-decoration: underline; text-decoration-color: var(--color-control); text-underline-offset: 4px; cursor: pointer; } .ds-row { display: grid; grid-template-columns: 1fr 6rem 5rem 5rem; align-items: center; height: 2.5rem; border-bottom: 1px solid var(--color-rule); } .ds-num { text-align: right; font-variant-numeric: tabular-nums; } .ds-up { color: var(--color-up); } .ds-down { color: var(--color-down); }"
+    },
+    {
+      "name": "Decision Scale",
+      "kind": "custom",
+      "refersTo": "decision-scale",
+      "description": "AI 결정을 5칸 의견 눈금 위의 위치로. 왼쪽 매도 → 오른쪽 매수, 채운 칸 하나만 방향 색, 이름은 먹. 검토 필요는 눈금 밖.",
+      "html": "<span class=\"ds-scale ds-up-tone\" role=\"img\" aria-label=\"AI 의견 비중확대: 매도부터 매수까지 5단계 중 4단계\"><span class=\"ds-bar\"><i></i><i></i><i></i><i class=\"on\"></i><i></i></span>비중확대</span> <span class=\"ds-scale ds-review\" role=\"img\" aria-label=\"AI 의견 검토 필요\"><span class=\"ds-bar\"><i></i><i></i><i></i><i></i><i></i></span>검토 필요</span>",
+      "css": ".ds-scale { display: inline-flex; align-items: center; gap: 0.375rem; font: 700 0.75rem/1rem var(--font-sans); color: var(--color-ink); white-space: nowrap; } .ds-bar { display: inline-grid; grid-template-columns: repeat(5, 0.625rem); gap: 2px; } .ds-bar i { height: 0.5rem; border: 1px solid var(--color-ink-3); } .ds-up-tone .on { border-color: var(--color-up); background: var(--color-up); } .ds-review { color: var(--color-caution-ink); } .ds-review .ds-bar i { border-color: var(--color-caution); }"
+    },
+    {
+      "name": "Caution Banner",
+      "kind": "custom",
+      "refersTo": "banner-caution",
+      "description": "오프라인·끊김·키 오류. 빨강이 아닌 황토, 원인과 해결 버튼을 함께.",
+      "html": "<div class=\"ds-banner\" role=\"alert\"><b>오프라인: 알림 감시 일시 중지</b><span>30초마다 다시 확인합니다. 마지막 수신 14:32:05</span><button class=\"ds-banner-btn\" type=\"button\">지금 다시 확인</button></div>",
+      "css": ".ds-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; min-height: 2.25rem; padding: 0.25rem 0.75rem; border-top: 2px solid var(--color-caution); background: var(--color-caution-bg); color: var(--color-caution-ink); font: 400 0.8125rem/1.125rem var(--font-sans); font-variant-numeric: tabular-nums; } .ds-banner b { font-weight: 700; } .ds-banner-btn { margin-left: auto; height: 1.625rem; padding: 0 0.625rem; border: 1px solid var(--color-control); border-radius: 4px; background: var(--color-paper); color: var(--color-ink); font: 500 0.75rem/1 var(--font-sans); cursor: pointer; } .ds-banner-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "AI Text",
+      "kind": "custom",
+      "refersTo": "ai-lead",
+      "description": "AI가 쓴 문장만 명조 + 왼쪽 1px 선과 들여쓰기(해설 단락). 데이터 숫자는 고딕.",
+      "html": "<p class=\"ds-ai-lead\">반도체 대형주가 지수를 끌어올렸지만, 코스닥은 2차전지 약세에 밀렸습니다.</p><p class=\"ds-ai\">외국인 매수가 대형 반도체주에 몰렸습니다.<span class=\"ds-ai-tag\">AI 해석</span></p><p class=\"ds-data\">외국인 <span class=\"ds-up\">+3,124억</span></p>",
+      "css": ".ds-ai-lead { margin: 0 0 0.375rem; padding-left: 0.75rem; border-left: 1px solid var(--color-control); font: 500 1.25rem/1.875rem var(--font-serif); letter-spacing: -0.01em; color: var(--color-ink); } .ds-ai { margin: 0; padding-left: 0.75rem; border-left: 1px solid var(--color-control); max-width: 40rem; font: 400 0.9375rem/1.5rem var(--font-serif); color: var(--color-ink-2); } .ds-ai-tag { margin-left: 0.25rem; font: 400 0.75rem var(--font-sans); color: var(--color-ink-3); } .ds-data { font: 400 0.8125rem/1.25rem var(--font-sans); color: var(--color-ink-2); font-variant-numeric: tabular-nums; } .ds-up { color: var(--color-up); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "리서치 노트",
+    "overview": "Vater는 증권사 리서치 리포트처럼 읽힌다. 흰 종이에 먹으로 쓰고, 구역은 상자로 가두지 않고 위쪽의 굵은 먹선 한 줄과 여백으로 나눈다. 국내 개인 투자자가 이미 익숙한 문서의 문법(첫 장의 투자의견, 표로 정리된 숫자, 해설 문단)을 그대로 쓰되, 이 앱만의 사실 하나를 글꼴로 드러낸다. **AI가 쓴 문장은 명조(Hahmlet), 데이터에서 나온 숫자와 화면 글자는 고딕(Pretendard)**이다. 사용자는 설명을 읽지 않아도 \"이건 AI의 해석이고, 저 숫자는 데이터\"라는 것을 눈으로 구분한다(스펙 D9 \"브리핑의 숫자는 LLM이 쓰지 않는다\", 원칙 \"숫자는 데이터에서 나온다\").\n\n크롬(사이드바, 상태 표시줄, 버튼)에는 색이 없다. 그래서 화면에서 색은 두 가지 뜻만 가진다. 빨강·파랑은 시세 방향, 황토는 주의(폴링, 끊김, 오프라인, 오류, 검토 필요)다. 앱은 대부분의 시간을 트레이에서 조용히 감시하다가 가끔 열리므로, 평소 화면은 차분하고 바뀐 것만 눈에 띈다. 밀도는 중간이며 읽기 여유를 둔다(행 40px, 본문 14px, AI 첫 문장 20px).\n\n거부한 것: 회색 바탕 위 둥근 흰 카드(국내 금융 앱 표준, 시안 C), 짙은 색 크롬(시안 A의 초록), 다크 OLED와 초록 상승 색(ui-ux-pro-max 추천, 국내 관례와 충돌), 진하게 채운 매수·매도 모양 배지, 그림자·그라데이션·유리 효과.",
+    "keyCharacteristics": [
+      "흰 종이와 먹. 구역은 위쪽 2px 먹선과 여백으로 나눈다. 카드 상자를 쓰지 않는다.",
+      "AI 문장만 명조, 나머지는 모두 고딕. 숫자는 늘 고정폭(tnum)이고 오른쪽 정렬.",
+      "빨강·파랑은 시세 방향 전용, 늘 부호와 함께. 오류도 빨강이 아니라 황토.",
+      "결정은 5칸 \"의견 눈금\"의 위치로 보여 주고, 검토 필요는 눈금 밖.",
+      "라이트 테마 하나. 모든 색은 역할 이름의 토큰이라 다크 테마는 값만 더하면 된다."
+    ],
+    "rules": [
+      {
+        "name": "The 두 가지 뜻 Rule",
+        "body": "빨강과 파랑은 시세 방향에만 쓴다. 미국 종목도 상승은 빨강이다. 오류, 끊김, 오프라인, 폴링, 검토 필요는 황토와 글자로 표시하고, 빨간 오류 표시는 만들지 않는다. 예외는 하나뿐이다: 의견 눈금의 채운 칸 하나는 국내 관례대로 매수 쪽 빨강, 매도 쪽 파랑이다. 결정 이름 글자는 먹이다.",
+        "section": "colors"
+      },
+      {
+        "name": "The 부호 Rule",
+        "body": "방향 색은 늘 부호(`+`, `−`)와 함께 간다. 색만으로 상승·하락을 말하지 않는다. 0은 부호 없이 회색 `0`, `0.00%`이고, 반올림해서 0이 되어도 0이 아니면 부호와 색을 남긴다(`+0.00%`).",
+        "section": "colors"
+      },
+      {
+        "name": "The 역할 이름 Rule",
+        "body": "컴포넌트 CSS는 `var(--color-*)`만 쓰고 색 값을 직접 쓰지 않는다(테스트가 막는다). 1차 버전은 라이트 테마만 낸다. 다크 테마는 `tokens.css`에 `[data-theme='dark']` 블록으로 같은 이름을 다시 정의해서 더한다. `paper`는 \"바탕\", `ink`는 \"글자\"라는 역할이므로 다크에서는 값만 뒤집힌다.",
+        "section": "colors"
+      },
+      {
+        "name": "The 두 목소리 Rule",
+        "body": "명조는 AI가 쓴 문장(그리고 워드마크)에만 쓴다. 화면이 쓰는 말, 버튼, 표, 데이터 숫자는 모두 고딕이다. AI 문장 안에 든 숫자는 명조로 남는다. 그 숫자는 데이터가 아니라 AI의 말이기 때문이다. AI 문장은 `AiText` 컴포넌트로만 쓰고, 덩어리마다 고딕 꼬리표(\"AI 해석\", \"AI 요약\")를 한 번 붙인다.",
+        "section": "typography"
+      },
+      {
+        "name": "The 해설 단락 Rule",
+        "body": "함렛 한글은 대비가 낮아 1배율 Windows에서 고딕과 거의 같아 보인다(비평에서 확인). 그래서 글꼴만 믿지 않는다: `AiText`는 늘 왼쪽 1px `control` 선과 12px 들여쓰기를 가진 블록이다. 리서치 리포트의 해설 단락처럼, 선과 꼬리표가 \"AI의 말\"을 표시하고 명조는 결을 더한다.",
+        "section": "typography"
+      },
+      {
+        "name": "The 고정폭 숫자 Rule",
+        "body": "숫자가 들어간 칸과 줄은 늘 `tabular-nums`(`.vt-num`)다. 숫자 열은 머리와 칸 모두 오른쪽 정렬이다. 숫자 꾸미기는 `format/money.ts`의 함수만 쓰고 화면에서 직접 만들지 않는다.",
+        "section": "typography"
+      },
+      {
+        "name": "The 평면 Rule",
+        "body": "쉬고 있는 요소에는 그림자가 없다. 나중에 메뉴나 대화 상자처럼 정말 떠 있는 것이 생기면 그것에만 그림자를 허락하고 이 문서에 그 값을 적는다.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** 구역을 위쪽 2px 먹선(`rule-section`)과 여백으로 나눈다.",
+      "**Do** AI가 쓴 문장은 `AiText`(Hahmlet)로, 그 밖의 모든 글자와 데이터 숫자는 Pretendard로 쓴다.",
+      "**Do** 숫자는 `format/money.ts`로 꾸미고 `.vt-num`(tnum)으로 오른쪽 정렬한다. 음수는 `−`(U+2212).",
+      "**Do** 상승·하락에는 늘 부호를 붙이고, 0은 회색 `0`, `0.00%`로 둔다.",
+      "**Do** 오류·끊김·오프라인·폴링·검토 필요는 황토(`caution*`)와 글자로, 원인과 해결 버튼을 함께 보여 준다.",
+      "**Do** 주 버튼은 한 화면에 하나만 둔다.",
+      "**Do** 새 색이 필요하면 역할 이름으로 `tokens.css`에 더하고, 글자 4.5:1·그래픽 3:1 대비를 `tokens.test.ts`에 추가한다.",
+      "**Do** 최소 창 1024×700과 배율 1.5에서 `gallery.html#shell`을 찍어 보고 나서 합친다."
+    ],
+    "donts": [
+      "**Don't** 빨강·파랑을 시세 방향 말고 다른 뜻(오류, 강조, 링크, 브랜드)으로 쓰지 않는다.",
+      "**Don't** 회색 바탕 위 둥근 흰 카드, 카드 안의 카드를 쓰지 않는다.",
+      "**Don't** 그림자, 그라데이션, 글로우, 배경 흐림을 쓰지 않는다.",
+      "**Don't** 결정 배지를 진하게 채운 버튼처럼 만들거나 \"매수하기\" 같은 행동 유도를 두지 않는다. Vater는 주문 기능이 없다.",
+      "**Don't** 데이터 숫자를 명조로 쓰거나, AI 문장을 고딕으로 섞지 않는다.",
+      "**Don't** 컴포넌트 CSS에 색 값을 직접 쓰지 않는다(`var(--color-*)`만).",
+      "**Don't** 실행 중 CDN에서 글꼴·아이콘·스타일을 받지 않는다.",
+      "**Don't** 12px보다 작은 글자, 회색만으로 된 본문을 쓰지 않는다."
+    ]
+  }
+}
