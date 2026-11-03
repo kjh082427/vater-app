@@ -34,13 +34,14 @@ describe('Sparkline: 선 하나 + 끝점', () => {
     expect(Number(dot?.getAttribute('cy'))).toBeCloseTo(last?.[1] ?? NaN);
   });
 
-  it('방향은 처음과 끝을 비교해 정하고 이름에 덧붙인다', () => {
+  it('방향을 주지 않으면 처음·끝 비교로 색을 지어내지 않는다: 먹(flat), 이름에 방향 말 없음', () => {
+    // 30일 사이 하락해도 옆 숫자(전일 대비)는 상승일 수 있다. 색은 옆 숫자와 같은 자료여야 한다.
     render(<Sparkline values={[742, 750, 739]} label="코스닥 최근 30일 종가" />);
-    const img = screen.getByRole('img', { name: '코스닥 최근 30일 종가, 하락' });
-    expect(img).toHaveAttribute('data-direction', 'down');
+    const img = screen.getByRole('img', { name: '코스닥 최근 30일 종가' });
+    expect(img).toHaveAttribute('data-direction', 'flat');
   });
 
-  it('방향을 따로 줄 수 있다(그날의 전일 대비 방향으로 색칠)', () => {
+  it('방향을 주면(옆 숫자와 같은 전일 대비 방향) 그 색으로 칠하고 이름에 덧붙인다', () => {
     render(<Sparkline values={[742, 739]} label="코스닥" direction="up" />);
     expect(screen.getByRole('img', { name: '코스닥, 상승' })).toHaveAttribute(
       'data-direction',
@@ -48,12 +49,11 @@ describe('Sparkline: 선 하나 + 끝점', () => {
     );
   });
 
-  it('값이 모두 같으면 가운데 수평선, 보합', () => {
+  it('값이 모두 같으면 가운데 수평선', () => {
     const { container } = render(
       <Sparkline values={[5, 5, 5]} label="보합" width={84} height={22} />,
     );
     expect(points(container).map(([, y]) => y)).toEqual([11, 11, 11]);
-    expect(screen.getByRole('img', { name: '보합, 보합' })).toBeInTheDocument();
   });
 
   it('숫자가 아닌 값은 건너뛴다', () => {

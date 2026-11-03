@@ -127,3 +127,19 @@ def test_re_enabling_a_rule_resets_its_baseline(db: sqlite3.Connection) -> None:
     assert rules.update(r.id, enabled=True).last_state is None
     rules.set_state(r.id, True)
     assert rules.update(r.id, enabled=True).last_state is True  # 이미 켜진 규칙은 그대로
+
+
+def test_close_before_a_day(db: sqlite3.Connection) -> None:
+    bars = BarRepo(db)
+    bars.upsert(
+        "KR",
+        "005930",
+        [
+            Bar(date(2026, 10, 30), 1, 1, 1, 68000, 1),
+            Bar(date(2026, 11, 2), 1, 1, 1, 69000, 1),
+            Bar(date(2026, 11, 3), 1, 1, 1, 71000, 1),  # 그날(장중 미확정일 수 있음)은 빼고 본다
+        ],
+    )
+    assert bars.close_before("KR", "005930", date(2026, 11, 3)) == 69000
+    assert bars.close_before("KR", "005930", date(2026, 10, 30)) is None
+    assert bars.close_before("KR", "000660", date(2026, 11, 3)) is None

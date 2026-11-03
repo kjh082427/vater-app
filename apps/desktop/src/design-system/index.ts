@@ -36,6 +36,7 @@ export {
   SignedNumber,
   type PriceChangeProps,
   type SignedFormat,
+  type SignedTone,
   type SignedNumberProps,
 } from './components/SignedNumber';
 export { Sparkline, type SparklineProps } from './components/Sparkline';

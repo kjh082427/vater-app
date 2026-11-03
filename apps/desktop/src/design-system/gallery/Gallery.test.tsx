@@ -37,12 +37,12 @@ describe('디자인 시스템 견본(gallery.html)', () => {
     expect(screen.getByRole('navigation', { name: '주 메뉴' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo', { name: '상태' })).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('#shell-offline: 오프라인 배너가 붙은 창 틀', () => {
     window.location.hash = '#shell-offline';
     render(<GalleryApp />);
-    expect(screen.getByRole('alert')).toHaveTextContent('오프라인: 알림 감시 일시 중지');
+    expect(screen.getByRole('status')).toHaveTextContent('오프라인: 알림 감시 일시 중지');
   });
 });

@@ -288,6 +288,13 @@ function Numbers() {
             <SignedNumber value={null} format="percent" />
           </div>
         </Row>
+        <Row label='tone="neutral": 시세 방향이 아닌 부호 숫자(목표가 괴리율)'>
+          <div className={styles.inline}>
+            <SignedNumber value={-3.2} format="percent" tone="neutral" />
+            <SignedNumber value={12.4} format="percent" tone="neutral" />
+            <SignedNumber value={0} format="percent" tone="neutral" />
+          </div>
+        </Row>
         <Row label="PriceChange: 한 덩어리">
           <div className={styles.inline}>
             {watchlist.map((r) => (
@@ -508,11 +515,11 @@ function Sparklines() {
           <IndexTable />
           <FlowsLine />
         </Row>
-        <Row label="상승 · 하락 · 보합 · 한 점 · 없음">
+        <Row label="상승 · 하락 · 보합 · 한 점 · 없음 (direction을 줌)">
           <div className={styles.inline}>
-            <Sparkline values={[3, 4, 3.5, 5, 6]} label="상승 예" />
-            <Sparkline values={[6, 5, 5.5, 4, 3]} label="하락 예" />
-            <Sparkline values={[5, 5, 5, 5]} label="보합 예" />
+            <Sparkline values={[3, 4, 3.5, 5, 6]} label="상승 예" direction="up" />
+            <Sparkline values={[6, 5, 5.5, 4, 3]} label="하락 예" direction="down" />
+            <Sparkline values={[5, 5, 5, 5]} label="보합 예" direction="flat" />
             <Sparkline values={[5]} label="한 점 예" />
             <Sparkline values={[]} label="빈 예" />
           </div>

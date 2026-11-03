@@ -6,7 +6,7 @@ import { Button } from './Button';
 import { Disclaimer } from './Disclaimer';
 
 describe('Banner', () => {
-  it('주의(오프라인·오류·끊김): role="alert", 제목과 설명, 행동 버튼', () => {
+  it('주의(오프라인·오류·끊김): 계속 떠 있는 상태라 role="status"(정중히 읽음), 제목과 설명, 행동 버튼', () => {
     render(
       <Banner
         tone="caution"
@@ -16,10 +16,12 @@ describe('Banner', () => {
         30초마다 다시 확인합니다. 마지막 수신 14:32:05
       </Banner>,
     );
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveAttribute('data-tone', 'caution');
-    expect(alert).toHaveTextContent('오프라인: 알림 감시 일시 중지');
-    expect(alert).toHaveTextContent('30초마다 다시 확인합니다. 마지막 수신 14:32:05');
+    // 시각이 바뀔 때마다 끼어들어 읽지 않도록 assertive(alert)를 쓰지 않는다
+    expect(screen.queryByRole('alert')).toBeNull();
+    const banner = screen.getByRole('status');
+    expect(banner).toHaveAttribute('data-tone', 'caution');
+    expect(banner).toHaveTextContent('오프라인: 알림 감시 일시 중지');
+    expect(banner).toHaveTextContent('30초마다 다시 확인합니다. 마지막 수신 14:32:05');
     expect(screen.getByRole('button', { name: '지금 다시 확인' })).toBeInTheDocument();
   });
 

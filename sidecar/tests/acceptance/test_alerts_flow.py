@@ -130,6 +130,11 @@ class World:
         return wid
 
 
+def counts(status: dict[str, Any]) -> dict[str, Any]:
+    """상태 중 감시 루프 개수 부분(markets·feeds는 따로 있다)."""
+    return {k: status[k] for k in ("state", "realtime", "polling")}
+
+
 async def until(cond: Callable[[], bool], timeout: float, what: str) -> float:
     start = time.monotonic()
     while not cond():
@@ -202,7 +207,7 @@ async def test_c1_c5_realtime_tick_alerts_within_5_seconds(world: tuple[World, F
     assert len(fired) == 1 and fired[0].data["code"] == "005930"
     await w.monitor.tick_once()  # 상태는 회차마다 갱신된다(첫 회차는 연결 전이라 폴링)
     status = (await w.api.get("/alerts/status")).json()
-    assert status == {"state": "running", "realtime": 2, "polling": 0}
+    assert counts(status) == {"state": "running", "realtime": 2, "polling": 0}
     await asyncio.sleep(1.2)
     assert len(w.notes) == 1  # C5: 처음부터 참이던 규칙은 울리지 않았다
 
@@ -235,19 +240,19 @@ async def test_c3_websocket_drop_falls_back_to_polling_and_recovers(
     await w.monitor.tick_once()
     await until(lambda: w.realtime is not None and w.realtime.state == "connected", 10, "ws")
     await w.monitor.tick_once()
-    assert w.monitor.status() == {"state": "running", "realtime": 2, "polling": 0}
+    assert counts(w.monitor.status()) == {"state": "running", "realtime": 2, "polling": 0}
 
     assert fake.current is not None and w.realtime is not None
     await fake.current.close()  # 한투가 연결을 끊는다
     await until(lambda: w.realtime is not None and w.realtime.state != "connected", 5, "drop")
     await w.monitor.tick_once()
-    assert w.monitor.status() == {"state": "running", "realtime": 0, "polling": 2}
+    assert counts(w.monitor.status()) == {"state": "running", "realtime": 0, "polling": 2}
 
     await until(lambda: fake.connections >= 2 and w.realtime is not None
                 and w.realtime.state == "connected", 10, "reconnect")  # fmt: skip
     await until(lambda: fake.subscribed.count("005930") >= 2, 5, "resubscribe")
     await w.monitor.tick_once()
-    assert w.monitor.status() == {"state": "running", "realtime": 2, "polling": 0}
+    assert counts(w.monitor.status()) == {"state": "running", "realtime": 2, "polling": 0}
 
 
 async def test_c4_offline_is_reported_and_watch_resumes(world: tuple[World, FakeKis]) -> None:

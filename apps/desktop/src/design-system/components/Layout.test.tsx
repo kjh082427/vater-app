@@ -96,8 +96,8 @@ describe('AppShell: 사이드바 + 본문 + 상태 표시줄', () => {
     );
     const main = screen.getByRole('main');
     expect(within(main).getByRole('heading', { name: '홈' })).toBeInTheDocument();
-    const alert = screen.getByRole('alert');
-    expect(alert.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const banner = screen.getByRole('status');
+    expect(banner.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('navigation', { name: '주 메뉴' })).toBeInTheDocument();
     expect(screen.getByRole('contentinfo', { name: '상태' })).toBeInTheDocument();
     const skip = screen.getByRole('link', { name: '본문으로 건너뛰기' });

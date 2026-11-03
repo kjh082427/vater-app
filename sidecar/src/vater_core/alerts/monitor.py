@@ -22,14 +22,15 @@ import contextlib
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
 
-from vater_core.alerts.clock import MarketClock, MarketId
+from vater_core.alerts.clock import KST, MarketClock, MarketId
 from vater_core.alerts.evaluator import Evaluator, NotifyFn, NowFn
-from vater_core.alerts.rules import Live
+from vater_core.alerts.rules import Live, Reading, condition, parse_rule
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
 from vater_core.kis.models import Quote, UsExchange
@@ -44,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 TICK_SEC = 30.0
 CLOSE_RETRY = timedelta(minutes=5)  # 마감 평가용 일봉을 다시 받기까지 기다리는 시간
+QUOTE_FRESH = timedelta(seconds=30)  # 홈 화면 시세: 이보다 오래되면 한투 REST로 다시 받는다
 MARKETS: tuple[MarketId, ...] = ("KR", "US")
 OFFLINE_CODES = {"KIS_UNREACHABLE"}
 Key = tuple[str, str]
@@ -68,6 +70,17 @@ SleepFn = Callable[[float], Awaitable[None]]
 
 class _Offline(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class WatchQuote:
+    """감시 종목의 최신 시세. `change`는 전일 대비 금액(모르면 None — 지어내지 않는다)."""
+
+    price: float
+    change: float | None
+    change_pct: float
+    at: str  # KST ISO
+    source: str  # realtime | polling | rest
 
 
 def _now_default() -> datetime:
@@ -130,8 +143,19 @@ class AlertMonitor:
         self._last_poll: dict[Key, datetime] = {}
         self._close_done: dict[Key, date] = {}  # 종목별로 마감 평가를 마친 세션 날짜
         self._close_retry: dict[Key, tuple[date, datetime]] = {}  # (세션, 다시 받을 시각)
+        self._last_closed: dict[str, date] = {}  # 시장별 일봉이 확정된 마지막 세션
+        self._rest_tried: dict[
+            Key, datetime
+        ] = {}  # 홈 화면 시세를 한투 REST로 마지막에 시도한 시각
+        self._rest_inflight: dict[Key, asyncio.Future[WatchQuote | None]] = {}
         self._last_eval: dict[Key, float] = {}
         self._pending: dict[Key, Tick] = {}
+        self._quotes: dict[Key, WatchQuote] = {}
+        self._prev_close: dict[
+            Key, tuple[date, float]
+        ] = {}  # (세션, 전일 종가) — REST 시세에서 배움
+        self._markets: dict[str, str] = {}
+        self._feeds: list[dict[str, str]] = []
 
     # ---- 공용 ----------------------------------------------------------------
 
@@ -145,7 +169,155 @@ class AlertMonitor:
 
     def status(self) -> dict[str, Any]:
         state = "paused" if self._paused else self._state
-        return {"state": state, "realtime": self._counts[0], "polling": self._counts[1]}
+        return {
+            "state": state,
+            "realtime": self._counts[0],
+            "polling": self._counts[1],
+            "markets": dict(self._markets),
+            "feeds": [dict(f) for f in self._feeds],
+        }
+
+    def quotes(self) -> dict[Key, WatchQuote]:
+        return dict(self._quotes)
+
+    async def watch_quotes(self) -> list[dict[str, Any]]:
+        """홈 화면용: 감시 종목마다 최신 시세와 수신 상태.
+
+        감시 루프의 시세가 30초 안이면 그대로 쓰고, 아니면 한투 REST로 받아 30초 동안 쓴다
+        (앱 시작 직후, 장 마감, 장중 감시 규칙이 없는 종목).
+        한투가 실패하면 그 종목만 예전 시세나 None.
+        """
+        now = self._now()
+        feeds = {(f["market"], f["code"]): f["feed"] for f in self._feeds}
+
+        async def one(item: WatchItem) -> dict[str, Any]:
+            key = _key(item)
+            quote = self._quotes.get(key)
+            if quote is None or now - datetime.fromisoformat(quote.at) >= QUOTE_FRESH:
+                quote = await self._rest_quote_once(item, now) or quote
+            return {
+                "watchlist_id": item.id,
+                "market": item.market,
+                "code": item.code,
+                "name": item.name,
+                "price": quote.price if quote else None,
+                "change": quote.change if quote else None,
+                "change_pct": quote.change_pct if quote else None,
+                "at": quote.at if quote else None,
+                "source": quote.source if quote else None,
+                "feed": feeds.get(key, "idle"),
+            }
+
+        return list(await asyncio.gather(*(one(i) for i in WatchlistRepo(self._db()).list())))
+
+    async def _rest_quote_once(self, item: WatchItem, now: datetime) -> WatchQuote | None:
+        """종목당 30초에 한 번만 한투를 부른다(실패도 센다). 동시에 온 요청은 같은 호출을 기다린다.
+
+        감시 루프가 끊김(offline)이면 부르지 않는다: 종목마다 연결 제한 시간을 기다리지 않게.
+        """
+        key = _key(item)
+        if self._state == "offline":
+            return None
+        running = self._rest_inflight.get(key)
+        if running is not None:
+            return await asyncio.shield(running)
+        tried = self._rest_tried.get(key)
+        if tried is not None and now - tried < QUOTE_FRESH:
+            return None
+        self._rest_tried[key] = now
+        task = asyncio.ensure_future(self._rest_quote(item))
+        self._rest_inflight[key] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if self._rest_inflight.get(key) is task:
+                del self._rest_inflight[key]
+
+    async def preview(
+        self, item: WatchItem, kind: str, params: dict[str, Any], timing: str
+    ) -> Reading:
+        """규칙을 저장하지 않고 지금 조건을 계산한다(규칙 편집기의 '미리보기: 현재 지표값').
+
+        일봉이 아직 없으면(방금 추가한 종목) 먼저 받는다.
+        장중의 realtime 규칙은 현재가를 오늘 종가로 가정한다(알림 판정과 같은 규칙).
+        한투가 실패해도 가진 데이터로 계산하고, 부족하면 '계산 불가'.
+        """
+        parsed = parse_rule(kind, params)
+        market = cast(MarketId, item.market)
+        bars = BarRepo(self._db())
+        day = await self._clock.last_closed_session(market)
+        if day is not None:
+            last = bars.last_day(item.market, item.code)
+            if last is None or last < day:
+                try:
+                    await self._bars(item, day)
+                except Exception as e:
+                    logger.warning("rule preview %s %s: bars failed: %s", item.market, item.code, e)
+        live: Live | None = None
+        if timing == "realtime" and await self._clock.is_open(market):
+            try:
+                q = await self._price(item)
+                session = await self._clock.session_date(market)
+                live = Live(day=session, price=q.price, change_pct=q.change_pct, volume=q.volume)
+            except Exception as e:
+                logger.warning("rule preview %s %s: price failed: %s", item.market, item.code, e)
+        return condition(parsed, bars.history(item.market, item.code), live)
+
+    async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
+        try:
+            q = await self._price(item)
+        except Exception as e:  # 홈 화면 한 줄 때문에 전체가 실패하지 않게 한다
+            level = (
+                logging.DEBUG if getattr(e, "code", "") == "KIS_NOT_CONFIGURED" else logging.WARNING
+            )
+            logger.log(level, "watch quote %s %s failed: %s", item.market, item.code, e)
+            return None
+        self._record_quote(item, q.price, q.change_pct, q.change, "rest")
+        return self._quotes.get(_key(item))
+
+    def _record_quote(
+        self,
+        item: WatchItem,
+        price: float,
+        change_pct: float,
+        change: float | None,
+        source: str,
+    ) -> None:
+        """최신 시세를 보관하고 SSE `quote`로 보낸다(틱은 이미 종목당 1초 1번으로 걸러져 온다)."""
+        key = _key(item)
+        day = self._session_day.get(item.market)
+        if change is not None:
+            if day is not None:
+                self._prev_close[key] = (day, price - change)
+        elif day is not None:
+            prev = self._prev_close.get(key)
+            done = self._close_done.get(key)
+            # 받아 둔 일봉의 전 세션 종가는 이 종목의 직전 세션 마감 평가(일봉 받기)가 끝났을 때만
+            # 믿는다. 그 전에는 더 오래된 일봉일 수 있어서, 틀린 숫자 대신 null로 둔다.
+            settled = done is not None and done < day and done == self._last_closed.get(item.market)
+            if (prev is None or prev[0] != day) and settled:
+                close = BarRepo(self._db()).close_before(item.market, item.code, day)
+                if close is not None:
+                    prev = (day, close)
+                    self._prev_close[key] = prev
+            if prev is not None and prev[0] == day:
+                change = round(price - prev[1], 6)
+        at = self._now().astimezone(KST).isoformat(timespec="seconds")
+        quote = WatchQuote(price, change, change_pct, at, source)
+        self._quotes[key] = quote
+        if self._deps.events is not None:
+            self._deps.events.publish(
+                "quote",
+                {
+                    "market": item.market,
+                    "code": item.code,
+                    "price": price,
+                    "change": change,
+                    "change_pct": change_pct,
+                    "at": at,
+                    "source": source,
+                },
+            )
 
     def _publish_status(self) -> None:
         status = self.status()
@@ -201,23 +373,35 @@ class AlertMonitor:
         offline = False
         any_open = False
         realtime = polling = 0
+        items: list[WatchItem] = []
+        feeds: dict[Key, str] = {}
         try:
             items = WatchlistRepo(self._db()).list()
             rules = RuleRepo(self._db()).list(enabled_only=True)
             timings: dict[int, set[str]] = {}
             for r in rules:
                 timings.setdefault(r.watchlist_id, set()).add(r.timing)
+            opens = {m: await self._clock.is_open(m) for m in MARKETS}
+            self._markets = {m: "open" if opens[m] else "closed" for m in MARKETS}
             for market in MARKETS:
                 mine = [i for i in items if i.market == market]
                 await self._close_pass(market, mine, timings)
-                if await self._clock.is_open(market):
+                if opens[market]:
                     any_open = True
                     live_items = [i for i in mine if "realtime" in timings.get(i.id, set())]
-                    rt, polled = await self._open_market(market, live_items)
-                    realtime += rt
-                    polling += polled
+                    live_keys, polled_keys = await self._open_market(market, live_items)
+                    realtime += len(live_keys)
+                    polling += len(polled_keys)
+                    for i in mine:
+                        k = _key(i)
+                        feeds[k] = (
+                            "realtime"
+                            if k in live_keys
+                            else ("polling" if k in polled_keys else "idle")
+                        )
                 else:
                     await self._unsubscribe_market(market)
+                    feeds.update({_key(i): "closed" for i in mine})
         except _Offline:
             offline = True
         except VaterError as e:
@@ -227,6 +411,18 @@ class AlertMonitor:
         self._stop_realtime_if_idle()
         self._state = "offline" if offline else ("running" if any_open else "closed")
         self._counts = (realtime, polling)
+        self._feeds = [
+            {
+                "market": i.market,
+                "code": i.code,
+                "feed": "offline" if offline else feeds.get(_key(i), "idle"),
+            }
+            for i in items
+        ]
+        watched = {_key(i) for i in items}
+        for key in [k for k in self._quotes if k not in watched]:  # 감시 종목에서 지웠다
+            self._quotes.pop(key, None)
+            self._prev_close.pop(key, None)
         self._publish_status()
 
     async def _guard(self, item: WatchItem, call: Awaitable[Any]) -> Any:
@@ -244,7 +440,9 @@ class AlertMonitor:
             logger.warning("alert monitor: %s %s failed: %s", item.market, item.code, e)
             return None
 
-    async def _open_market(self, market: MarketId, items: list[WatchItem]) -> tuple[int, int]:
+    async def _open_market(
+        self, market: MarketId, items: list[WatchItem]
+    ) -> tuple[set[Key], set[Key]]:
         self._session_day[market] = await self._clock.session_date(market)
         wanted = {_key(i): i for i in items}
         rt = self._ensure_realtime() if items else self._rt
@@ -272,8 +470,9 @@ class AlertMonitor:
             quote = await self._guard(item, self._price(item))
             self._last_poll[_key(item)] = now
             if quote is not None:
+                self._record_quote(item, quote.price, quote.change_pct, quote.change, "polling")
                 self._evaluate_live(item, quote.price, quote.change_pct, quote.volume)
-        return len(live_keys), len(to_poll)
+        return live_keys, {_key(i) for i in to_poll}
 
     async def _close_pass(
         self, market: MarketId, items: list[WatchItem], timings: dict[int, set[str]]
@@ -283,6 +482,7 @@ class AlertMonitor:
         day = await self._clock.last_closed_session(market)
         if day is None:
             return
+        self._last_closed[market] = day
         now = self._now()
         bars = BarRepo(self._db())
         evaluator = self._evaluator()
@@ -363,7 +563,9 @@ class AlertMonitor:
 
     def _evaluate_tick(self, key: Key, tick: Tick) -> None:
         self._last_eval[key] = self._monotonic()
-        self._evaluate_live(self._subscribed[key], tick.price, tick.change_pct, tick.volume)
+        item = self._subscribed[key]
+        self._record_quote(item, tick.price, tick.change_pct, None, "realtime")
+        self._evaluate_live(item, tick.price, tick.change_pct, tick.volume)
 
     def _evaluate_live(self, item: WatchItem, price: float, change_pct: float, volume: int) -> None:
         day = self._session_day.get(item.market)

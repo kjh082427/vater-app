@@ -119,4 +119,47 @@ describe('DataTable', () => {
     );
     expect(screen.getByText('지수').closest('caption')).toHaveAttribute('data-hidden', 'false');
   });
+
+  it('행 안의 버튼은 행을 열지 않는다: Enter는 버튼만, 버튼 클릭은 행을 열지 않고, 다른 곳 클릭은 연다', async () => {
+    const user = userEvent.setup();
+    const onRowActivate = vi.fn();
+    const onRemove = vi.fn();
+    const withButton: Column<Row>[] = [
+      ...columns,
+      {
+        key: 'remove',
+        header: '삭제',
+        cell: (r) => (
+          <button type="button" onClick={() => onRemove(r.code)}>
+            {`${r.name} 삭제`}
+          </button>
+        ),
+      },
+    ];
+    render(
+      <DataTable
+        caption="감시 종목"
+        columns={withButton}
+        rows={rows}
+        rowKey={(r) => r.code}
+        onRowActivate={onRowActivate}
+      />,
+    );
+    const remove = screen.getByRole('button', { name: '삼성전자 삭제' });
+    remove.focus();
+    await user.keyboard('{Enter}');
+    expect(onRemove).toHaveBeenCalledWith('005930');
+    expect(onRowActivate).not.toHaveBeenCalled();
+
+    await user.keyboard(' ');
+    expect(onRemove).toHaveBeenCalledTimes(2);
+    expect(onRowActivate).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'SK하이닉스 삭제' }));
+    expect(onRemove).toHaveBeenLastCalledWith('000660');
+    expect(onRowActivate).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('cell', { name: 'NAVER' }));
+    expect(onRowActivate).toHaveBeenCalledWith(rows[2]);
+  });
 });
