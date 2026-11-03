@@ -1,65 +1,15 @@
 import { useState } from 'react';
 import { useResource } from '../../api/useResource';
 import type { BriefingDetail, BriefingItem, MarketCode } from '../../api/types';
-import {
-  AiText,
-  DataTable,
-  directionOf,
-  formatNumber,
-  Section,
-  SignedNumber,
-  Sparkline,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
-  type Column,
-} from '../../design-system';
-import { missingLabel, parseIndices, type IndexRow } from '../briefing/data';
+import { AiText, Section, Tab, TabList, TabPanel, Tabs } from '../../design-system';
+import { missingLabel, parseIndices } from '../briefing/data';
+import { IndexTable } from '../briefing/tables';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
-import { MissingValue } from '../common/quotes';
 import common from '../common/screen.module.css';
 import { formatDay, formatHm } from '../common/time';
 import styles from './home.module.css';
 
 const MARKET_NAME: Record<MarketCode, string> = { KR: '국내', US: '미국' };
-
-const indexColumns: Column<IndexRow>[] = [
-  { key: 'name', header: '지수', cell: (r) => <b>{r.name}</b> },
-  {
-    key: 'value',
-    header: '종가',
-    numeric: true,
-    cell: (r) => (r.value === null ? <MissingValue /> : formatNumber(r.value, 2)),
-  },
-  {
-    key: 'change',
-    header: '전일 대비',
-    numeric: true,
-    cell: (r) => <SignedNumber value={r.change} format="number" decimals={2} />,
-  },
-  {
-    key: 'pct',
-    header: '등락률',
-    numeric: true,
-    cell: (r) => <SignedNumber value={r.changePct} format="percent" />,
-  },
-  {
-    key: 'spark',
-    header: <span className={common.afterNumeric}>최근 30일</span>,
-    width: '7rem',
-    cell: (r) => (
-      <span className={common.afterNumeric}>
-        {/* 선 색은 옆 숫자와 같은 자료: 그날 전일 대비 방향 */}
-        <Sparkline
-          values={r.closes}
-          label={`${r.name} 최근 30일 종가`}
-          direction={directionOf(r.change)}
-        />
-      </span>
-    ),
-  },
-];
 
 function useLatestBriefing(market: MarketCode) {
   return useResource<BriefingDetail | null>(
@@ -102,6 +52,8 @@ function EmptyBriefing({
 
 function BriefingBody({ detail }: { detail: BriefingDetail }) {
   const rows = parseIndices(detail.data);
+  // AI 해석이 빠진 것은 위의 "AI 해석 없음(데이터만)"이 이미 말한다
+  const missing = detail.missing.filter((m) => m !== 'interpretation');
   return (
     <div className={styles.brief}>
       {detail.headline ? (
@@ -111,18 +63,11 @@ function BriefingBody({ detail }: { detail: BriefingDetail }) {
       ) : (
         <p className={common.meta}>AI 해석 없음(데이터만)</p>
       )}
-      {rows.length > 0 ? (
-        <DataTable
-          caption="지수"
-          columns={indexColumns}
-          rows={rows}
-          rowKey={(r) => r.code || r.name}
-        />
-      ) : null}
+      {rows.length > 0 ? <IndexTable rows={rows} /> : null}
       <div className={styles.briefFoot}>
-        {detail.missing.length > 0 ? (
+        {missing.length > 0 ? (
           <span className={common.meta}>
-            {`빠진 항목: ${detail.missing.map(missingLabel).join(', ')}`}
+            {`빠진 항목: ${missing.map(missingLabel).join(', ')}`}
           </span>
         ) : (
           <span />

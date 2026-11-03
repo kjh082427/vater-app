@@ -391,6 +391,83 @@ export const briefingKr: BriefingDetail = {
         closes: closes(760, kqSteps),
       },
     ],
+    sectors: {
+      KOSPI: {
+        index: { code: '0001', name: '코스피', value: 2583.27, change: 21.48, change_pct: 0.84 },
+        advancers: 512,
+        decliners: 318,
+        unchanged: 76,
+        sectors: [
+          { code: '0013', name: '전기전자', value: 31244.1, change: 701.2, change_pct: 2.3 },
+          { code: '0005', name: '음식료품', value: 3820.5, change: -21.0, change_pct: -0.55 },
+          { code: '0008', name: '화학', value: 4120.7, change: 0, change_pct: 0 },
+        ],
+      },
+      KOSDAQ: {
+        index: { code: '1001', name: '코스닥', value: 742.15, change: -4.12, change_pct: -0.55 },
+        advancers: 610,
+        decliners: 902,
+        unchanged: 88,
+        sectors: [{ code: '1012', name: '반도체', value: 1520.2, change: 9.1, change_pct: 0.6 }],
+      },
+    },
+    movers: {
+      up: [
+        {
+          rank: 1,
+          code: '123456',
+          name: '가나전자',
+          price: 12300,
+          change_pct: 29.92,
+          trading_value: 51200000000,
+        },
+      ],
+      down: [
+        {
+          rank: 1,
+          code: '654321',
+          name: '다라바이오',
+          price: 4100,
+          change_pct: -18.4,
+          trading_value: 820000000,
+        },
+      ],
+      value: [
+        {
+          rank: 1,
+          code: '005930',
+          name: '삼성전자',
+          price: 71400,
+          change_pct: 1.71,
+          trading_value: 1824000000000,
+        },
+        {
+          rank: 2,
+          code: '000660',
+          name: 'SK하이닉스',
+          price: 198500,
+          change_pct: -1.63,
+          trading_value: 950000000,
+        },
+      ],
+    },
+    // 투자자 수급: 단위 백만원(kis/market.py InvestorFlows)
+    flows: {
+      KOSPI: { day: '2026-11-02', foreign: 312400, institution: -152000, individual: -160400 },
+      KOSDAQ: { day: '2026-11-02', foreign: 40, institution: -320, individual: 0 },
+    },
+    watchlist: [
+      { code: '005930', name: '삼성전자', price: 71400, change_pct: 1.71 },
+      { code: '000660', name: 'SK하이닉스', price: 198500, change_pct: -1.63 },
+    ],
+    alerts: [
+      {
+        fired_at: '2026-11-02T13:58:10+09:00',
+        name: '삼성전자',
+        kind: 'price_above',
+        message: '삼성전자 현재가 71,400 — 목표가 71,000 이상',
+      },
+    ],
   },
 };
 
@@ -399,9 +476,9 @@ export const briefingUs: BriefingDetail = {
   market: 'US',
   date: '2026-11-02',
   status: 'partial',
-  missing: ['sectors'],
+  missing: ['interpretation'],
   created_at: '2026-11-03T07:00:30+09:00',
-  headline: '기술주가 쉬어 가며 나스닥이 소폭 내렸습니다. (예시)',
+  headline: null,
   text: null,
   data: {
     market: 'US',
@@ -426,6 +503,16 @@ export const briefingUs: BriefingDetail = {
           kqSteps.map((s) => s * 10),
         ),
       },
+      {
+        code: 'NDX',
+        name: '나스닥100',
+        value: 20511.9,
+        change: 12.7,
+        change_pct: 0.06,
+        closes: closes(20400, krSteps),
+      },
     ],
+    watchlist: [{ code: 'AAPL', name: '애플', price: 227.48, change_pct: 0.95 }],
+    alerts: [],
   },
 };

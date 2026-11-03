@@ -62,17 +62,14 @@ describe('최근 브리핑', () => {
     );
   });
 
-  it('미국 탭: 빠진 항목과 AI 해석이 없을 때', async () => {
-    const us = mock.db.briefings.find((b) => b.market === 'US');
-    if (!us) throw new Error('fixture');
-    us.headline = null;
+  it('미국 탭: AI 해석이 없으면 "AI 해석 없음(데이터만)"(빠진 항목에 다시 쓰지 않음)', async () => {
     renderHome();
     const card = section('최근 브리핑');
     await within(card).findByText(/반도체 대형주/);
     await userEvent.click(within(card).getByRole('tab', { name: '미국' }));
     expect(await within(card).findByText('S&P500')).toBeInTheDocument();
     expect(within(card).getByText('AI 해석 없음(데이터만)')).toBeInTheDocument();
-    expect(within(card).getByText('빠진 항목: 업종')).toBeInTheDocument();
+    expect(within(card).queryByText(/빠진 항목/)).not.toBeInTheDocument();
     expect(within(card).getByText('11월 2일(월) 미국 마감 · 07:00')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: '브리핑 읽기' })).toHaveAttribute(
       'href',

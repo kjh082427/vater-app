@@ -38,7 +38,7 @@ describe('앱 틀', () => {
     ['#/alerts', '감시·알림', '감시·알림'],
     ['#/symbols/KR/005930', '감시·알림', '감시·알림'],
     ['#/briefings', '브리핑', '브리핑'],
-    ['#/briefings/21', '브리핑', '브리핑'],
+    ['#/briefings/21', '11월 2일(월) 국내 시장 브리핑', '브리핑'],
     ['#/settings', '설정', '설정'],
   ])('%s → 화면 %s, 사이드바 %s', async (hash, title, nav) => {
     renderApp(hash);

@@ -7,6 +7,8 @@ import { ScreenHeader } from '../screens/common/ScreenHeader';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { AnalysesScreen } from '../screens/analysis/AnalysesScreen';
 import { AnalysisDetailScreen } from '../screens/analysis/AnalysisDetailScreen';
+import { BriefingDetailScreen } from '../screens/briefing/BriefingDetailScreen';
+import { BriefingsScreen } from '../screens/briefing/BriefingsScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { formatClock } from '../screens/common/time';
 import styles from './app.module.css';
@@ -130,8 +132,9 @@ function screenFor(route: Route): ReactNode {
     case 'symbol':
       return <AlertsScreen focus={{ market: route.market, code: route.code }} />;
     case 'briefings':
+      return <BriefingsScreen />;
     case 'briefing':
-      return <Placeholder title="브리핑" />;
+      return <BriefingDetailScreen key={route.id} id={route.id} />;
     case 'settings':
       return <Placeholder title="설정" />;
     default:
