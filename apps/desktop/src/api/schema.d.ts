@@ -1086,7 +1086,7 @@ export interface components {
        * State
        * @enum {string}
        */
-      state: 'running' | 'paused' | 'offline' | 'closed';
+      state: 'running' | 'paused' | 'offline' | 'auth_invalid' | 'closed';
     };
     /** MonitorStatus */
     MonitorStatus: {
@@ -1104,7 +1104,7 @@ export interface components {
        * State
        * @enum {string}
        */
-      state: 'running' | 'paused' | 'offline' | 'closed';
+      state: 'running' | 'paused' | 'offline' | 'auth_invalid' | 'closed';
     };
     /** OllamaStatusOut */
     OllamaStatusOut: {

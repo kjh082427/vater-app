@@ -50,6 +50,7 @@ describe('watchSummary: 사이드바 아래 감시 상태', () => {
     ['running', 'on', '알림 감시 중'],
     ['paused', 'off', '감시 일시 중지됨'],
     ['offline', 'caution-strong', '감시 멈춤 · 오프라인'],
+    ['auth_invalid', 'caution-strong', '감시 멈춤 · 한투 키 확인 필요'],
     ['closed', 'off', '장 외 시간 · 감시 쉼'],
   ] as const)('%s → %s %s', (state, tone, text) => {
     expect(watchSummary(state)).toEqual({ tone, text });
