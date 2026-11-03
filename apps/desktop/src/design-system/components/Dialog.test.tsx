@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
+import { Select } from './Select';
 
 function Confirm({ onClose }: { onClose?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -86,5 +87,37 @@ describe('Dialog: 모달 대화 상자', () => {
     await user.click(screen.getByRole('button', { name: '취소' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
+  });
+});
+
+describe('Dialog 안의 Select (리뷰 I1)', () => {
+  it('Esc는 열린 목록만 닫고 대화 상자는 그대로 둔다', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    function WithSelect() {
+      const [v, setV] = useState('kr');
+      return (
+        <Dialog open title="칸 설정" onClose={onClose}>
+          <Select
+            label="시장"
+            value={v}
+            options={[
+              { value: 'kr', label: '국내' },
+              { value: 'us', label: '미국' },
+            ]}
+            onChange={setV}
+          />
+        </Dialog>
+      );
+    }
+    render(<WithSelect />);
+    await user.click(screen.getByRole('button', { name: /시장/ }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

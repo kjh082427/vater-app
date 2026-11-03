@@ -54,7 +54,9 @@ export function niceTicks(lo: number, hi: number): number[] {
   let step = niceStep(range / 4);
   for (let tries = 0; tries < 6; tries += 1) {
     const ticks: number[] = [];
-    for (let t = Math.ceil(lo / step) * step; t < hi; t += step) {
+    // 범위가 부동소수 한 칸 수준이면 t += step이 t를 바꾸지 못한다: 멈추고 고르게 나눈다(리뷰 C1).
+    for (let t = Math.ceil(lo / step) * step, n = 0; t < hi && n < 50; t += step, n += 1) {
+      if (t + step === t) break;
       if (t > lo) ticks.push(Math.round(t / step) * step);
     }
     if (ticks.length >= 3) {
@@ -139,7 +141,8 @@ export function LineChart({
   const all = points.map((i) => values[i] as number).concat(isNum(baseline) ? [baseline] : []);
   let lo = Math.min(...all);
   let hi = Math.max(...all);
-  if (hi === lo) {
+  if (hi - lo <= Math.abs(hi) * 1e-9) {
+    // 모두 같거나 부동소수 오차만큼만 다르면 평평한 선으로 본다
     const spread = Math.abs(hi) * 0.01 || 1;
     lo -= spread;
     hi += spread;

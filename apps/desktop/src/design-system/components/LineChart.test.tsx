@@ -133,3 +133,22 @@ describe('niceTicks: 보기 좋은 y축 눈금 3개', () => {
     expect(niceTicks(5, 5)).toHaveLength(3);
   });
 });
+
+describe('LineChart: 부동소수 한 칸 차이 범위 (리뷰 C1)', () => {
+  it('niceTicks가 멈추지 않고 눈금 3개를 준다', () => {
+    expect(niceTicks(0.3, 0.30000000000000004)).toHaveLength(3);
+    expect(niceTicks(2500.12, 2500.1200000000003)).toHaveLength(3);
+  });
+
+  it('거의 같은 값들로도 그려진다', () => {
+    render(
+      <LineChart
+        values={[0.1 + 0.2, 0.3]}
+        direction="flat"
+        format={(n) => formatNumber(n, 2)}
+        aria-label="거의 같은 값"
+      />,
+    );
+    expect(screen.getByRole('img', { name: /거의 같은 값/ })).toBeInTheDocument();
+  });
+});
