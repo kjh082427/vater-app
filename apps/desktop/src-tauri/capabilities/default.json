@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "주 창: Tauri 기본 기능(이벤트 수신 포함)만. 앱 커맨드는 get_sidecar_info, get_autostart, set_autostart",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
