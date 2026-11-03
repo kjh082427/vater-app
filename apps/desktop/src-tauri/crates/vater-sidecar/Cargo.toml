@@ -1,0 +1,10 @@
+[package]
+name = "vater-sidecar"
+version = "0.1.0"
+edition = "2024"
+description = "Vater 셸의 사이드카 실행·감시·재시작·종료 (Tauri에 의존하지 않는 순수 로직)"
+publish = false
+
+# 버전은 배포된 지 2주가 지난 것으로 고정한다 (shell/tauri 계획서 Tech Stack).
+[dependencies]
+serde_json = "=1.0.154"
