@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { useResource } from '../../api/useResource';
 import type { AnalysisItem } from '../../api/types';
-import { DataTable, DecisionScale, Section, type Column } from '../../design-system';
+import { Card, DataTable, DecisionScale, type Column } from '../../design-system';
 import { navigate } from '../../app/router';
 import { PRESET_LABEL } from '../../app/status';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
-import { Field } from '../common/Field';
 import form from '../common/form.module.css';
 import { StockName } from '../common/quotes';
 import common from '../common/screen.module.css';
 import { formatDay, formatDayTime } from '../common/time';
 import { toDecision } from './decision';
 import { STATUS_LABEL } from './stages';
+import { SelectField } from '../common/SelectField';
 
 const LIMIT = 50;
 
@@ -29,7 +29,7 @@ const columns: Column<AnalysisItem>[] = [
   },
   {
     key: 'preset',
-    header: '프리셋',
+    header: 'AI 사용 방식',
     width: '5rem',
     cell: (a) => PRESET_LABEL[a.preset] ?? a.preset,
   },
@@ -76,26 +76,18 @@ export function AnalysisHistory() {
   for (const a of all.data ?? []) options.set(`${a.market}:${a.code}`, a.name ?? a.code);
 
   return (
-    <Section title="분석 이력" meta={rows && rows.length > 0 ? `${rows.length}건` : undefined}>
+    <Card title="분석 이력" description={rows && rows.length > 0 ? `${rows.length}건` : undefined}>
       {(all.data?.length ?? 0) > 0 ? (
         <div className={form.row}>
-          <Field label="종목">
-            {(control) => (
-              <select
-                {...control}
-                className={form.control}
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-              >
-                <option value="">전체 종목</option>
-                {[...options].map(([value, name]) => (
-                  <option key={value} value={value}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          <SelectField
+            label="종목"
+            value={symbol}
+            onChange={setSymbol}
+            options={[
+              { value: '', label: '전체 종목' },
+              ...[...options].map(([value, name]) => ({ value, label: name })),
+            ]}
+          />
         </div>
       ) : null}
       {current.error ? (
@@ -119,6 +111,6 @@ export function AnalysisHistory() {
           onRowActivate={(a) => navigate({ name: 'analysis', id: a.id })}
         />
       ) : null}
-    </Section>
+    </Card>
   );
 }

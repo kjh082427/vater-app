@@ -62,13 +62,13 @@ describe('StatusBar (스펙 9-1: 시장 상태, 한투 연결, AI 엔진)', () =
         <StatusBarItem>
           <MarketState market="KR" status="open" detail="15:30 마감" variant="inline" />
         </StatusBarItem>
-        <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 폴링 1" />
+        <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 주기 확인 1" />
         <StatusBarItem align="end">알림 감시 중</StatusBarItem>
       </StatusBar>,
     );
     const bar = screen.getByRole('contentinfo', { name: '상태' });
     expect(bar).toHaveTextContent('국내 장중 15:30 마감');
-    expect(bar).toHaveTextContent('한투 연결 실시간 2 · 폴링 1');
+    expect(bar).toHaveTextContent('한투 연결 실시간 2 · 주기 확인 1');
     expect(
       screen.getByText('한투 연결').closest('[data-item]')?.querySelector('[data-dot]'),
     ).toHaveAttribute('data-dot', 'caution');

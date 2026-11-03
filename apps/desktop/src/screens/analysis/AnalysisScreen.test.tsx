@@ -8,6 +8,7 @@ import { analysisDone } from '../../mocks/fixtures';
 import { errorResponse } from '../../mocks/handlers';
 import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
+import { choose } from '../../test/select';
 
 function renderAt(hash: string) {
   window.location.hash = hash;
@@ -94,7 +95,7 @@ describe('새 분석', () => {
     ).toBeInTheDocument();
   });
 
-  it('기준일과 프리셋을 고르면 함께 보낸다', async () => {
+  it('기준일과 AI 사용 방식을 고르면 함께 보낸다', async () => {
     let body: unknown = null;
     server.events.on('request:start', async ({ request }) => {
       if (request.method === 'POST' && new URL(request.url).pathname === '/analyses') {
@@ -106,7 +107,7 @@ describe('새 분석', () => {
     await userEvent.type(within(form).getByRole('searchbox', { name: '종목 검색' }), 'AAPL');
     await userEvent.click(await within(form).findByRole('button', { name: '애플 선택' }));
     await userEvent.type(within(form).getByLabelText('기준일'), '2026-10-30');
-    await userEvent.selectOptions(within(form).getByRole('combobox', { name: '프리셋' }), 'local');
+    await choose(form, 'AI 사용 방식', '로컬');
     await userEvent.click(within(form).getByRole('button', { name: '분석 시작' }));
     await waitFor(() =>
       expect(body).toEqual({ market: 'US', code: 'AAPL', as_of: '2026-10-30', preset: 'local' }),
@@ -369,10 +370,12 @@ describe('실패', () => {
     });
   });
 
-  it('[프리셋 바꿔 새로 분석]은 같은 종목·기준일로 새 분석 폼', async () => {
+  it('[AI 사용 방식 바꿔 새로 분석]은 같은 종목·기준일로 새 분석 폼', async () => {
     renderAt('#/analyses/6');
     const failed = await waitFor(() => region('분석 실패'));
-    await userEvent.click(within(failed).getByRole('button', { name: '프리셋 바꿔 새로 분석' }));
+    await userEvent.click(
+      within(failed).getByRole('button', { name: 'AI 사용 방식 바꿔 새로 분석' }),
+    );
     await waitFor(() =>
       expect(window.location.hash).toBe('#/analyses?market=US&code=AAPL&as_of=2026-11-03'),
     );
@@ -427,10 +430,7 @@ describe('이력', () => {
     renderAt('#/analyses');
     const history = await waitFor(() => region('분석 이력'));
     await within(history).findByRole('table', { name: '분석 이력' });
-    await userEvent.selectOptions(
-      within(history).getByRole('combobox', { name: '종목' }),
-      'US:AAPL',
-    );
+    await choose(history, '종목', '애플');
     await waitFor(() => expect(queries).toContain('?market=US&code=AAPL&limit=50'));
     const table = within(history).getByRole('table', { name: '분석 이력' });
     await waitFor(() => expect(within(table).queryByText('삼성전자')).not.toBeInTheDocument());

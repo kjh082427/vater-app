@@ -72,8 +72,6 @@
 /* 진행률: 브라우저 기본 막대에 먹색만. 움직이는 연출 없음 */
 .progress {
   width: 100%;
-  height: var(--space-2);
-  accent-color: var(--color-ink);
 }
 
 .row {

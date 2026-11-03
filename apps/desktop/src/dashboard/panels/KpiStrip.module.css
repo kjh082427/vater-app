@@ -1,0 +1,14 @@
+/* 높이 100px(+ 틈 12px)은 layout/geometry.ts CHROME.kpi와 같아야 한다. */
+.strip {
+  display: grid;
+  flex: none;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-gap);
+  height: 6.25rem;
+}
+
+.strip > * {
+  min-height: 0;
+  overflow: hidden;
+}

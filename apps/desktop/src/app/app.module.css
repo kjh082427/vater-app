@@ -20,12 +20,28 @@
 }
 
 .link {
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-decoration-color: var(--color-control);
-  text-underline-offset: 4px;
+  color: var(--color-accent);
+  text-decoration: none;
+  text-underline-offset: 3px;
 }
 
 .link:hover {
-  text-decoration-color: var(--color-ink);
+  text-decoration: underline;
+}
+
+/* 배너 안의 이동 링크(버튼 모양): [설정 열기] */
+.bannerLink {
+  padding: var(--space-1) var(--space-2-5);
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bannerLink:hover {
+  background: var(--color-hover);
 }

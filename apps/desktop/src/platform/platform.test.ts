@@ -119,6 +119,13 @@ describe('Tauri 플랫폼', () => {
     expect(invoke).toHaveBeenCalledWith('set_autostart', { enabled: true });
     expect(await platform.getAutostart()).toBe(true);
   });
+
+  it('로그 폴더 열기: open_log_folder', async () => {
+    const { bridge, invoke } = fakeTauri({ open_log_folder: null });
+    const platform = createTauriPlatform(bridge);
+    await platform.openLogFolder();
+    expect(invoke).toHaveBeenCalledWith('open_log_folder');
+  });
 });
 
 describe('브라우저 플랫폼 (Vite 개발 서버)', () => {
@@ -147,5 +154,12 @@ describe('브라우저 플랫폼 (Vite 개발 서버)', () => {
     off();
     expect(await platform.getAutostart()).toBe(false);
     await expect(platform.setAutostart(true)).resolves.toBeUndefined();
+  });
+
+  it('로그 폴더는 설치한 앱에서만 열 수 있다', async () => {
+    const platform = createBrowserPlatform({});
+    await expect(platform.openLogFolder()).rejects.toMatchObject({
+      message: '설치한 앱에서만 열 수 있습니다',
+    });
   });
 });

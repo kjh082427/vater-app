@@ -47,7 +47,7 @@ export function StatusBarSample({ offline = false }: { offline?: boolean }) {
         </>
       ) : (
         <>
-          <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 폴링 1" />
+          <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 주기 확인 1" />
           <StatusBarItem tone="on" label="AI 엔진" detail="클라우드 · 분석 1건 진행 중" />
         </>
       )}

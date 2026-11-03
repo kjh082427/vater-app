@@ -6,6 +6,7 @@ import { errorResponse } from '../../mocks/handlers';
 import { App } from '../../app/App';
 import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
+import { choose, findSelectButton } from '../../test/select';
 
 function renderAlerts(hash = '#/alerts') {
   window.location.hash = hash;
@@ -36,8 +37,8 @@ describe('감시 종목 목록', () => {
     const rules = within(panel('삼성전자')).getByRole('list', { name: '삼성전자 규칙' });
     expect(within(rules).getByText('목표가 71,000원 이상')).toBeInTheDocument();
     expect(within(rules).getByText('5일·20일 이동평균 골든크로스')).toBeInTheDocument();
-    expect(within(rules).getByText('장중 실시간(잠정)')).toBeInTheDocument();
-    expect(within(rules).getByText('장 마감 후(확정 일봉)')).toBeInTheDocument();
+    expect(within(rules).getByText('장중 실시간')).toBeInTheDocument();
+    expect(within(rules).getByText('장 마감 후(그날 종가)')).toBeInTheDocument();
     expect(within(rules).getByText('마지막 알림 11월 3일 13:58')).toBeInTheDocument();
   });
 
@@ -175,9 +176,9 @@ describe('규칙 편집기', () => {
     await userEvent.selectOptions(kind, 'rsi');
     expect(within(form).getByRole('textbox', { name: '기간(일)' })).toHaveValue('14');
     expect(within(form).getByRole('textbox', { name: '과매수 기준' })).toHaveValue('70');
-    expect(within(form).getByRole('radio', { name: '장 마감 후(확정 일봉)' })).toBeChecked();
+    expect(within(form).getByRole('radio', { name: '장 마감 후(그날 종가)' })).toBeChecked();
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '조건' }), 'oversold');
-    await userEvent.click(within(form).getByRole('radio', { name: '장중 실시간(잠정)' }));
+    await userEvent.click(within(form).getByRole('radio', { name: '장중 실시간' }));
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
     const rules = within(part).getByRole('list', { name: 'SK하이닉스 규칙' });
     expect(await within(rules).findByText('RSI(14) 30 이하 과매도 진입')).toBeInTheDocument();
@@ -389,27 +390,21 @@ describe('알림 이력', () => {
     const part = historySection();
     const table = await within(part).findByRole('table', { name: '알림 이력' });
     await within(table).findByText(/삼성전자 현재가/);
-    await userEvent.selectOptions(
-      within(part).getByRole('combobox', { name: '종목' }),
-      'KR:000660',
-    );
+    await choose(part, '종목', 'SK하이닉스');
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
     expect(within(table).getByText(/SK하이닉스 RSI/)).toBeInTheDocument();
-    await userEvent.selectOptions(within(part).getByRole('combobox', { name: '종목' }), '');
-    await userEvent.selectOptions(within(part).getByRole('combobox', { name: '종류' }), 'event');
+    await choose(part, '종목', '전체 종목');
+    await choose(part, '종류', '분석 완료·실패');
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
     expect(within(table).getByText('AI 분석 완료: 삼성전자 — 비중확대')).toBeInTheDocument();
-    await userEvent.selectOptions(
-      within(part).getByRole('combobox', { name: '종류' }),
-      'macd_cross',
-    );
+    await choose(part, '종류', 'MACD 시그널선 교차');
     expect(await within(part).findByText('조건에 맞는 알림이 없습니다.')).toBeInTheDocument();
   });
 
   it('종목 주소로 열면 그 종목의 이력만', async () => {
     renderAlerts('#/symbols/KR/000660');
     const part = historySection();
-    expect(await within(part).findByRole('combobox', { name: '종목' })).toHaveValue('KR:000660');
+    expect(await findSelectButton(part, '종목')).toHaveAccessibleName('종목 SK하이닉스');
     const table = await within(part).findByRole('table', { name: '알림 이력' });
     await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
   });

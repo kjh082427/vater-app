@@ -1,0 +1,188 @@
+/*
+ * 홈 대시보드. 크기 상수는 layout/geometry.ts의 CHROME과 같아야 한다:
+ * 탭 줄 40px + 틈 12px, 맨 위 숫자 줄 100px + 틈 12px.
+ */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap);
+  height: 100%;
+  min-height: 0;
+}
+
+.tabBar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  height: 2.5rem; /* 40 */
+  border-bottom: var(--rule-hair) solid var(--color-line);
+}
+
+.tabList {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.plus {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.tabReason {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.tabActions {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.tabPanel {
+  flex: 1;
+  min-height: 0;
+}
+
+.tabPanel:focus-visible {
+  outline: var(--rule-focus) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 칸 배치 영역: 남는 높이를 다 쓰고, 최소 합보다 작으면 가로·세로로 스크롤한다 */
+.area {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.area:focus-visible {
+  outline: var(--rule-focus) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.canvas {
+  position: relative;
+}
+
+/* 스크롤할 때는 칸이 영역 끝에 붙어 모서리·그림자가 잘리지 않게 둘레에 칸 사이와 같은 틈(12px)을 둔다 */
+.area[data-scroll='true'] .canvas {
+  margin: var(--space-gap);
+}
+
+.cell {
+  position: absolute;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.panel {
+  flex: 1;
+  overflow: hidden;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  margin-bottom: auto;
+}
+
+/* 경계선 손잡이: 칸 사이 틈 전체가 끌 수 있는 자리, 가운데에 손잡이 */
+.divider {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.divider[data-dir='row'] {
+  cursor: col-resize;
+}
+
+.divider[data-dir='col'] {
+  cursor: row-resize;
+}
+
+.divider:hover::before,
+.divider:focus-visible::before,
+.divider[data-dragging='true']::before {
+  position: absolute;
+  background: var(--color-accent);
+  content: '';
+}
+
+.divider[data-dir='row']::before {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+.divider[data-dir='col']::before {
+  top: calc(50% - 1px);
+  right: 0;
+  left: 0;
+  height: 2px;
+}
+
+.divider:focus-visible {
+  outline: none;
+}
+
+.grip {
+  position: relative;
+  z-index: 1;
+  border: var(--rule-hair) solid var(--color-accent-line);
+  border-radius: var(--radius-round);
+  background: var(--color-card);
+}
+
+.divider[data-dir='row'] .grip {
+  width: 0.5rem;
+  height: 2rem;
+}
+
+.divider[data-dir='col'] .grip {
+  width: 2rem;
+  height: 0.5rem;
+}
+
+.divider:focus-visible .grip,
+.divider[data-dragging='true'] .grip {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--rule-focus) var(--color-focus);
+}
+
+.ratio {
+  position: absolute;
+  z-index: 2;
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.divider[data-dir='row'] .ratio {
+  top: calc(50% + 1.5rem);
+}
+
+.divider[data-dir='col'] .ratio {
+  left: calc(50% + 1.5rem);
+}

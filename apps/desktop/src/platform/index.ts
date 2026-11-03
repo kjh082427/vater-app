@@ -3,6 +3,7 @@
  * - Tauri: 셸의 커맨드 `get_sidecar_info`·`get_autostart`·`set_autostart`, 이벤트 `sidecar-state`·`navigate`
  * - 브라우저(Vite 개발 서버): 환경변수 `VITE_SIDECAR_URL`·`VITE_SIDECAR_TOKEN`, 셸 이벤트는 없음
  */
+import { ApiError } from '../api/errors';
 import { invoke as tauriInvoke, isTauri } from '@tauri-apps/api/core';
 import { listen as tauriListen } from '@tauri-apps/api/event';
 
@@ -25,6 +26,8 @@ export interface Platform {
   onNavigate(callback: (route: string) => void): () => void;
   getAutostart(): Promise<boolean>;
   setAutostart(enabled: boolean): Promise<void>;
+  /** 로그 폴더를 탐색기로 연다(셸 open_log_folder). 브라우저에서는 ApiError. */
+  openLogFolder(): Promise<void>;
 }
 
 /** @tauri-apps/api 중 쓰는 두 함수. 테스트는 흉내를 넘긴다. */
@@ -94,6 +97,9 @@ export function createTauriPlatform(bridge: TauriBridge): Platform {
     async setAutostart(enabled) {
       await bridge.invoke('set_autostart', { enabled });
     },
+    async openLogFolder() {
+      await bridge.invoke('open_log_folder');
+    },
   };
 }
 
@@ -116,6 +122,9 @@ export function createBrowserPlatform(env: BrowserEnv): Platform {
     // 브라우저에는 부팅 시 자동 실행이 없다
     getAutostart: async () => false,
     setAutostart: async () => undefined,
+    openLogFolder: async () => {
+      throw new ApiError('UI_DESKTOP_ONLY', '설치한 앱에서만 열 수 있습니다', null, 0);
+    },
   };
 }
 

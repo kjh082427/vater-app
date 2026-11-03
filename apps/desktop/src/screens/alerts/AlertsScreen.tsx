@@ -3,7 +3,7 @@ import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AlertKindInfo, AlertRule, MarketCode, WatchItem } from '../../api/types';
-import { Banner, Button, Section } from '../../design-system';
+import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
@@ -72,9 +72,9 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
       />
       <div className={common.twoUp}>
         <div className={common.twoUpGrid}>
-          <Section
+          <Card
             title="감시 종목"
-            meta={items && items.length > 0 ? `${items.length}종목` : undefined}
+            description={items && items.length > 0 ? `${items.length}종목` : undefined}
           >
             {adding ? (
               <div className={styles.editor}>
@@ -175,7 +175,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                 })}
               </ul>
             ) : null}
-          </Section>
+          </Card>
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
         </div>
       </div>

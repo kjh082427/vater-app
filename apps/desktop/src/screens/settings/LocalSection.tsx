@@ -3,13 +3,13 @@ import { ApiError, toApiError } from '../../api/errors';
 import { useApi, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { CatalogOut, EventMap, HardwareOut, LocalModel, OllamaStatus } from '../../api/types';
-import { Button, formatNumber } from '../../design-system';
+import { Button, formatNumber, ProgressBar } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
-import { Field } from '../common/Field';
 import form from '../common/form.module.css';
 import common from '../common/screen.module.css';
 import styles from './settings.module.css';
 import { str, type Settings } from './useSettings';
+import { SelectField } from '../common/SelectField';
 
 const INSTALL_STAGE: Record<string, string> = {
   download: '설치 파일을 내려받는 중입니다.',
@@ -100,11 +100,10 @@ function ModelRow({
       </span>
       {pulling && !installed ? (
         <span className={`${styles.wide} ${styles.fields}`}>
-          <progress
+          <ProgressBar
             className={styles.progress}
-            aria-label={`${model.label} 받는 중`}
-            max={100}
-            {...(typeof progress?.percent === 'number' ? { value: progress.percent } : {})}
+            label={`${model.label} 받는 중`}
+            value={progress?.percent ?? 0}
           />
           <span className={`${common.meta} vt-num`}>
             {typeof progress?.percent === 'number'
@@ -329,24 +328,16 @@ export function LocalSettings({
       ) : null}
 
       {showChoice ? (
-        <Field label="분석에 쓸 로컬 모델" hint="받은 모델 중에서 고릅니다.">
-          {(control) => (
-            <select
-              {...control}
-              className={form.control}
-              value={str(settings, 'llm.local_model')}
-              disabled={!settings}
-              onChange={(e) => void save({ 'llm.local_model': e.target.value })}
-            >
-              <option value="">고르지 않음</option>
-              {installed.map((m) => (
-                <option key={m.tag} value={m.tag}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        <SelectField
+          label="분석에 쓸 로컬 모델"
+          hint="받은 모델 중에서 고릅니다."
+          value={str(settings, 'llm.local_model')}
+          onChange={(tag) => void save({ 'llm.local_model': tag })}
+          options={[
+            { value: '', label: '고르지 않음' },
+            ...installed.map((m) => ({ value: m.tag, label: m.label })),
+          ]}
+        />
       ) : null}
     </div>
   );

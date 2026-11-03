@@ -3,7 +3,7 @@ import { toApiError, type ApiError } from '../../api/errors';
 import { useServices } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { CatalogOut, Health } from '../../api/types';
-import { Button, Section } from '../../design-system';
+import { Button, Card, Section, Toggle } from '../../design-system';
 import { PRESET_LABEL } from '../../app/status';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { Field } from '../common/Field';
@@ -15,11 +15,12 @@ import { KisSettings } from './KisSection';
 import { LocalSettings } from './LocalSection';
 import styles from './settings.module.css';
 import { str, useSettings, type Settings } from './useSettings';
+import { SelectField } from '../common/SelectField';
 
 const PRESET_HINT: Record<string, string> = {
-  cloud: '빠른 단계와 깊은 분석 모두 클라우드 AI. 키가 필요합니다.',
+  cloud: '자료 정리와 결론 모두 클라우드 AI. 키가 필요합니다.',
   local: '모두 이 PC의 Ollama 모델. 인터넷과 키가 필요 없지만 느립니다.',
-  mixed: '빠른 단계는 이 PC의 모델, 깊은 분석은 클라우드 AI.',
+  mixed: '자료 정리는 이 PC의 모델, 결론은 클라우드 AI.',
 };
 
 function BriefingSettings({
@@ -56,15 +57,12 @@ function BriefingSettings({
         const name = m === 'kr' ? '국내' : '미국';
         return (
           <div key={m} className={styles.row}>
-            <label className={form.choice}>
-              <input
-                type="checkbox"
-                checked={value(`briefing.${m}.enabled`) !== false}
-                disabled={!settings}
-                onChange={(e) => set(`briefing.${m}.enabled`, e.target.checked)}
-              />
-              {`${name} 브리핑 만들기`}
-            </label>
+            <Toggle
+              label={`${name} 브리핑 만들기`}
+              checked={value(`briefing.${m}.enabled`) !== false}
+              disabled={!settings}
+              onChange={(on) => set(`briefing.${m}.enabled`, on)}
+            />
             <Field
               label={`${name} 브리핑 시각`}
               hint={`한국 시간, 기본 ${m === 'kr' ? '16:00' : '07:00'}`}
@@ -137,25 +135,19 @@ function GeneralSettings({
 
   return (
     <div className={styles.body}>
-      <label className={form.choice}>
-        <input
-          type="checkbox"
-          checked={autostart === true}
-          disabled={autostart === null || browser}
-          onChange={(e) => void changeAutostart(e.target.checked)}
-        />
-        부팅 시 자동 실행
-      </label>
+      <Toggle
+        label="부팅 시 자동 실행"
+        checked={autostart === true}
+        disabled={autostart === null || browser}
+        onChange={(on) => void changeAutostart(on)}
+      />
       {browser ? <span className={common.meta}>설치한 앱에서만 바꿀 수 있습니다.</span> : null}
-      <label className={form.choice}>
-        <input
-          type="checkbox"
-          checked={settings?.['general.close_to_tray'] !== false}
-          disabled={!settings}
-          onChange={(e) => void save({ 'general.close_to_tray': e.target.checked })}
-        />
-        창을 닫으면 트레이로 숨기기
-      </label>
+      <Toggle
+        label="창을 닫으면 트레이로 숨기기"
+        checked={settings?.['general.close_to_tray'] !== false}
+        disabled={!settings}
+        onChange={(on) => void save({ 'general.close_to_tray': on })}
+      />
       {error ? <ApiErrorNotice error={error} /> : null}
       <dl className={styles.facts}>
         <dt>버전</dt>
@@ -191,33 +183,25 @@ export function SettingsScreen() {
       ) : null}
       {/* 한 열: 설정은 위에서 아래로 훑어 읽는다(두 열이면 AI 엔진 열만 길게 늘어진다) */}
       <div className={`${common.stack} ${styles.page}`}>
-        <Section title="한국투자증권">
+        <Card title="한국투자증권">
           <KisSettings
             secrets={secrets.data}
             onSecretsSaved={secrets.reload}
             settings={s}
             save={settings.save}
           />
-        </Section>
-        <Section title="AI 엔진">
+        </Card>
+        <Card title="AI 엔진">
           <div className={styles.body}>
-            <Field label="프리셋" hint={PRESET_HINT[preset]}>
-              {(control) => (
-                <select
-                  {...control}
-                  className={form.control}
-                  value={preset}
-                  disabled={!s}
-                  onChange={(e) => void settings.save({ 'llm.preset': e.target.value })}
-                >
-                  {Object.entries(PRESET_LABEL).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Field>
+            {s ? (
+              <SelectField
+                label="AI 사용 방식"
+                hint={PRESET_HINT[preset]}
+                value={preset}
+                onChange={(v) => void settings.save({ 'llm.preset': v })}
+                options={Object.entries(PRESET_LABEL).map(([value, label]) => ({ value, label }))}
+              />
+            ) : null}
             {catalog.error ? (
               <ApiErrorNotice error={catalog.error} title="모델 목록을 불러오지 못했습니다" />
             ) : null}
@@ -234,37 +218,26 @@ export function SettingsScreen() {
               <LocalSettings catalog={catalog.data} settings={s} save={settings.save} />
             </Section>
           </div>
-        </Section>
-        <Section title="분석 기본값">
+        </Card>
+        <Card title="분석 기본값">
           <div className={styles.body}>
-            <Field
-              label="토론 라운드"
-              hint="강세·약세 토론과 리스크 토론을 몇 번 주고받을지. 늘리면 오래 걸립니다."
-            >
-              {(control) => (
-                <select
-                  {...control}
-                  className={form.control}
-                  value={String(s?.['analysis.debate_rounds'] ?? 1)}
-                  disabled={!s}
-                  onChange={(e) =>
-                    void settings.save({ 'analysis.debate_rounds': Number(e.target.value) })
-                  }
-                >
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{`${n}회`}</option>
-                  ))}
-                </select>
-              )}
-            </Field>
+            {s ? (
+              <SelectField
+                label="토론 라운드"
+                hint="강세·약세 토론과 리스크 토론을 몇 번 주고받을지. 늘리면 오래 걸립니다."
+                value={String(s['analysis.debate_rounds'] ?? 1)}
+                onChange={(v) => void settings.save({ 'analysis.debate_rounds': Number(v) })}
+                options={['1', '2', '3', '4', '5'].map((n) => ({ value: n, label: `${n}회` }))}
+              />
+            ) : null}
           </div>
-        </Section>
-        <Section title="브리핑">
+        </Card>
+        <Card title="브리핑">
           <BriefingSettings settings={s} saveOrError={settings.saveOrError} />
-        </Section>
-        <Section title="일반">
+        </Card>
+        <Card title="일반">
           <GeneralSettings settings={s} save={settings.save} />
-        </Section>
+        </Card>
       </div>
     </>
   );

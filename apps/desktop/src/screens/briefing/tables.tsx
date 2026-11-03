@@ -1,11 +1,13 @@
 /** 브리핑 데이터 표. 숫자는 수집 자료에서만 나오고(D9) design-system 표기 함수로만 꾸민다. */
 import {
+  type Column,
   DataTable,
   directionOf,
+  DivergingBar,
+  formatEokChange,
   formatNumber,
   SignedNumber,
   Sparkline,
-  type Column,
 } from '../../design-system';
 import { MissingValue, Price } from '../common/quotes';
 import common from '../common/screen.module.css';
@@ -73,32 +75,34 @@ export function SectorTable({ caption, rows }: { caption: string; rows: SectorQu
   );
 }
 
-/** 수급: 외국인·기관·개인 순매수(원 → 억). 순매수 빨강·순매도 파랑(DESIGN 결정 19). */
-const flowColumns: Column<FlowRow>[] = [
-  { key: 'market', header: '시장', cell: (r) => <b>{r.label}</b> },
-  {
-    key: 'foreign',
-    header: '외국인',
-    numeric: true,
-    cell: (r) => <SignedNumber value={r.foreign} format="eok" />,
-  },
-  {
-    key: 'institution',
-    header: '기관',
-    numeric: true,
-    cell: (r) => <SignedNumber value={r.institution} format="eok" />,
-  },
-  {
-    key: 'individual',
-    header: '개인',
-    numeric: true,
-    cell: (r) => <SignedNumber value={r.individual} format="eok" />,
-  },
-];
-
+/**
+ * 수급: 시장마다 외국인·기관·개인 순매수 가로 막대(원 → 억). 순매수 빨강(오른쪽)·순매도 파랑(왼쪽),
+ * 0 기준선(DESIGN 결정 19). 값이 없는 투자자는 막대에서 뺀다.
+ */
 export function FlowTable({ rows }: { rows: FlowRow[] }) {
   return (
-    <DataTable caption="투자자 수급" columns={flowColumns} rows={rows} rowKey={(r) => r.market} />
+    <div className={common.column}>
+      {rows.map((r) => {
+        const bars = (
+          [
+            ['외국인', r.foreign],
+            ['기관', r.institution],
+            ['개인', r.individual],
+          ] as const
+        ).flatMap(([label, value]) => (value === null ? [] : [{ label, value }]));
+        // 시장마다 막대 길이의 기준(가장 큰 값)이 다르므로 시장 이름을 위에 둔다
+        return bars.length > 0 ? (
+          <div key={r.market}>
+            <p className={common.meta}>{r.label}</p>
+            <DivergingBar
+              aria-label={`투자자별 순매수 · ${r.label}`}
+              format={formatEokChange}
+              rows={bars}
+            />
+          </div>
+        ) : null;
+      })}
+    </div>
   );
 }
 
