@@ -1,0 +1,39 @@
+/* 앱 틀(사이드바 아래쪽, 첫 실행·빈 화면). 색은 토큰만 쓴다. */
+
+.sideStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.serverNote {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+/* 사이드바 안의 오류: 좁아서 띠 대신 황토 글자 한 줄 */
+.sideError {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-caution-ink);
+}
+
+/* 첫 실행 마법사처럼 틀 없이 여는 화면 */
+.bare {
+  max-width: 44rem;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-8);
+}
+
+.link {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.link:hover {
+  text-decoration-color: var(--color-ink);
+}
