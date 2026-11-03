@@ -22,12 +22,13 @@ import contextlib
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
 
-from vater_core.alerts.clock import MarketClock, MarketId
+from vater_core.alerts.clock import KST, MarketClock, MarketId
 from vater_core.alerts.evaluator import Evaluator, NotifyFn, NowFn
 from vater_core.alerts.rules import Live
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
@@ -68,6 +69,17 @@ SleepFn = Callable[[float], Awaitable[None]]
 
 class _Offline(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class WatchQuote:
+    """감시 종목의 최신 시세. `change`는 전일 대비 금액(모르면 None — 지어내지 않는다)."""
+
+    price: float
+    change: float | None
+    change_pct: float
+    at: str  # KST ISO
+    source: str  # realtime | polling | rest
 
 
 def _now_default() -> datetime:
@@ -132,6 +144,12 @@ class AlertMonitor:
         self._close_retry: dict[Key, tuple[date, datetime]] = {}  # (세션, 다시 받을 시각)
         self._last_eval: dict[Key, float] = {}
         self._pending: dict[Key, Tick] = {}
+        self._quotes: dict[Key, WatchQuote] = {}
+        self._prev_close: dict[
+            Key, tuple[date, float]
+        ] = {}  # (세션, 전일 종가) — REST 시세에서 배움
+        self._markets: dict[str, str] = {}
+        self._feeds: list[dict[str, str]] = []
 
     # ---- 공용 ----------------------------------------------------------------
 
@@ -145,7 +163,51 @@ class AlertMonitor:
 
     def status(self) -> dict[str, Any]:
         state = "paused" if self._paused else self._state
-        return {"state": state, "realtime": self._counts[0], "polling": self._counts[1]}
+        return {
+            "state": state,
+            "realtime": self._counts[0],
+            "polling": self._counts[1],
+            "markets": dict(self._markets),
+            "feeds": [dict(f) for f in self._feeds],
+        }
+
+    def quotes(self) -> dict[Key, WatchQuote]:
+        return dict(self._quotes)
+
+    def _record_quote(
+        self,
+        item: WatchItem,
+        price: float,
+        change_pct: float,
+        change: float | None,
+        source: str,
+    ) -> None:
+        """최신 시세를 보관하고 SSE `quote`로 보낸다(틱은 이미 종목당 1초 1번으로 걸러져 온다)."""
+        key = _key(item)
+        day = self._session_day.get(item.market)
+        if change is not None:
+            if day is not None:
+                self._prev_close[key] = (day, price - change)
+        else:
+            prev = self._prev_close.get(key)
+            if prev is not None and day is not None and prev[0] == day:
+                change = round(price - prev[1], 6)
+        at = self._now().astimezone(KST).isoformat(timespec="seconds")
+        quote = WatchQuote(price, change, change_pct, at, source)
+        self._quotes[key] = quote
+        if self._deps.events is not None:
+            self._deps.events.publish(
+                "quote",
+                {
+                    "market": item.market,
+                    "code": item.code,
+                    "price": price,
+                    "change": change,
+                    "change_pct": change_pct,
+                    "at": at,
+                    "source": source,
+                },
+            )
 
     def _publish_status(self) -> None:
         status = self.status()
@@ -201,23 +263,35 @@ class AlertMonitor:
         offline = False
         any_open = False
         realtime = polling = 0
+        items: list[WatchItem] = []
+        feeds: dict[Key, str] = {}
         try:
             items = WatchlistRepo(self._db()).list()
             rules = RuleRepo(self._db()).list(enabled_only=True)
             timings: dict[int, set[str]] = {}
             for r in rules:
                 timings.setdefault(r.watchlist_id, set()).add(r.timing)
+            opens = {m: await self._clock.is_open(m) for m in MARKETS}
+            self._markets = {m: "open" if opens[m] else "closed" for m in MARKETS}
             for market in MARKETS:
                 mine = [i for i in items if i.market == market]
                 await self._close_pass(market, mine, timings)
-                if await self._clock.is_open(market):
+                if opens[market]:
                     any_open = True
                     live_items = [i for i in mine if "realtime" in timings.get(i.id, set())]
-                    rt, polled = await self._open_market(market, live_items)
-                    realtime += rt
-                    polling += polled
+                    live_keys, polled_keys = await self._open_market(market, live_items)
+                    realtime += len(live_keys)
+                    polling += len(polled_keys)
+                    for i in mine:
+                        k = _key(i)
+                        feeds[k] = (
+                            "realtime"
+                            if k in live_keys
+                            else ("polling" if k in polled_keys else "idle")
+                        )
                 else:
                     await self._unsubscribe_market(market)
+                    feeds.update({_key(i): "closed" for i in mine})
         except _Offline:
             offline = True
         except VaterError as e:
@@ -227,6 +301,18 @@ class AlertMonitor:
         self._stop_realtime_if_idle()
         self._state = "offline" if offline else ("running" if any_open else "closed")
         self._counts = (realtime, polling)
+        self._feeds = [
+            {
+                "market": i.market,
+                "code": i.code,
+                "feed": "offline" if offline else feeds.get(_key(i), "idle"),
+            }
+            for i in items
+        ]
+        watched = {_key(i) for i in items}
+        for key in [k for k in self._quotes if k not in watched]:  # 감시 종목에서 지웠다
+            self._quotes.pop(key, None)
+            self._prev_close.pop(key, None)
         self._publish_status()
 
     async def _guard(self, item: WatchItem, call: Awaitable[Any]) -> Any:
@@ -244,7 +330,9 @@ class AlertMonitor:
             logger.warning("alert monitor: %s %s failed: %s", item.market, item.code, e)
             return None
 
-    async def _open_market(self, market: MarketId, items: list[WatchItem]) -> tuple[int, int]:
+    async def _open_market(
+        self, market: MarketId, items: list[WatchItem]
+    ) -> tuple[set[Key], set[Key]]:
         self._session_day[market] = await self._clock.session_date(market)
         wanted = {_key(i): i for i in items}
         rt = self._ensure_realtime() if items else self._rt
@@ -272,8 +360,9 @@ class AlertMonitor:
             quote = await self._guard(item, self._price(item))
             self._last_poll[_key(item)] = now
             if quote is not None:
+                self._record_quote(item, quote.price, quote.change_pct, quote.change, "polling")
                 self._evaluate_live(item, quote.price, quote.change_pct, quote.volume)
-        return len(live_keys), len(to_poll)
+        return live_keys, {_key(i) for i in to_poll}
 
     async def _close_pass(
         self, market: MarketId, items: list[WatchItem], timings: dict[int, set[str]]
@@ -363,7 +452,9 @@ class AlertMonitor:
 
     def _evaluate_tick(self, key: Key, tick: Tick) -> None:
         self._last_eval[key] = self._monotonic()
-        self._evaluate_live(self._subscribed[key], tick.price, tick.change_pct, tick.volume)
+        item = self._subscribed[key]
+        self._record_quote(item, tick.price, tick.change_pct, None, "realtime")
+        self._evaluate_live(item, tick.price, tick.change_pct, tick.volume)
 
     def _evaluate_live(self, item: WatchItem, price: float, change_pct: float, volume: int) -> None:
         day = self._session_day.get(item.market)

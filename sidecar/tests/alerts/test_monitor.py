@@ -46,6 +46,11 @@ def db(tmp_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def counts(status: dict[str, Any]) -> dict[str, Any]:
+    """상태 중 감시 루프 개수 부분(markets·feeds는 따로 확인한다)."""
+    return {k: status[k] for k in ("state", "realtime", "polling")}
+
+
 class Clock:
     def __init__(self, at: datetime) -> None:
         self.at = at
@@ -100,6 +105,7 @@ class Market:
     def __init__(self, db: sqlite3.Connection) -> None:
         self.db = db
         self.prices: dict[str, float] = {}
+        self.changes: dict[str, float] = {}  # 전일 대비 금액(REST 현재가에만 있음)
         self.price_calls: list[str] = []
         self.bar_calls: list[tuple[str, date]] = []
         self.closes: dict[tuple[str, date], float] = {}  # (종목, 날짜) → 그날 확정 종가
@@ -113,7 +119,8 @@ class Market:
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
         price = self.prices.get(item.code, 100.0)
-        return Quote(item.market, item.code, price, 0.0, 0.0, 1000)  # type: ignore[arg-type]
+        change = self.changes.get(item.code, 0.0)
+        return Quote(item.market, item.code, price, change, 0.0, 1000)  # type: ignore[arg-type]
 
     async def bars(self, item: WatchItem, through: date) -> int:
         """refresh_bars처럼: 이미 `through`까지 있으면 한투를 부르지 않는다."""
@@ -219,7 +226,7 @@ async def test_open_market_subscribes_up_to_limit_and_polls_the_rest(
 
     assert rig.realtime is not None and rig.realtime.subs == [("KR", "005930"), ("KR", "000660")]
     assert rig.market.price_calls == ["035420"]
-    assert rig.monitor.status() == {"state": "running", "realtime": 2, "polling": 1}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 2, "polling": 1}
 
 
 async def test_polling_waits_for_the_poll_interval(db: sqlite3.Connection) -> None:
@@ -291,13 +298,13 @@ async def test_reconnecting_websocket_falls_back_to_polling(db: sqlite3.Connecti
     rig.clock.at = KR_OPEN + timedelta(seconds=30)
     await rig.monitor.tick_once()
     assert sorted(rig.market.price_calls) == sorted(CODES)
-    assert rig.monitor.status() == {"state": "running", "realtime": 0, "polling": 3}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 0, "polling": 3}
 
     rig.realtime.state = "connected"
     rig.clock.at = KR_OPEN + timedelta(seconds=60)
     await rig.monitor.tick_once()
     assert len(rig.market.price_calls) == 3
-    assert rig.monitor.status() == {"state": "running", "realtime": 3, "polling": 0}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 3, "polling": 0}
 
 
 @pytest.mark.parametrize(
@@ -352,7 +359,7 @@ async def test_after_close_refreshes_bars_and_evaluates_close_rules_once(
     assert ("000660", DAY) in rig.market.bar_calls and ("005930", DAY) in rig.market.bar_calls
     assert rig.state(rule) is True
     assert [n[0] for n in rig.notes.sent] == ["알림: SK하이닉스"]
-    assert rig.monitor.status() == {"state": "closed", "realtime": 0, "polling": 0}
+    assert counts(rig.monitor.status()) == {"state": "closed", "realtime": 0, "polling": 0}
 
     calls = len(rig.market.bar_calls)
     rig.clock.at = KR_AFTER + timedelta(minutes=5)
@@ -581,4 +588,134 @@ async def test_subscription_rejected_by_the_server_is_polled(db: sqlite3.Connect
     await rig.monitor.tick_once()
 
     assert rig.market.price_calls == ["000660"]
-    assert rig.monitor.status() == {"state": "running", "realtime": 1, "polling": 1}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 1, "polling": 1}
+
+
+def quotes(events: list[Any]) -> list[dict[str, Any]]:
+    return [e.data for e in events if e.type == "quote"]
+
+
+def drained(sub: Any) -> list[Any]:
+    out = []
+    while not sub.queue.empty():
+        out.append(sub.queue.get_nowait())
+    return out
+
+
+async def test_ticks_publish_quotes_at_most_once_per_second(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN, throttle=0.05)
+    rig.watch("005930")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 70000, 1.0, 1000, "100001"))
+    rig.mono.t += 0.01
+    rig.realtime.on_tick(Tick("KR", "005930", 70100, 1.1, 1100, "100001"))  # 1초 안: 미룸
+    got = quotes(drained(sub))
+    assert got == [
+        {
+            "market": "KR",
+            "code": "005930",
+            "price": 70000.0,
+            "change": None,  # 전일 종가를 아직 모른다: 지어내지 않는다
+            "change_pct": 1.0,
+            "at": "2026-11-03T10:00:00+09:00",
+            "source": "realtime",
+        }
+    ]
+    await asyncio.sleep(0.15)
+    assert [q["price"] for q in quotes(drained(sub))] == [70100.0]
+
+
+async def test_polled_quote_teaches_the_previous_close_for_ticks(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.market.prices["005930"] = 70000.0
+    rig.market.changes["005930"] = 1200.0  # 전일 종가 68,800
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.state = "reconnecting"  # 끊긴 동안: REST로 받는다
+    sub = rig.bus.subscribe()
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    polled = quotes(drained(sub))
+    assert [(q["price"], q["change"], q["source"]) for q in polled] == [
+        (70000.0, 1200.0, "polling")
+    ]
+
+    rig.realtime.state = "connected"
+    rig.realtime.on_tick(Tick("KR", "005930", 69000, 0.29, 1000, "100500"))
+    ticked = quotes(drained(sub))
+    assert [(q["price"], q["change"], q["source"]) for q in ticked] == [
+        (69000.0, 200.0, "realtime")
+    ]
+    assert rig.monitor.quotes()[("KR", "005930")].change == 200.0
+
+
+async def test_status_reports_markets_and_per_symbol_feeds(db: sqlite3.Connection) -> None:
+    SettingsRepo(db).update({"kis.ws_max_subscriptions": 2})
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")  # 실시간
+    rig.watch("000660")  # 실시간
+    rig.watch("035420")  # 한도를 넘어 폴링
+    rig.watch("005380", "ma_break", period=3)  # 실시간 규칙 없음: 장중 감시 안 함
+    rig.watch("AAPL", market="US")  # 미국은 장 전
+    await rig.monitor.tick_once()  # 첫 회차: 연결 중이라 모두 폴링
+    await rig.monitor.tick_once()
+    status = rig.monitor.status()
+    assert status["markets"] == {"KR": "open", "US": "closed"}
+    assert status["feeds"] == [
+        {"market": "KR", "code": "005930", "feed": "realtime"},
+        {"market": "KR", "code": "000660", "feed": "realtime"},
+        {"market": "KR", "code": "035420", "feed": "polling"},
+        {"market": "KR", "code": "005380", "feed": "idle"},
+        {"market": "US", "code": "AAPL", "feed": "closed"},
+    ]
+    assert (status["state"], status["realtime"], status["polling"]) == ("running", 2, 1)
+
+
+async def test_rejected_or_disconnected_symbols_show_polling(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.subscription_errors[("H0STCNT0", "000660")] = "거부"
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    feeds = {f["code"]: f["feed"] for f in rig.monitor.status()["feeds"]}
+    assert feeds == {"005930": "realtime", "000660": "polling"}
+
+    rig.realtime.state = "reconnecting"
+    rig.clock.at = KR_OPEN + timedelta(seconds=60)
+    await rig.monitor.tick_once()
+    feeds = {f["code"]: f["feed"] for f in rig.monitor.status()["feeds"]}
+    assert feeds == {"005930": "polling", "000660": "polling"}
+
+
+async def test_offline_marks_every_symbol_offline(db: sqlite3.Connection) -> None:
+    SettingsRepo(db).update({"kis.ws_max_subscriptions": 1})
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.fail = VaterError("KIS_UNREACHABLE", "끊김", status=503)
+    await rig.monitor.tick_once()
+    status = rig.monitor.status()
+    assert status["state"] == "offline"
+    assert {f["feed"] for f in status["feeds"]} == {"offline"}
+
+
+async def test_removed_symbol_leaves_quotes_and_feeds(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.on_tick(Tick("KR", "005930", 70000, 1.0, 1000, "100001"))
+    assert ("KR", "005930") in rig.monitor.quotes()
+
+    WatchlistRepo(db).remove(item.id)
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    assert rig.monitor.quotes() == {}
+    assert rig.monitor.status()["feeds"] == []
