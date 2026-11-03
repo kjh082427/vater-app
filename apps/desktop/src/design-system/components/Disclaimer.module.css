@@ -1,0 +1,6 @@
+.disclaimer {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+  text-wrap: pretty;
+}

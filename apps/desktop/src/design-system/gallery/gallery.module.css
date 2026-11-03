@@ -1,0 +1,377 @@
+/* 견본 페이지 전용. 색은 토큰만 쓴다. */
+.page {
+  display: grid;
+  gap: var(--space-10);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) var(--space-10);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-3xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.lede {
+  margin-top: var(--space-1);
+  color: var(--color-ink-2);
+}
+
+.links {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.links a,
+.inlineLink {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.links a:hover,
+.inlineLink:hover {
+  text-decoration-color: var(--color-ink);
+}
+
+/* 견본 한 줄: 왼쪽 이름표 + 오른쪽 실물 */
+.rows {
+  display: grid;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.label {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.code,
+code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* 색 견본 */
+.swatchGroup {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.swatchGroup + .swatchGroup {
+  margin-top: var(--space-5);
+}
+
+.groupName {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.swatch {
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.chip {
+  height: 2.75rem;
+  border-bottom: var(--rule-hair) solid var(--color-line);
+}
+
+.swatchText {
+  display: grid;
+  gap: var(--space-0-5);
+  padding: var(--space-1-5) var(--space-2) var(--space-2);
+}
+
+.swatchText b {
+  font-weight: var(--weight-semibold);
+}
+
+.swatchText span {
+  color: var(--color-ink-3);
+}
+
+/* 글자 견본 */
+.specimenSans {
+  font-family: var(--font-sans);
+}
+
+.screenTitle {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-3xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.sectionTitle {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-bold);
+}
+
+.small {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+.wordmark {
+  font-family: var(--font-serif);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-3xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.numbers {
+  display: inline-grid;
+  grid-template-columns: repeat(3, auto);
+  column-gap: var(--space-6);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  text-align: right;
+}
+
+.numbersProportional {
+  font-variant-numeric: proportional-nums;
+}
+
+/* 간격과 선 */
+.spaceBar {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.spaceBar i {
+  display: block;
+  height: var(--space-2);
+  background: var(--color-ink);
+}
+
+.ruleDemo {
+  display: grid;
+  gap: var(--space-4);
+  width: 20rem;
+}
+
+.ruleSection {
+  border-top: var(--rule-section) solid var(--color-rule-section);
+}
+
+.ruleLine {
+  border-top: var(--rule-hair) solid var(--color-line);
+}
+
+.ruleRow {
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.radiusDemo {
+  width: 4rem;
+  height: 2rem;
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-sm);
+}
+
+/* 표 안의 조합 */
+.stock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.stock b {
+  font-weight: var(--weight-semibold);
+}
+
+.market,
+.stockCode {
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.feedHead,
+.feedCell {
+  display: block;
+  padding-left: var(--space-4);
+}
+
+.sparkHead,
+.sparkCell {
+  display: block;
+  padding-left: var(--space-4);
+}
+
+.flows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding-top: var(--space-2-5);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.flowsKey {
+  margin-right: var(--space-1-5);
+  color: var(--color-ink-3);
+}
+
+.activity {
+  min-height: var(--leading-sm);
+  padding-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+/* 두 구역을 나란히: 본문이 좁으면(1024 창) 한 열 */
+.twoUp {
+  container-type: inline-size;
+}
+
+.twoUpGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-6) var(--space-8);
+  align-items: start;
+}
+
+@container (max-width: 52rem) {
+  .twoUpGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column {
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* 사이드바 견본 틀 */
+.frame {
+  display: grid;
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+  height: 30rem;
+  overflow: hidden;
+  border: var(--rule-hair) solid var(--color-line);
+}
+
+.frameBody {
+  padding: var(--space-5);
+  color: var(--color-ink-3);
+  font-size: var(--text-sm);
+}
+
+.statusFrame {
+  height: var(--size-statusbar);
+  border: var(--rule-hair) solid var(--color-line);
+  border-top: 0;
+}
+
+.sideStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.serverNote {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+/* 창 틀 견본(#shell) */
+.shellHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
+.shellHead p {
+  margin-top: var(--space-0-5);
+  color: var(--color-ink-2);
+}
+
+.shellHeadEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stamp {
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.summary {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.summaryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.summaryList {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+}

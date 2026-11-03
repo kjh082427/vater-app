@@ -1,0 +1,21 @@
+/* 시세 방향 색은 숫자 글자에만. 부호(+, −)가 늘 함께 있어 색만으로 구분하지 않는다 */
+.signed {
+  white-space: nowrap;
+}
+
+.signed[data-tone='direction'][data-direction='up'] {
+  color: var(--color-up);
+}
+
+.signed[data-tone='direction'][data-direction='down'] {
+  color: var(--color-down);
+}
+
+.signed[data-tone='direction'][data-direction='flat'] {
+  color: var(--color-ink-3);
+}
+
+/* 시세 방향·수급이 아닌 부호 숫자: 부호는 남기고 색은 먹 */
+.signed[data-tone='neutral'] {
+  color: var(--color-ink);
+}

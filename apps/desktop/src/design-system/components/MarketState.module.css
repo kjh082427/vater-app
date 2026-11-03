@@ -1,0 +1,21 @@
+.market {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+.market[data-variant='chip'] {
+  height: var(--size-control-sm);
+  padding: 0 var(--space-2-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-chrome);
+}
+
+.label {
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}

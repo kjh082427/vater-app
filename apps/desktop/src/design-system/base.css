@@ -1,0 +1,70 @@
+/*
+ * 앱 전체 기본값. styles.css가 fonts.css, tokens.css 다음에 한 번만 불러온다.
+ * 브라우저 기본 모양(선택 색, 포커스 링, 스크롤바, 숫자)도 디자인 시스템이 정한다.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-synthesis: none;
+  /* 한국어는 낱말 중간에서 줄을 바꾸지 않는다 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ol,
+ul,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--color-selection);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: var(--rule-focus) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* 스크롤바: 얇고 조용하게. 크롬과 같은 회색 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-control) transparent;
+}
+
+/* 숫자는 늘 고정폭(tnum). 표가 아니어도 자리가 흔들리지 않게 */
+.vt-num {
+  font-variant-numeric: tabular-nums;
+}

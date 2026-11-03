@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Vater 시안 A · 통장 정리</title>
+<!-- 시안 미리보기 전용: 글꼴을 CDN에서 받는다. 실제 앱은 같은 글꼴 파일을 앱에 포함한다(오프라인). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap">
+<style>
+:root {
+  /* 바탕: 통장 속지의 옅은 보안 인쇄색 */
+  --ground: #eaf2ec;
+  --sheet: #ffffff;
+  --sheet-2: #f3f8f4;
+  --line: #d3e0d7;
+  --rule: #e6eee9;
+  --control: #a9bdb1;
+  /* 글자: 초록빛 먹색 3단계 */
+  --ink: #102019;
+  --ink-2: #43544b;
+  --ink-3: #56665d;
+  /* 표지색: 셸과 진행 중인 것에만 */
+  --cover: #1d5a43;
+  --cover-ink: #ffffff;
+  --cover-soft: #d7e8dd;
+  /* 시세 방향: 상승 빨강, 하락 파랑 (국내 관례) */
+  --up: #c42a2f;    --up-bg: #fdecec;   --up-ink: #8c1d21;
+  --down: #1e58c0;  --down-bg: #e9f0fc; --down-ink: #163f8a;
+  /* 주의: 폴링, 검토 필요 */
+  --warn: #b7791f;  --warn-bg: #fff3d6; --warn-ink: #6f4600; --warn-line: #ecd08a;
+
+  --font: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
+  --fig: "Nanum Gothic Coding", "D2Coding", ui-monospace, monospace; /* taste-skill-ignore: 이 방향은 모든 숫자를 통장 인자체(고정폭)로 쓴다 */
+  --r-card: 6px; --r-ctl: 4px;
+  --gap: 16px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #c9d3cd; font-family: var(--font); color: var(--ink); font-size: 14px; line-height: 20px; word-break: keep-all; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--cover-soft); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--cover); outline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.fig { font-family: var(--fig); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--ink-3); }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* 창 1280×800: 사이드바 216 + 본문 1064, 하단 상태 표시줄 32 */
+.app { width: 1280px; height: 800px; margin: 0 auto; display: grid; grid-template-columns: 216px 1fr; grid-template-rows: 1fr 32px; background: var(--ground); overflow: hidden; }
+
+/* 사이드바 */
+.side { display: flex; flex-direction: column; padding: 18px 12px 14px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; }
+.brand svg { width: 26px; height: 26px; }
+.brand b { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.brand span { display: block; font-size: 12px; line-height: 16px; color: var(--ink-3); }
+.nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.nav a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r-ctl); color: var(--ink-2); text-decoration: none; font-size: 14px; }
+.nav a:hover { background: var(--sheet-2); color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--sheet); color: var(--ink); font-weight: 600; border-color: var(--line); }
+.nav a[aria-current="page"] svg { color: var(--cover); }
+.nav .count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--cover); color: var(--cover-ink); font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
+.side-foot { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.watching { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.watching i { width: 8px; height: 8px; border-radius: 50%; background: var(--cover); }
+.btn { height: 32px; padding: 0 12px; border-radius: var(--r-ctl); border: 1px solid var(--control); background: var(--sheet); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--cover); border-color: var(--cover); color: var(--cover-ink); }
+.btn.primary:hover { background: #164a37; }
+.btn.text { border-color: transparent; background: transparent; padding: 0 6px; color: var(--ink-2); }
+.btn.text:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.server { font-size: 12px; color: var(--ink-3); line-height: 16px; }
+
+/* 본문 */
+.main { padding: 18px 24px 0 8px; display: flex; flex-direction: column; min-height: 0; }
+.title { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 0 0 14px; }
+.title h1 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.title p { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); }
+.title p b { color: var(--ink); font-weight: 600; }
+.title .right { display: flex; align-items: center; gap: 12px; }
+.stamp { font-size: 12px; color: var(--ink-3); }
+
+/* 600 + 16 + 416 = 1032 = 1064 - 8 - 24 */
+.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 600px 416px; gap: var(--gap); }
+.col { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+.card { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-card); }
+.card-h { display: flex; align-items: center; gap: 10px; padding: 10px 16px 8px; min-height: 46px; }
+.card-h h2 { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; }
+.card-h .meta { font-size: 12px; color: var(--ink-3); }
+.card-h .end { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+/* 세그먼트 */
+.seg { display: inline-flex; padding: 2px; border-radius: var(--r-ctl); background: var(--sheet-2); border: 1px solid var(--rule); }
+.seg button { height: 26px; padding: 0 10px; border: 1px solid transparent; border-radius: 3px; background: transparent; font-size: 12px; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); font-weight: 600; border-color: var(--line); }
+
+/* 브리핑 */
+.brief .lead { margin: 0 16px; padding: 2px 0 12px; font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: -0.005em; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 0; }
+.tbl th { font-size: 12px; font-weight: 400; color: var(--ink-3); text-align: left; height: 28px; }
+.tbl td { height: 40px; border-top: 1px solid var(--rule); }
+.tbl .num { text-align: right; }
+.tbl th:first-child, .tbl td:first-child { padding-left: 16px; }
+.tbl th:last-child, .tbl td:last-child { padding-right: 16px; }
+.idx td.spark { width: 112px; padding-left: 20px; }
+.idx td.spark svg { display: block; }
+.idx .name { font-weight: 600; }
+.brief-foot { display: flex; align-items: center; gap: 16px; padding: 10px 16px 12px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-2); }
+.brief-foot .k { color: var(--ink-3); margin-right: 6px; }
+.brief-foot .end { margin-left: auto; }
+
+/* 감시 종목 */
+.watch { flex: 1; min-height: 0; }
+.watch .grp th { height: 30px; padding-top: 6px; text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-2); border-top: 1px solid var(--rule); }
+.watch .grp th span { font-weight: 400; color: var(--ink-3); margin-left: 6px; }
+.watch .grp:first-of-type th { border-top: 0; }
+.stock b { font-weight: 600; }
+.stock .code { margin-left: 8px; font-size: 12px; color: var(--ink-3); }
+.feed { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.feed i { width: 7px; height: 7px; border-radius: 50%; }
+.feed.live i { background: var(--cover); }
+.feed.poll i { background: var(--warn); }
+.feed.closed i { background: transparent; border: 1.5px solid var(--ink-3); }
+.watch td.feedc { width: 116px; padding-left: 24px; }
+
+/* 진행 중인 분석 */
+.run-obj { display: flex; align-items: baseline; justify-content: space-between; padding: 0 16px 6px; }
+.run-obj b { font-size: 16px; font-weight: 700; }
+.run-obj .code { font-size: 12px; color: var(--ink-3); margin-left: 6px; }
+.run-obj .sub { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.run-obj .elapsed { font-size: 20px; line-height: 24px; }
+.run-obj .elapsed small { display: block; font-family: var(--font); font-size: 12px; color: var(--ink-3); text-align: right; }
+.stages { list-style: none; margin: 0; padding: 2px 16px 4px; display: grid; }
+.stages li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; height: 30px; font-size: 14px; position: relative; }
+.stages li::before { content: ""; position: absolute; left: 6px; top: 22px; bottom: -10px; width: 1px; background: var(--line); }
+.stages li:last-child::before { display: none; }
+.stages .m { width: 13px; height: 13px; border-radius: 50%; position: relative; z-index: 1; background: var(--sheet); }
+.stages .done .m { background: var(--ink); }
+.stages .done .m::after { content: ""; position: absolute; left: 4px; top: 2px; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.stages .now .m { background: var(--cover); }
+.stages .wait .m { border: 1.5px solid var(--control); }
+.stages .now .n { font-weight: 600; }
+.stages .wait .n { color: var(--ink-3); }
+.stages .t { font-size: 13px; color: var(--ink-2); }
+.stages .now .t { color: var(--cover); font-weight: 700; }
+.stages .t .fig { font-size: 13px; }
+.stages .wait .t { color: var(--ink-3); font-family: var(--font); }
+.stages .n small { color: var(--ink-3); font-size: 12px; margin-left: 6px; font-weight: 400; }
+.run-foot { display: flex; align-items: center; gap: 8px; padding: 8px 16px 9px; border-top: 1px solid var(--rule); }
+.run-foot .queue { font-size: 12px; color: var(--ink-3); }
+.run-foot .cancel { margin-left: auto; }
+
+/* 최근 알림 + 확인선 */
+.alerts { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.feedlist { list-style: none; margin: 0; padding: 0 0 4px; }
+.feedlist li.a { display: grid; grid-template-columns: 50px 1fr; column-gap: 10px; padding: 6px 16px 6px; border-top: 1px solid var(--rule); align-items: start; }
+.feedlist li.a .time { font-size: 13px; color: var(--ink-2); padding-top: 1px; }
+.feedlist li.a .msg { font-size: 14px; line-height: 20px; }
+.feedlist li.a .msg small { display: flex; align-items: center; gap: 6px; margin-top: 1px; font-size: 12px; line-height: 18px; color: var(--ink-3); }
+.feedlist li.new .time { color: var(--ink); font-weight: 700; }
+.feedlist li.new .msg { font-weight: 500; }
+.feedlist li.old .msg { color: var(--ink-2); }
+.seen { display: flex; align-items: center; gap: 8px; padding: 0 16px; height: 26px; font-size: 12px; color: var(--cover); font-weight: 600; }
+.seen::before, .seen::after { content: ""; height: 1px; background: var(--cover); flex: 1; }
+.seen::before { flex: 0 0 8px; }
+.seen + li.a { border-top: 0; }
+
+/* 배지 */
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; border: 1px solid transparent; }
+.tag.kind { background: var(--sheet-2); color: var(--ink-2); border-color: var(--rule); font-weight: 500; }
+.dec { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 3px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.dec.buy { background: var(--up-bg); color: var(--up-ink); }
+.dec.over { background: var(--up-bg); color: var(--up-ink); border: 1px solid #f3c6c7; }
+.dec.hold { background: var(--sheet-2); color: var(--ink); border: 1px solid var(--line); }
+.dec.under { background: var(--down-bg); color: var(--down-ink); border: 1px solid #c9d8f5; }
+.dec.sell { background: var(--down-bg); color: var(--down-ink); }
+.dec.review { background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); }
+
+.disclaimer { margin: 0; padding: 8px 0 8px; font-size: 12px; line-height: 16px; color: var(--ink-3); }
+
+/* 하단 상태 표시줄: 통장 표지색 */
+.status { grid-column: 1 / -1; display: flex; align-items: center; gap: 0; background: var(--cover); color: #e4efe8; font-size: 12px; }
+.status .s { display: flex; align-items: center; gap: 7px; padding: 0 14px; height: 100%; border-right: 1px solid #2d6c54; white-space: nowrap; }
+.status .s:first-child { padding-left: 16px; }
+.status .s b { color: #fff; font-weight: 600; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: #fff; flex: none; }
+.status i.off { background: transparent; border: 1.5px solid #a9cdbb; }
+.status i.warn { background: #f2c562; }
+.status .push { margin-left: auto; border-right: 0; border-left: 1px solid #2d6c54; }
+
+/* 아래: 시안 설명 (앱 화면 아님) */
+.notes { width: 1280px; margin: 0 auto; padding: 32px 40px 48px; background: #f6f8f6; color: #1b1f1d; }
+.notes h2 { margin: 0 0 4px; font-size: 20px; }
+.notes > p { margin: 0 0 24px; color: #4a524e; font-size: 14px; }
+.notes h3 { margin: 28px 0 10px; font-size: 14px; }
+.chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.chip { border: 1px solid #dfe5e1; border-radius: 6px; overflow: hidden; background: #fff; font-size: 12px; }
+.chip div { height: 44px; }
+.chip p { margin: 0; padding: 6px 8px 8px; line-height: 16px; }
+.chip p code { font-family: var(--fig); color: #4a524e; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.specimen { display: grid; grid-template-columns: 180px 1fr; gap: 6px 16px; align-items: baseline; font-size: 13px; }
+.specimen span { color: #4a524e; }
+.banner { display: flex; align-items: center; gap: 10px; width: 760px; height: 36px; padding: 0 14px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-ink); border: 1px solid var(--warn-line); font-size: 13px; }
+.banner b { font-weight: 700; }
+.banner .btn { margin-left: auto; height: 26px; font-size: 12px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M8.5 12.5h7M8.5 16.5h4.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-paper" viewBox="0 0 24 24"><path d="M4 5h12.5v13.5a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M16.5 9H20v9.5a2 2 0 0 1-2 2M7.5 9h5.5M7.5 13h5.5M7.5 17h3.5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h8M17 7h3M4 17h3M12 17h8"/><circle cx="14.5" cy="7" r="2.5"/><circle cx="9.5" cy="17" r="2.5"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side" aria-label="주 메뉴">
+    <div class="brand">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="3" width="24" height="20" rx="3" fill="#1d5a43"/><path d="M7 8.5 13 18l6-9.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 7.5h24" stroke="#2f7a5d" stroke-width="1"/></svg>
+      <div><b>Vater</b><span>투자 보조</span></div>
+    </div>
+    <ul class="nav">
+      <li><a href="#" aria-current="page"><svg class="i"><use href="#i-home"/></svg>홈</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-report"/></svg>분석</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-bell"/></svg>감시·알림<span class="count" aria-label="새 알림 2건">2</span></a></li>
+      <li><a href="#"><svg class="i"><use href="#i-paper"/></svg>브리핑</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-sliders"/></svg>설정</a></li>
+    </ul>
+    <div class="side-foot">
+      <div class="watching"><i aria-hidden="true"></i>알림 감시 중 · 규칙 7개</div>
+      <button class="btn" type="button"><svg class="i" style="width:14px;height:14px"><use href="#i-pause"/></svg>감시 일시 중지</button>
+      <div class="server">한투 실전 서버에 연결됨</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="title">
+      <div>
+        <h1>홈</h1>
+        <p><b>삼성전자가 목표가 71,000원 이상에 도달했습니다.</b> 14:21 알림</p>
+      </div>
+      <div class="right">
+        <span class="stamp">14:32:05 기준</span>
+        <button class="btn primary" type="button"><svg class="i" style="width:16px;height:16px"><use href="#i-plus"/></svg>새 분석</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="col">
+        <section class="card brief" aria-labelledby="h-brief">
+          <div class="card-h">
+            <h2 id="h-brief">최근 브리핑</h2>
+            <span class="meta">11월 2일(월) 국내 마감 · 16:00 생성</span>
+            <div class="end"><div class="seg" role="group" aria-label="시장"><button type="button" aria-pressed="true">국내</button><button type="button" aria-pressed="false">미국</button></div></div>
+          </div>
+          <p class="lead">반도체 대형주가 지수를 끌어올렸지만, 코스닥은 2차전지 약세에 밀렸습니다.</p>
+          <table class="tbl idx">
+            <thead><tr><th>지수</th><th class="num">종가</th><th class="num">전일 대비</th><th class="num">등락률</th><th style="padding-left:20px">최근 30일</th></tr></thead>
+            <tbody>
+              <tr><td class="name">코스피</td><td class="num fig">2,583.27</td><td class="num fig up">+21.48</td><td class="num fig up">+0.84%</td>
+                <td class="spark"><svg width="88" height="24" viewBox="0 0 88 24" role="img" aria-label="코스피 최근 30일 종가, 상승"><polyline fill="none" stroke="var(--up)" stroke-width="1.5" stroke-linejoin="round" points="2.0,19.7 4.9,20.1 7.8,18.0 10.7,18.3 13.6,19.0 16.5,21.7 19.4,22.0 22.3,17.8 25.2,15.9 28.1,12.0 31.0,10.7 33.9,9.0 36.8,7.9 39.7,13.2 42.6,9.8 45.4,7.7 48.3,5.6 51.2,10.9 54.1,16.4 57.0,19.0 59.9,20.2 62.8,18.7 65.7,18.5 68.6,16.3 71.5,18.0 74.4,16.6 77.3,14.8 80.2,16.6 83.1,7.9 86.0,2.0"/><circle cx="86" cy="2.6" r="2" fill="var(--up)"/></svg></td></tr>
+              <tr><td class="name">코스닥</td><td class="num fig">742.15</td><td class="num fig down">-2.76</td><td class="num fig down">-0.37%</td>
+                <td class="spark"><svg width="88" height="24" viewBox="0 0 88 24" role="img" aria-label="코스닥 최근 30일 종가, 하락"><polyline fill="none" stroke="var(--down)" stroke-width="1.5" stroke-linejoin="round" points="2.0,3.6 4.9,8.5 7.8,7.8 10.7,4.8 13.6,7.2 16.5,12.5 19.4,13.3 22.3,12.2 25.2,8.8 28.1,13.7 31.0,18.9 33.9,16.9 36.8,15.8 39.7,11.0 42.6,8.1 45.4,9.0 48.3,10.5 51.2,2.0 54.1,3.6 57.0,6.9 59.9,11.5 62.8,11.8 65.7,11.8 68.6,13.6 71.5,14.4 74.4,14.0 77.3,12.1 80.2,8.8 83.1,19.6 86.0,22.0"/><circle cx="86" cy="21.4" r="2" fill="var(--down)"/></svg></td></tr>
+            </tbody>
+          </table>
+          <div class="brief-foot">
+            <span><span class="k">코스피 수급</span>외국인 <span class="fig up">+3,124억</span> · 기관 <span class="fig down">-987억</span> · 개인 <span class="fig down">-2,013억</span></span>
+            <span>상승 <span class="fig">512</span> · 하락 <span class="fig">357</span></span>
+            <button class="btn text end" type="button">브리핑 읽기</button>
+          </div>
+        </section>
+
+        <section class="card watch" aria-labelledby="h-watch">
+          <div class="card-h">
+            <h2 id="h-watch">감시 종목</h2>
+            <span class="meta">5종목</span>
+            <div class="end"><button class="btn text" type="button">종목 추가</button></div>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>종목</th><th class="num">현재가</th><th class="num">전일 대비</th><th class="num">등락률</th><th style="padding-left:24px">수신</th></tr></thead>
+            <tbody class="grp">
+              <tr><th colspan="5">국내 장중<span>15:30 마감까지 58분</span></th></tr>
+              <tr><td class="stock"><b>삼성전자</b><span class="code fig">005930</span></td><td class="num fig">71,400원</td><td class="num fig up">+1,200</td><td class="num fig up">+1.71%</td><td class="feedc"><span class="feed live"><i></i>실시간</span></td></tr>
+              <tr><td class="stock"><b>SK하이닉스</b><span class="code fig">000660</span></td><td class="num fig">198,700원</td><td class="num fig down">-3,300</td><td class="num fig down">-1.63%</td><td class="feedc"><span class="feed poll"><i></i>폴링 · 30초</span></td></tr>
+              <tr><td class="stock"><b>NAVER</b><span class="code fig">035420</span></td><td class="num fig">172,300원</td><td class="num fig flat">0</td><td class="num fig flat">0.00%</td><td class="feedc"><span class="feed live"><i></i>실시간</span></td></tr>
+            </tbody>
+            <tbody class="grp">
+              <tr><th colspan="5">미국 마감<span>11/2 종가 · 오늘 23:30 개장</span></th></tr>
+              <tr><td class="stock"><b>애플</b><span class="code fig">AAPL</span></td><td class="num fig">$227.48</td><td class="num fig up">+$2.13</td><td class="num fig up">+0.95%</td><td class="feedc"><span class="feed closed"><i></i>장 마감</span></td></tr>
+              <tr><td class="stock"><b>엔비디아</b><span class="code fig">NVDA</span></td><td class="num fig">$135.40</td><td class="num fig down">-$1.87</td><td class="num fig down">-1.36%</td><td class="feedc"><span class="feed closed"><i></i>장 마감</span></td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card run" aria-labelledby="h-run">
+          <div class="card-h">
+            <h2 id="h-run">진행 중인 분석</h2>
+            <div class="end"><span class="meta">대기 0건</span></div>
+          </div>
+          <div class="run-obj">
+            <div><b>SK하이닉스</b><span class="code fig">000660</span><span class="sub">기준일 11월 2일 · 클라우드 전용 · 14:24 시작</span></div>
+            <div class="elapsed"><span class="fig">8</span>분 <span class="fig">12</span>초<small>경과</small></div>
+          </div>
+          <ol class="stages">
+            <li class="done"><span class="m"></span><span class="n">애널리스트<small>시장 · 뉴스 · 재무</small></span><span class="t"><span class="fig">3</span>분 <span class="fig">41</span>초</span></li>
+            <li class="done"><span class="m"></span><span class="n">강세·약세 토론</span><span class="t"><span class="fig">2</span>분 <span class="fig">5</span>초</span></li>
+            <li class="now"><span class="m"></span><span class="n">트레이더</span><span class="t"><span class="fig">2</span>분 <span class="fig">26</span>초</span></li>
+            <li class="wait"><span class="m"></span><span class="n">리스크 토론</span><span class="t">대기</span></li>
+            <li class="wait"><span class="m"></span><span class="n">포트폴리오 매니저</span><span class="t">대기</span></li>
+          </ol>
+          <div class="run-foot">
+            <button class="btn" type="button">진행 보기</button>
+            <button class="btn text cancel" type="button">분석 취소</button>
+          </div>
+        </section>
+
+        <section class="card alerts" aria-labelledby="h-alerts">
+          <div class="card-h">
+            <h2 id="h-alerts">최근 알림</h2>
+            <span class="meta">새 알림 2건</span>
+            <div class="end"><button class="btn text" type="button">모두 확인</button><button class="btn text" type="button">전체 보기</button></div>
+          </div>
+          <ul class="feedlist">
+            <li class="a new"><span class="time fig">14:21</span><span class="msg">삼성전자 현재가 71,000 — 목표가 71,000 이상<small>가격 · 목표가 이상 · 장중 실시간</small></span></li>
+            <li class="a new"><span class="time fig">13:05</span><span class="msg">AI 분석 완료: 삼성전자 — 비중확대<small><span class="dec over">비중확대</span>기준일 11월 2일 · 9분 48초 소요</small></span></li>
+            <li class="seen" aria-label="여기까지 확인함, 12시 30분">여기까지 확인 · 12:30</li>
+            <li class="a old"><span class="time fig">11:47</span><span class="msg">SK하이닉스 거래량이 20일 평균의 3.2배<small>거래량 급증 · 장중 실시간</small></span></li>
+            <li class="a old"><span class="time fig">07:02</span><span class="msg">시장 브리핑 도착: 미국 2026-11-02<small>일일 브리핑 · 미국 마감</small></span></li>
+            <li class="a old"><span class="time fig">11/2</span><span class="msg">NAVER RSI(14) 29.4 — 과매도 진입<small>RSI · 어제 15:41 · 장 마감 후 확인</small></span></li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    <p class="disclaimer">투자 판단 보조용이며 투자 권유가 아닙니다. Vater는 주문 기능이 없습니다.</p>
+  </main>
+
+  <footer class="status" aria-label="상태">
+    <div class="s"><i></i><b>국내 장중</b>15:30 마감</div>
+    <div class="s"><i class="off"></i><b>미국 마감</b>23:30 개장</div>
+    <div class="s"><i class="warn"></i><b>한투 연결</b>실시간 2 · 폴링 1</div>
+    <div class="s"><i></i><b>AI 엔진</b>클라우드 전용 · 분석 1건 진행 중</div>
+    <div class="s push">알림 감시 중</div>
+  </footer>
+</div>
+
+<section class="notes" aria-label="시안 설명">
+  <h2>A · 통장 정리</h2>
+  <p>시안용 예시 데이터입니다. 장면: 2026-11-03(화) 14:32, 국내 장중. 시세, 브리핑 문장, 알림은 모두 지어낸 값입니다.</p>
+
+  <h3>팔레트</h3>
+  <div class="chips">
+    <div class="chip"><div style="background:#eaf2ec"></div><p>바탕 (통장 속지)<br><code>#eaf2ec</code></p></div>
+    <div class="chip"><div style="background:#ffffff;border-bottom:1px solid #e6eee9"></div><p>장(카드)<br><code>#ffffff</code></p></div>
+    <div class="chip"><div style="background:#102019"></div><p>글자 먹색<br><code>#102019</code></p></div>
+    <div class="chip"><div style="background:#1d5a43"></div><p>표지색 (셸·진행 중)<br><code>#1d5a43</code></p></div>
+    <div class="chip"><div style="background:#c42a2f"></div><p>상승<br><code>#c42a2f</code> · 흰 바탕 5.7:1</p></div>
+    <div class="chip"><div style="background:#1e58c0"></div><p>하락<br><code>#1e58c0</code> · 흰 바탕 6.5:1</p></div>
+  </div>
+
+  <h3>글꼴</h3>
+  <div class="specimen">
+    <span>Pretendard (화면 글자)</span><div style="font-size:16px;font-weight:600">반도체 대형주가 지수를 끌어올렸습니다</div>
+    <span>나눔고딕코딩 (모든 숫자)</span><div class="fig" style="font-size:16px">71,400원 &nbsp; +1,200 &nbsp; +1.71% &nbsp; $227.48 &nbsp; 14:21</div>
+  </div>
+
+  <h3>결정 배지</h3>
+  <div class="row"><span class="dec buy">매수</span><span class="dec over">비중확대</span><span class="dec hold">보유</span><span class="dec under">비중축소</span><span class="dec sell">매도</span><span class="dec review">검토 필요</span></div>
+
+  <h3>수신 상태와 오프라인 배너</h3>
+  <div class="row" style="margin-bottom:12px"><span class="feed live"><i></i>실시간</span><span class="feed poll"><i></i>폴링 · 30초</span><span class="feed closed"><i></i>장 마감</span><span class="feed" style="color:var(--warn-ink);font-weight:600"><i style="border:2px solid var(--warn-ink)"></i>끊김 · 재연결 중</span></div>
+  <div class="banner" role="status"><b>오프라인: 알림 감시 일시 중지</b>30초마다 다시 확인합니다. 마지막 수신 14:32:05<button class="btn" type="button">지금 다시 확인</button></div>
+</section>
+</body>
+</html>

@@ -1,0 +1,20 @@
+.spark {
+  display: block;
+  overflow: visible;
+}
+
+.spark[data-direction='up'] {
+  color: var(--color-up);
+}
+
+.spark[data-direction='down'] {
+  color: var(--color-down);
+}
+
+.spark[data-direction='flat'] {
+  color: var(--color-ink-3);
+}
+
+.empty {
+  color: var(--color-ink-3);
+}

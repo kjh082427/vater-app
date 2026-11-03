@@ -1,0 +1,66 @@
+/*
+ * 창 전체. 설계 기준은 최소 창 1024×700(CSS 픽셀)이다. 너비는 64rem 아래로 줄이지 않고 가로로
+ * 스크롤한다. 높이는 막지 않는다: 1920×1080 화면을 150%로 쓰면 최대화한 창도 CSS 높이가
+ * 약 640px이라, 높이를 막으면 상태 표시줄이 화면 밖으로 밀려난다. 그래서 상태 표시줄은 늘
+ * 보이고 본문과 사이드바가 각자 스크롤한다. Windows 배율은 WebView2가 CSS 픽셀 전체를 키운다.
+ */
+.shell {
+  display: grid;
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--size-statusbar);
+  width: 100%;
+  height: 100vh;
+  min-width: 64rem;
+  background: var(--color-paper);
+}
+
+.sidebar {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  grid-row: 1;
+  grid-column: 2;
+  min-width: 0;
+  min-height: 0;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-5) var(--space-6) var(--space-6) var(--space-8);
+}
+
+.main:focus {
+  outline: none;
+}
+
+.status {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* 본문으로 건너뛰기: 키보드로 처음 Tab을 누를 때만 보인다 */
+.skip {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 10;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip:focus-visible {
+  transform: none;
+}

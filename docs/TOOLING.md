@@ -15,6 +15,8 @@
 | 2026-11-03 | uv (+ uvx) | 0.13.6 | `~/.local/bin` | Python 버전·의존성 관리 | GitHub Releases 공식 바이너리, sha256 검증 (`curl \| sh` 설치 스크립트는 worktree 격리 규칙 때문에 쓰지 않음) |
 | 2026-11-03 | Python | 3.13 | uv 관리 폴더 | 검증 실험·사이드카 실행 | `uv python install 3.13` |
 | 2026-11-03 | Ollama 모델 | `qwen3.5:4b`, `qwen3.5:9b` | Windows Ollama | 로컬 LLM 검증 | Ollama 0.40.13은 사용자가 설치 |
+| 2026-11-03 | fonttools + brotli (`uvx`로 실행) | fonttools 4.68.0 | uv 캐시 (설치하지 않음) | Hahmlet 글꼴 서브셋, woff2 변환 (`pyftsubset`, `varLib.instancer`) | `ui/design-system`. 명령은 `apps/desktop/src/design-system/fonts/make-fonts.sh` |
+| 2026-11-03 | 프런트엔드 npm 의존성 | `apps/desktop/package.json`에 정확한 버전 고정 | `apps/desktop/node_modules` (git 제외) | Vite, React 18, TypeScript, Vitest, ESLint, Prettier | `npm install --before=2026-10-20`으로 2주 이상 지난 버전만 받음. `package-lock.json` 커밋 |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |
