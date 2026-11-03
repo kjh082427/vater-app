@@ -130,3 +130,51 @@ async def test_last_closed_session_gives_up_after_a_long_holiday() -> None:
 
     at = datetime(2026, 11, 3, 20, 0, tzinfo=KST)
     assert await clock(at, Closed()).last_closed_session("KR") is None
+
+
+CSAT = date(2026, 11, 19)  # 2027학년도 수능: 국내 장 10:00~16:30
+
+
+@pytest.mark.parametrize(
+    ("market", "day", "opened", "closed"),
+    [
+        (
+            "KR",
+            date(2026, 11, 3),
+            datetime(2026, 11, 3, 9, 0, tzinfo=KST),
+            datetime(2026, 11, 3, 15, 30, tzinfo=KST),
+        ),
+        (
+            "KR",
+            CSAT,
+            datetime(2026, 11, 19, 10, 0, tzinfo=KST),
+            datetime(2026, 11, 19, 16, 30, tzinfo=KST),
+        ),
+        (
+            "US",
+            date(2026, 11, 27),
+            datetime(2026, 11, 27, 9, 30, tzinfo=NY),
+            datetime(2026, 11, 27, 13, 0, tzinfo=NY),
+        ),  # 추수감사절 다음 날 조기 폐장
+    ],
+)
+def test_session_bounds(market: str, day: date, opened: datetime, closed: datetime) -> None:
+    from vater_core.alerts.clock import session_bounds
+
+    assert session_bounds(market, day) == (opened, closed)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("hh", "mm", "is_open", "settled"),
+    [
+        (9, 30, False, False),  # 수능날은 10:00에 연다
+        (16, 0, True, False),  # 평소라면 마감 뒤지만 수능날은 장중
+        (16, 39, False, False),
+        (16, 40, False, True),  # 16:30 마감 + 10분
+    ],
+)
+async def test_kr_csat_day_hours(hh: int, mm: int, is_open: bool, settled: bool) -> None:
+    c = clock(datetime(2026, 11, 19, hh, mm, tzinfo=KST))
+    assert await c.is_open("KR") is is_open
+    assert await c.after_close("KR") is settled
+    assert await c.last_closed_session("KR") == (CSAT if settled else date(2026, 11, 18))
