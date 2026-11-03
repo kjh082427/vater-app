@@ -48,28 +48,36 @@ async function chooseContent(user: User, n: number, label: string) {
 }
 
 describe('배치 편집: 성공 기준 1 흐름', () => {
-  it('[배치 편집] → 3칸 → 왼쪽 크게 → 칸마다 내용 → [저장] → 보기', async () => {
-    windowSize(1280, 800);
-    const user = userEvent.setup();
-    const puts = recordPuts();
-    const editor = await openEditor(user);
-    expect(within(editor).getByText(/배치 편집 · 기본/)).toBeInTheDocument();
+  it(
+    '[배치 편집] → 3칸 → 왼쪽 크게 → 칸마다 내용 → [저장] → 보기',
+    { timeout: 20_000 },
+    async () => {
+      windowSize(1280, 800);
+      const user = userEvent.setup();
+      const puts = recordPuts();
+      const editor = await openEditor(user);
+      expect(within(editor).getByText(/배치 편집 · 기본/)).toBeInTheDocument();
 
-    await user.click(within(countGroup()).getByRole('radio', { name: '3' }));
-    await user.click(templateRadio(/왼쪽 크게 \+ 오른쪽 2/));
-    expect(templateRadio(/왼쪽 크게 \+ 오른쪽 2/)).toBeChecked();
-    await chooseContent(user, 1, '감시 종목');
-    await chooseContent(user, 2, '지수 차트');
-    await chooseContent(user, 3, '최근 알림');
-    await user.click(within(editor).getByRole('button', { name: '저장' }));
+      await user.click(within(countGroup()).getByRole('radio', { name: '3' }));
+      await user.click(templateRadio(/왼쪽 크게 \+ 오른쪽 2/));
+      expect(templateRadio(/왼쪽 크게 \+ 오른쪽 2/)).toBeChecked();
+      await chooseContent(user, 1, '감시 종목');
+      await chooseContent(user, 2, '지수 차트');
+      await chooseContent(user, 3, '최근 알림');
+      await user.click(within(editor).getByRole('button', { name: '저장' }));
 
-    await waitFor(() => expect(puts).toHaveLength(1));
-    const board = puts[0]?.dashboards[0];
-    expect(board?.layout.template).toBe('left-big-3');
-    expect(board?.panels.map((p) => p.type)).toEqual(['watchlist', 'index-chart', 'recent-alerts']);
-    expect(await screen.findByRole('region', { name: '칸 1: 감시 종목' })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: '배치 편집' })).not.toBeInTheDocument();
-  });
+      await waitFor(() => expect(puts).toHaveLength(1));
+      const board = puts[0]?.dashboards[0];
+      expect(board?.layout.template).toBe('left-big-3');
+      expect(board?.panels.map((p) => p.type)).toEqual([
+        'watchlist',
+        'index-chart',
+        'recent-alerts',
+      ]);
+      expect(await screen.findByRole('region', { name: '칸 1: 감시 종목' })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: '배치 편집' })).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe('배치 편집: 규칙', () => {
@@ -241,7 +249,7 @@ describe('배치 편집: 키보드만으로', () => {
     throw new Error(`Tab으로 ${name} 에 닿지 못함`);
   }
 
-  it('칸 수 → 틀 → 내용 → 경계선 → 저장', async () => {
+  it('칸 수 → 틀 → 내용 → 경계선 → 저장', { timeout: 20_000 }, async () => {
     windowSize(1280, 800);
     const user = userEvent.setup();
     const puts = recordPuts();

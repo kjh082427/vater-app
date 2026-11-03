@@ -25,7 +25,7 @@ function label(state: FeedState, intervalSeconds?: number): string {
     case 'live':
       return '실시간';
     case 'polling':
-      return intervalSeconds ? `폴링 · ${intervalSeconds}초` : '폴링';
+      return intervalSeconds ? `${intervalSeconds}초마다 확인` : '주기 확인';
     case 'disconnected':
       return '끊김 · 재연결 중';
     case 'closed':

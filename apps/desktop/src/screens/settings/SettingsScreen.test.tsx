@@ -7,6 +7,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { errorResponse } from '../../mocks/handlers';
 import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
+import { choose, selectButton } from '../../test/select';
 
 const FAKE_KEY = 'PSfakeAppKey0000000000000000000000';
 const FAKE_SECRET = 'fake-secret-value-for-tests-only';
@@ -152,13 +153,14 @@ describe('한국투자증권', () => {
 });
 
 describe('AI 엔진', () => {
-  it('프리셋', async () => {
+  it('AI 사용 방식', async () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('AI 엔진'));
-    const preset = await within(part).findByRole('combobox', { name: '프리셋' });
-    await waitFor(() => expect(preset).toHaveValue('cloud'));
-    await userEvent.selectOptions(preset, 'mixed');
+    await waitFor(() =>
+      expect(selectButton(part, 'AI 사용 방식')).toHaveAccessibleName('AI 사용 방식 클라우드'),
+    );
+    await choose(part, 'AI 사용 방식', '혼합');
     await waitFor(() =>
       expect(patches).toContainEqual({ path: '/settings', body: { 'llm.preset': 'mixed' } }),
     );
@@ -217,10 +219,7 @@ describe('AI 엔진', () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('클라우드 AI'));
-    await userEvent.selectOptions(
-      await within(part).findByRole('combobox', { name: '제공자' }),
-      'compat',
-    );
+    await choose(part, '제공자', /OpenAI 호환 서버/);
     await waitFor(() =>
       expect(patches).toContainEqual({
         path: '/settings',
@@ -258,7 +257,7 @@ describe('AI 엔진', () => {
       percent: 45,
     });
     const bar = await within(part).findByRole('progressbar', { name: 'Qwen 3.5 9B 받는 중' });
-    expect(bar).toHaveAttribute('value', '45');
+    expect(bar).toHaveAttribute('aria-valuenow', '45');
     expect(within(part).getByText('45% · 2.9 / 6.6GB')).toBeInTheDocument();
     mock.db.ollama.models.push({ name: 'qwen3.5:9b-16k', size: 6_550_000_000 });
     emit(source, 'llm.pull', { tag: 'qwen3.5:9b', status: 'done', variant: 'qwen3.5:9b-16k' });
@@ -346,8 +345,7 @@ describe('AI 엔진', () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('로컬 AI'));
-    const select = await within(part).findByRole('combobox', { name: '분석에 쓸 로컬 모델' });
-    await userEvent.selectOptions(select, 'qwen3.5:4b');
+    await choose(part, '분석에 쓸 로컬 모델', 'Qwen 3.5 4B');
     await waitFor(() =>
       expect(patches).toContainEqual({
         path: '/settings',
@@ -362,10 +360,7 @@ describe('분석·브리핑·일반', () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('분석 기본값'));
-    await userEvent.selectOptions(
-      await within(part).findByRole('combobox', { name: '토론 라운드' }),
-      '2',
-    );
+    await choose(part, '토론 라운드', '2회');
     await waitFor(() =>
       expect(patches).toContainEqual({ path: '/settings', body: { 'analysis.debate_rounds': 2 } }),
     );
@@ -389,9 +384,7 @@ describe('분석·브리핑·일반', () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('브리핑'));
-    await userEvent.click(
-      await within(part).findByRole('checkbox', { name: '미국 브리핑 만들기' }),
-    );
+    await userEvent.click(await within(part).findByRole('switch', { name: '미국 브리핑 만들기' }));
     const time = within(part).getByLabelText('국내 브리핑 시각');
     await userEvent.clear(time);
     await userEvent.type(time, '16:30');
@@ -413,7 +406,7 @@ describe('분석·브리핑·일반', () => {
   it('부팅 시 자동 실행은 플랫폼 어댑터, 버전은 /health', async () => {
     const view = renderSettings();
     const part = await waitFor(() => region('일반'));
-    const auto = await within(part).findByRole('checkbox', { name: '부팅 시 자동 실행' });
+    const auto = await within(part).findByRole('switch', { name: '부팅 시 자동 실행' });
     await waitFor(() => expect(auto).toBeChecked());
     await userEvent.click(auto);
     await waitFor(() => expect(auto).not.toBeChecked());
@@ -425,7 +418,7 @@ describe('분석·브리핑·일반', () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('일반'));
-    const tray = await within(part).findByRole('checkbox', { name: '창을 닫으면 트레이로 숨기기' });
+    const tray = await within(part).findByRole('switch', { name: '창을 닫으면 트레이로 숨기기' });
     await waitFor(() => expect(tray).toBeChecked());
     await act(async () => {
       await userEvent.click(tray);

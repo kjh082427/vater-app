@@ -59,21 +59,12 @@
 
   --color-focus: var(--color-accent);
 
-  /* 예전 이름(별칭). 다른 브랜치의 화면 CSS가 쓰므로 남긴다. 새 코드는 오른쪽 이름을 쓴다 */
-  --color-paper: var(--color-card);
-  --color-chrome: var(--color-row-alt);
-  --color-selected: var(--color-accent-weak);
-  --color-rule-section: var(--color-line);
-  --color-ink-hover: var(--color-ink-2);
-  --color-on-ink: var(--color-on-accent);
-
   /* 그림자: 칸 카드는 아주 옅게, 떠 있는 것(메뉴, 목록, 대화 상자)만 진하게 */
   --shadow-card: 0 1px 2px var(--color-card-shadow), 0 2px 8px var(--color-card-shadow);
   --shadow-pop: 0 12px 32px var(--color-pop-shadow), 0 2px 6px var(--color-card-shadow);
 
-  /* 글꼴: Pretendard 하나. --font-serif는 예전 이름이며 같은 고딕을 가리킨다 */
+  /* 글꼴: Pretendard 하나 */
   --font-sans: 'Pretendard', 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif;
-  --font-serif: var(--font-sans);
 
   /* 글자 크기(기준 16px) · 줄 높이 */
   --text-xs: 0.75rem; /* 12 보조 정보, 표 머리, 상태 표시줄, 축 눈금 */

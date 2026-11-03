@@ -218,14 +218,16 @@ describe('브리핑 상세: 국내', () => {
   it('수급: 백만원 → 억, 순매수 빨강·순매도 파랑, 작은 값도 0억이 아님', async () => {
     renderAt('#/briefings/21');
     const part = await waitFor(() => region('수급'));
-    const table = within(part).getByRole('table', { name: '투자자 수급' });
-    const kospi = within(table).getByRole('row', { name: /코스피/ });
-    expect(within(kospi).getByText('+3,124억')).toHaveAttribute('data-direction', 'up');
-    expect(within(kospi).getByText('−1,520억')).toHaveAttribute('data-direction', 'down');
-    const kosdaq = within(table).getByRole('row', { name: /코스닥/ });
-    expect(within(kosdaq).getByText('+0.4억')).toHaveAttribute('data-direction', 'up');
+    // 가로 막대(DivergingBar): 순매수는 오른쪽(빨강), 순매도는 왼쪽(파랑), 0은 막대 없음
+    const kospi = within(part).getByRole('img', { name: /투자자별 순매수 · 코스피/ });
+    expect(within(kospi).getByText('+3,124억')).toBeInTheDocument();
+    expect(kospi.querySelector('[data-row="외국인"] [data-side="right"]')).not.toBeNull();
+    expect(within(kospi).getByText('−1,520억')).toBeInTheDocument();
+    expect(kospi.querySelector('[data-row="기관"] [data-side="left"]')).not.toBeNull();
+    const kosdaq = within(part).getByRole('img', { name: /투자자별 순매수 · 코스닥/ });
+    expect(within(kosdaq).getByText('+0.4억')).toBeInTheDocument();
     expect(within(kosdaq).getByText('−3.2억')).toBeInTheDocument();
-    expect(within(kosdaq).getByText('0.0억')).toHaveAttribute('data-direction', 'flat');
+    expect(within(kosdaq).getByText('0.0억')).toBeInTheDocument();
   });
 
   it('상위 종목: 상승률·하락률·거래대금(억 원) 탭', async () => {

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import type { AlertKindInfo, AlertRule, RulePreviewOut, WatchItem } from '../../api/types';
-import { Button } from '../../design-system';
+import { Button, SegmentedControl } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { Field } from '../common/Field';
 import form from '../common/form.module.css';
@@ -192,24 +192,23 @@ export function RuleEditor({ item, kinds, rule, onDone }: RuleEditorProps) {
             </div>
           ) : null}
 
-          <fieldset className={form.choices}>
-            <legend className={form.legend}>확인 시점</legend>
-            {(['realtime', 'close'] as const).map((t) => (
-              <label key={t} className={form.choice}>
-                <input
-                  type="radio"
-                  name={`timing-${item.id}-${rule?.id ?? 'new'}`}
-                  value={t}
-                  checked={timing === t}
-                  onChange={() => {
-                    setTiming(t);
-                    setPreview(null);
-                  }}
-                />
-                {TIMING_LABEL[t]}
-              </label>
-            ))}
-          </fieldset>
+          <div className={form.choices}>
+            <span className={form.legend} aria-hidden="true">
+              확인 시점
+            </span>
+            <SegmentedControl
+              label="확인 시점"
+              value={timing}
+              options={(['realtime', 'close'] as const).map((t) => ({
+                value: t,
+                label: TIMING_LABEL[t],
+              }))}
+              onChange={(t) => {
+                setTiming(t);
+                setPreview(null);
+              }}
+            />
+          </div>
 
           {preview ? (
             <div className={styles.preview} role="status">

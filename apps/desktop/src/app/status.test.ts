@@ -29,9 +29,9 @@ describe('marketDetail: 장중일 때 마감 시각(한국 시간)', () => {
 
 describe('feedSummary: 한투 연결', () => {
   it.each([
-    [monitor({ realtime: 2, polling: 1 }), 'caution', '실시간 2 · 폴링 1'],
+    [monitor({ realtime: 2, polling: 1 }), 'caution', '실시간 2 · 주기 확인 1'],
     [monitor({ realtime: 3 }), 'on', '실시간 3'],
-    [monitor({ polling: 2 }), 'caution', '폴링 2'],
+    [monitor({ polling: 2 }), 'caution', '주기 확인 2'],
     [monitor({ state: 'offline', realtime: 2 }), 'caution-strong', '끊김 · 재연결 중'],
     [monitor({ state: 'paused' }), 'off', '감시 일시 중지'],
     [monitor({ state: 'closed' }), 'off', '장 외 시간 · 대기'],

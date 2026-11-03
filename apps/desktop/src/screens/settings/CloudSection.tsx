@@ -9,6 +9,7 @@ import form from '../common/form.module.css';
 import { SecretForm } from './SecretForm';
 import styles from './settings.module.css';
 import { str, type Settings } from './useSettings';
+import { SelectField } from '../common/SelectField';
 
 /** 클라우드 AI: 제공자, 쓰기 전용 키(호환 서버는 주소도), 모델 이름, 연결 테스트. */
 export function CloudSettings({
@@ -65,27 +66,21 @@ export function CloudSettings({
 
   return (
     <div className={styles.body}>
-      <Field label="제공자">
-        {(control) => (
-          <select
-            {...control}
-            className={form.control}
-            value={providerId}
-            disabled={!catalog || !settings}
-            onChange={(e) => {
-              setResult(null);
-              setError(null);
-              void save({ 'llm.cloud_provider': e.target.value });
-            }}
-          >
-            {Object.entries(catalog?.cloud ?? {}).map(([id, p]) => (
-              <option key={id} value={id}>
-                {p.free_tier ? `${p.label} (무료 등급 있음)` : p.label}
-              </option>
-            ))}
-          </select>
-        )}
-      </Field>
+      {catalog && settings ? (
+        <SelectField
+          label="제공자"
+          value={providerId}
+          onChange={(id) => {
+            setResult(null);
+            setError(null);
+            void save({ 'llm.cloud_provider': id });
+          }}
+          options={Object.entries(catalog.cloud).map(([id, p]) => ({
+            value: id,
+            label: p.free_tier ? `${p.label} (무료 등급 있음)` : p.label,
+          }))}
+        />
+      ) : null}
       {provider ? (
         <SecretForm
           key={providerId}
@@ -102,7 +97,7 @@ export function CloudSettings({
       {showModels && provider ? (
         <div className={form.row}>
           <Field
-            label="깊은 분석 모델"
+            label="결론을 내는 모델"
             hint={provider.deep ? `비우면 ${provider.deep}` : '모델 이름을 넣으세요.'}
           >
             {(control) => (
@@ -118,7 +113,7 @@ export function CloudSettings({
             )}
           </Field>
           <Field
-            label="빠른 모델"
+            label="자료를 정리하는 모델"
             hint={provider.quick ? `비우면 ${provider.quick}` : '모델 이름을 넣으세요.'}
           >
             {(control) => (

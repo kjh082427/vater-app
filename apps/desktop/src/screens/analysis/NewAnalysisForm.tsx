@@ -12,10 +12,11 @@ import form from '../common/form.module.css';
 import { StockName } from '../common/quotes';
 import { SymbolSearch } from '../common/SymbolSearch';
 import styles from './analysis.module.css';
+import { SelectField } from '../common/SelectField';
 
 type Picked = Pick<SymbolOut, 'market' | 'code' | 'name'>;
 
-/** 주소 쿼리(#/analyses?market=&code=&as_of=)로 미리 채울 값. "프리셋 바꿔 새로 분석"이 쓴다. */
+/** 주소 쿼리(#/analyses?market=&code=&as_of=)로 미리 채울 값. "AI 사용 방식 바꿔 새로 분석"이 쓴다. */
 function prefillFromHash(): { market: string; code: string; asOf: string } | null {
   const query = window.location.hash.split('?')[1];
   if (!query) return null;
@@ -116,21 +117,18 @@ export function NewAnalysisForm() {
             />
           )}
         </Field>
-        <Field label="프리셋" hint="AI 엔진 조합입니다. 설정에서 기본값을 바꿉니다.">
-          {(control) => (
-            <select
-              {...control}
-              className={form.control}
-              value={preset}
-              onChange={(e) => setPreset(e.target.value)}
-            >
-              <option value="">{currentLabel ? `설정값(${currentLabel})` : '설정값'}</option>
-              <option value="cloud">클라우드</option>
-              <option value="local">로컬</option>
-              <option value="mixed">혼합</option>
-            </select>
-          )}
-        </Field>
+        <SelectField
+          label="AI 사용 방식"
+          hint="AI 엔진 조합입니다. 설정에서 기본값을 바꿉니다."
+          value={preset}
+          onChange={setPreset}
+          options={[
+            { value: '', label: currentLabel ? `설정값(${currentLabel})` : '설정값' },
+            { value: 'cloud', label: '클라우드' },
+            { value: 'local', label: '로컬' },
+            { value: 'mixed', label: '혼합' },
+          ]}
+        />
       </div>
       {error ? <ApiErrorNotice error={error} /> : null}
       <div>

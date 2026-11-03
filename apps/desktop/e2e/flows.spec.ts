@@ -110,7 +110,7 @@ test('감시 종목과 규칙을 만들면 목록에 남고, 실제 422 오류�
   await form.getByRole('button', { name: '저장' }).click();
   const rules = panel.getByRole('list', { name: '삼성전자 규칙' });
   await expect(rules.getByText('RSI(14) 70 이상 과매수 진입')).toBeVisible();
-  await expect(rules.getByText('장 마감 후(확정 일봉)')).toBeVisible();
+  await expect(rules.getByText('장 마감 후(그날 종가)')).toBeVisible();
 
   // 새로 불러와도 사이드카 DB에 남아 있다
   await page.reload();

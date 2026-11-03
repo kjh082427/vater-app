@@ -1,11 +1,11 @@
 import type { AnalysisDetail } from '../../api/types';
 import {
   AiText,
+  Card,
   DataTable,
   DecisionScale,
   Disclaimer,
   formatNumber,
-  Section,
   Tab,
   TabList,
   TabPanel,
@@ -55,7 +55,7 @@ function Opinion({ detail }: { detail: AnalysisDetail }) {
     .join(' · ');
   const lines = detail.summary ?? [];
   return (
-    <Section title="AI 의견">
+    <Card title="AI 의견">
       <div className={styles.opinion}>
         <DecisionScale decision={toDecision(detail.decision)} size="lg" />
         {detail.decision_changed ? (
@@ -84,7 +84,7 @@ function Opinion({ detail }: { detail: AnalysisDetail }) {
         ) : null}
         <Disclaimer analysis />
       </div>
-    </Section>
+    </Card>
   );
 }
 
@@ -93,14 +93,14 @@ function Reports({ reports }: { reports: Record<string, string> | null }) {
   const first = available[0];
   if (!first) {
     return (
-      <Section title="에이전트 보고서">
+      <Card title="에이전트 보고서">
         <p className={common.empty}>보고서가 없습니다.</p>
-      </Section>
+      </Card>
     );
   }
   return (
     <Tabs defaultValue={first.key}>
-      <Section title="에이전트 보고서">
+      <Card title="에이전트 보고서">
         <TabList label="에이전트">
           {available.map((r) => (
             <Tab key={r.key} value={r.key}>
@@ -118,7 +118,7 @@ function Reports({ reports }: { reports: Record<string, string> | null }) {
             </div>
           </TabPanel>
         ))}
-      </Section>
+      </Card>
     </Tabs>
   );
 }
@@ -137,17 +137,17 @@ function RunInfo({ detail }: { detail: AnalysisDetail }) {
   };
   const tokens = detail.tokens;
   return (
-    <Section title="실행 정보">
+    <Card title="실행 정보">
       <dl className={styles.facts}>
-        <dt>프리셋</dt>
+        <dt>AI 사용 방식</dt>
         <dd>{PRESET_LABEL[detail.preset] ?? detail.preset}</dd>
-        <dt>깊은 분석 모델</dt>
+        <dt>결론을 내는 모델</dt>
         <dd>{model('deep')}</dd>
-        <dt>빠른 모델</dt>
+        <dt>자료를 정리하는 모델</dt>
         <dd>{model('quick')}</dd>
         <dt>걸린 시간</dt>
         <dd className="vt-num">{detail.timings ? formatDuration(total) : '—'}</dd>
-        <dt>토큰</dt>
+        <dt>AI 사용량</dt>
         <dd className="vt-num">
           {tokens
             ? `입력 ${formatNumber(tokens.in ?? null)} · 출력 ${formatNumber(tokens.out ?? null)}`
@@ -155,7 +155,7 @@ function RunInfo({ detail }: { detail: AnalysisDetail }) {
         </dd>
       </dl>
       <DataTable caption="단계별 시간" columns={stageColumns} rows={rows} rowKey={(r) => r.id} />
-    </Section>
+    </Card>
   );
 }
 

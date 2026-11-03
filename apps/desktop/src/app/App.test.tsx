@@ -180,13 +180,13 @@ describe('오프라인 배너', () => {
     const source = await stream();
     const side = screen.getByRole('complementary');
     await within(side).findByText('알림 감시 중');
-    await within(statusBar()).findByText('실시간 1 · 폴링 1');
+    await within(statusBar()).findByText('실시간 1 · 주기 확인 1');
     act(() => source.fail());
     expect(await within(side).findByText('감시 상태 확인 불가')).toBeInTheDocument();
     expect(within(side).queryByText('알림 감시 중')).not.toBeInTheDocument();
     expect(within(side).getByRole('button', { name: '감시 일시 중지' })).toBeDisabled();
     expect(within(statusBar()).getByText('확인 불가 · 다시 연결 중')).toBeInTheDocument();
-    expect(within(statusBar()).queryByText('실시간 1 · 폴링 1')).not.toBeInTheDocument();
+    expect(within(statusBar()).queryByText('실시간 1 · 주기 확인 1')).not.toBeInTheDocument();
   });
 
   it('감시 상태가 offline이면 "오프라인: 알림 감시 일시 중지"', async () => {
@@ -216,14 +216,14 @@ describe('상태 표시줄', () => {
     expect(await within(bar).findByText('국내 장중')).toBeInTheDocument();
     expect(within(bar).getByText('15:30 마감')).toBeInTheDocument();
     expect(within(bar).getByText('미국 마감')).toBeInTheDocument();
-    expect(within(bar).getByText('실시간 1 · 폴링 1')).toBeInTheDocument();
+    expect(within(bar).getByText('실시간 1 · 주기 확인 1')).toBeInTheDocument();
     expect(await within(bar).findByText(/클라우드 · gemini-3-pro/)).toBeInTheDocument();
   });
 
   it('alerts.state 이벤트로 바뀐다', async () => {
     const { stream } = renderApp();
     const source = await stream();
-    await within(statusBar()).findByText('실시간 1 · 폴링 1');
+    await within(statusBar()).findByText('실시간 1 · 주기 확인 1');
     emit(source, 'alerts.state', {
       state: 'running',
       realtime: 3,

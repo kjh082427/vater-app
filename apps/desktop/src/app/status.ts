@@ -39,7 +39,7 @@ export function feedSummary(status: MonitorStatus | null | undefined): Summary {
   if (status.state === 'offline') return { tone: 'caution-strong', detail: '끊김 · 재연결 중' };
   const parts: string[] = [];
   if (status.realtime > 0) parts.push(`실시간 ${status.realtime}`);
-  if (status.polling > 0) parts.push(`폴링 ${status.polling}`);
+  if (status.polling > 0) parts.push(`주기 확인 ${status.polling}`);
   if (parts.length > 0) {
     return { tone: status.polling > 0 ? 'caution' : 'on', detail: parts.join(' · ') };
   }

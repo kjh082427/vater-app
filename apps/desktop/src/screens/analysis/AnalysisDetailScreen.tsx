@@ -3,7 +3,7 @@ import { ApiError, toApiError } from '../../api/errors';
 import { useAnalysisProgress, useApi, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AnalysisDetail, AnalysisQueued } from '../../api/types';
-import { Banner, Button, Section } from '../../design-system';
+import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { PRESET_LABEL } from '../../app/status';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -53,7 +53,7 @@ function Progress({ detail, onChanged }: { detail: AnalysisDetail; onChanged: ()
   }
 
   return (
-    <Section title="진행" meta={STATUS_LABEL[detail.status]}>
+    <Card title="진행" description={STATUS_LABEL[detail.status]}>
       <div className={styles.opinion}>
         {unknownStage ? (
           <p className={styles.note}>단계 확인 중: 다음 진행 소식이 오면 바로 보입니다.</p>
@@ -82,7 +82,7 @@ function Progress({ detail, onChanged }: { detail: AnalysisDetail; onChanged: ()
           보냅니다.
         </p>
       </div>
-    </Section>
+    </Card>
   );
 }
 
@@ -104,7 +104,7 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
   }
 
   return (
-    <Section title={failed ? '분석 실패' : '분석 취소됨'}>
+    <Card title={failed ? '분석 실패' : '분석 취소됨'}>
       <div className={styles.opinion}>
         {failed && detail.error ? (
           <ApiErrorNotice
@@ -119,7 +119,7 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
         )}
         <StageTimeline timings={detail.timings} current={null} status={detail.status} />
         <p className={common.meta}>
-          다시 시도는 같은 종목·기준일·프리셋으로 이어서 실행합니다(이미 마친 단계는 다시 하지
+          다시 시도는 같은 종목·기준일·AI 사용 방식으로 이어서 실행합니다(이미 마친 단계는 다시 하지
           않음).
         </p>
         {retry.error ? <ApiErrorNotice error={retry.error} /> : null}
@@ -127,10 +127,12 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
           <Button variant="primary" busy={retry.busy} onClick={again}>
             다시 시도
           </Button>
-          <Button onClick={() => navigate(newAnalysisHref(detail))}>프리셋 바꿔 새로 분석</Button>
+          <Button onClick={() => navigate(newAnalysisHref(detail))}>
+            AI 사용 방식 바꿔 새로 분석
+          </Button>
         </div>
       </div>
-    </Section>
+    </Card>
   );
 }
 

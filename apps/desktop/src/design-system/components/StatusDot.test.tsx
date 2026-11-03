@@ -6,8 +6,8 @@ import { MarketState } from './MarketState';
 describe('FeedStatus: 종목별 시세 수신 상태', () => {
   it.each([
     [{ state: 'live' } as const, '실시간'],
-    [{ state: 'polling', intervalSeconds: 30 } as const, '폴링 · 30초'],
-    [{ state: 'polling' } as const, '폴링'],
+    [{ state: 'polling', intervalSeconds: 30 } as const, '30초마다 확인'],
+    [{ state: 'polling' } as const, '주기 확인'],
     [{ state: 'disconnected' } as const, '끊김 · 재연결 중'],
     [{ state: 'closed' } as const, '장 마감'],
     [{ state: 'idle' } as const, '감시 안 함'],

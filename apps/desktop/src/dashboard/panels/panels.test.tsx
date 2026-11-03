@@ -136,7 +136,7 @@ describe('감시 종목', () => {
 
     const hynix = within(table).getByRole('row', { name: /SK하이닉스/ });
     expect(within(hynix).getByText('−3,300')).toHaveAttribute('data-direction', 'down');
-    expect(within(hynix).getByText('폴링 · 30초')).toBeInTheDocument();
+    expect(within(hynix).getByText('30초마다 확인')).toBeInTheDocument();
 
     const apple = within(table).getByRole('row', { name: /애플/ });
     expect(within(apple).getByText('$227.48')).toBeInTheDocument();
