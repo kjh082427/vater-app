@@ -46,7 +46,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `client.py` | REST GET 전용 클라이언트: 공통 헤더, `EGW00201` 재시도, 토큰 만료 1회 재발급, 오류 변환 |
 | `quotes.py` | 국내·해외 현재가, 일봉(100행 넘으면 이어 받기), 국내 휴장일 |
 | `fundamentals.py` | 국내 재무제표·재무비율·뉴스 제목 (국내 분석 공급자용) |
-| `market.py` | 지수, 업종(상승·하락 종목 수), 등락률·거래대금 순위, 투자자 수급, 해외 지수(SPX/COMP/NDX) |
+| `market.py` | 지수(현재값·일봉), 업종(상승·하락 종목 수), 등락률·거래대금 순위, 투자자 수급, 해외 지수(SPX/COMP/NDX) |
 | `ws.py` | 실시간 체결(국내 H0STCNT0, 미국 HDFSCNT0), PINGPONG, 재연결·재구독, 구독 한도 |
 | `master.py` | 종목 마스터 다운로드·파싱·검색 (`symbols` 테이블) |
 | `services.py` | 현재 키·설정으로 부품 조립. 키·서버·한도가 바뀌면 자동 재조립 |
