@@ -30,7 +30,7 @@ import httpx
 
 from vater_core.alerts.clock import KST, MarketClock, MarketId
 from vater_core.alerts.evaluator import Evaluator, NotifyFn, NowFn
-from vater_core.alerts.rules import Live
+from vater_core.alerts.rules import Live, Reading, condition, parse_rule
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
 from vater_core.kis.models import Quote, UsExchange
@@ -205,6 +205,36 @@ class AlertMonitor:
                 }
             )
         return out
+
+    async def preview(
+        self, item: WatchItem, kind: str, params: dict[str, Any], timing: str
+    ) -> Reading:
+        """규칙을 저장하지 않고 지금 조건을 계산한다(규칙 편집기의 '미리보기: 현재 지표값').
+
+        일봉이 아직 없으면(방금 추가한 종목) 먼저 받는다.
+        장중의 realtime 규칙은 현재가를 오늘 종가로 가정한다(알림 판정과 같은 규칙).
+        한투가 실패해도 가진 데이터로 계산하고, 부족하면 '계산 불가'.
+        """
+        parsed = parse_rule(kind, params)
+        market = cast(MarketId, item.market)
+        bars = BarRepo(self._db())
+        day = await self._clock.last_closed_session(market)
+        if day is not None:
+            last = bars.last_day(item.market, item.code)
+            if last is None or last < day:
+                try:
+                    await self._bars(item, day)
+                except Exception as e:
+                    logger.warning("rule preview %s %s: bars failed: %s", item.market, item.code, e)
+        live: Live | None = None
+        if timing == "realtime" and await self._clock.is_open(market):
+            try:
+                q = await self._price(item)
+                session = await self._clock.session_date(market)
+                live = Live(day=session, price=q.price, change_pct=q.change_pct, volume=q.volume)
+            except Exception as e:
+                logger.warning("rule preview %s %s: price failed: %s", item.market, item.code, e)
+        return condition(parsed, bars.history(item.market, item.code), live)
 
     async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
         try:
