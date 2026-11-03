@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.28.1",
     "websockets>=17.4",
     "tradingagents",
+    "exchange-calendars==4.13.2",
 ]
 
 [dependency-groups]
@@ -22,6 +23,7 @@ dev = [
     "ruff",
     "mypy",
     "respx>=0.23.1",
+    "ta-lib==0.8.2",
 ]
 
 [build-system]
@@ -39,6 +41,7 @@ addopts = "-m 'not kis_live and not llm'"  # 실연동은 -m kis_live 로 직접
 filterwarnings = [
     # stockstats·yfinance(TradingAgents 의존성)가 쓰는 pandas 문법 경고. 동작에는 영향 없음
     "ignore:The inplace keyword in DataFrame:Warning",
+    "ignore:Series.values returning an ndarray that drops timezone:Warning",  # exchange_calendars
 ]
 markers = [
     "kis_live: 실제 한국투자증권 키가 필요한 테스트 (기본 제외)",
@@ -68,5 +71,5 @@ tradingagents = { git = "https://github.com/TauricResearch/TradingAgents", rev =
 
 [[tool.mypy.overrides]]
 # 타입 정보를 제공하지 않는 라이브러리 (TradingAgents와 그 의존성)
-module = ["tradingagents.*", "stockstats", "langchain_core.*", "langgraph.*", "pandas"]
+module = ["tradingagents.*", "stockstats", "langchain_core.*", "langgraph.*", "pandas", "exchange_calendars", "talib"]
 ignore_missing_imports = true

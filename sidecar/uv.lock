@@ -322,6 +322,23 @@ wheels = [
 ]
 
 [[package]]
+name = "exchange-calendars"
+version = "4.13.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "korean-lunar-calendar" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pyluach" },
+    { name = "toolz" },
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/73/460b0ece4e7444e3098b7738974c822787e134578d069d3a88b4be17d50a/exchange_calendars-4.13.2.tar.gz", hash = "sha256:a9459425dd64142cd54fbc639847403c7e0c33d60fbc326c94fc1d6bd127f002", size = 4137321, upload-time = "2026-03-10T03:24:38.536Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/4c/0469b40057bc9f8d9594dcc6024202626b981ae4b52dfcd304552e8e1c3a/exchange_calendars-4.13.2-py3-none-any.whl", hash = "sha256:fc5a2ad0d61b5c3a6539a3061cd4cbb55c59f4a903455cec7926e4b798919996", size = 213306, upload-time = "2026-03-10T03:24:37.055Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.162.0"
 source = { registry = "https://pypi.org/simple" }
@@ -600,6 +617,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/43/4b/674af6ef2f97d56f0ab5153bf0bfa28ccb6c3ed4d1babf4305449668807b/keyring-25.7.0.tar.gz", hash = "sha256:fe01bd85eb3f8fb3dd0405defdeac9a5b4f6f0439edbb3149577f244a2e8245b", size = 63516, upload-time = "2025-11-16T16:26:09.482Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/db/e655086b7f3a705df045bf0933bdd9c2f79bb3c97bfef1384598bb79a217/keyring-25.7.0-py3-none-any.whl", hash = "sha256:be4a0b195f149690c166e850609a477c532ddbfbaed96a404d4e43f8d5e2689f", size = 39160, upload-time = "2025-11-16T16:26:08.402Z" },
+]
+
+[[package]]
+name = "korean-lunar-calendar"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/9f/6160e95f3934026194dc7a0b5c78fe5c6e74761830ddea3e9cfc38e3f983/korean_lunar_calendar-0.4.0.tar.gz", hash = "sha256:be56f27bc0594fdbbdf7bbe00f504a9f929a31e311bd7d9bb93561b645afade7", size = 13425, upload-time = "2026-06-15T14:19:57.163Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/88/f56033b09fdca5c8c5e5fc2f3513950a05cd62caa9bd8e6d2750a887c86e/korean_lunar_calendar-0.4.0-py3-none-any.whl", hash = "sha256:c042e20de0bb702add6bec8d0f6da1ea8d3b170838e63846f70420cf341fe4e7", size = 11323, upload-time = "2026-06-15T14:19:56.089Z" },
 ]
 
 [[package]]
@@ -1154,6 +1180,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyluach"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/11/42568c1568a75f8803c59f26d29af01a0890352b7a8e03d41ecda8bfb5dd/pyluach-2.3.0.tar.gz", hash = "sha256:ec6e30669d1df50c9ca160486da44a8195bb4c7a5d3d533990d0c5b03accd281", size = 26910, upload-time = "2025-09-09T20:24:39.651Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/c8/f96208ade3ca4c23b372497d0788bcf0f2e0ff4310e5ee693366bc33fdf0/pyluach-2.3.0-py3-none-any.whl", hash = "sha256:4497b731aef59508b079dbf5f00bc5bf4329ac45090a6cd37b5a83756f0e69ab", size = 25914, upload-time = "2025-09-09T20:24:37.831Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1442,6 +1477,26 @@ wheels = [
 ]
 
 [[package]]
+name = "ta-lib"
+version = "0.8.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/2f/276f0cc55620708e7597c0d7ce60685637da140ff2d725dda43fb9afb086/ta_lib-0.8.2.tar.gz", hash = "sha256:75f4d8d9c9e0273cf6086b3aefa33fd9a9a3e465fc38ab35d41ccd9fe539093e", size = 1494709, upload-time = "2026-10-12T18:57:25.811Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/99/d72b8bc4ed7c34be4ad819fd251dfc3d1faaa0360be010fb776e4f48ef71/ta_lib-0.8.2-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:1d3f5b9569f65bce154335552d42b120d04311cbb3f420622c68ccf044f71604", size = 3589729, upload-time = "2026-10-12T18:56:06.031Z" },
+    { url = "https://files.pythonhosted.org/packages/68/8a/7a81c1b03a7f7c288ac719e8080ae180c1266dbcacd8edd48f2b7393fbf0/ta_lib-0.8.2-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:6419c5d14d16745fa3143122dc47b511d62052e3c6619ed3869f2c228362d530", size = 3380175, upload-time = "2026-10-12T18:56:07.669Z" },
+    { url = "https://files.pythonhosted.org/packages/31/b3/bd9ea5fcb601e856cfbb04f433da5c52d1b700c47cde56551bfc0d1cfc02/ta_lib-0.8.2-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3322c02ba9360c9b4052183be153044d15e2ccff11f94275ead7cc7b1cde9549", size = 3696021, upload-time = "2026-10-12T18:56:09.231Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/53/b01894b835ec46cf01ed36a3de8132a7d0771e769b7f2f3184b3e9ceaa0b/ta_lib-0.8.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ebc0e86121f0a6d534deed6d44c519c29eb176bf2292d393f834caea44d35aba", size = 4061890, upload-time = "2026-10-12T18:56:10.876Z" },
+    { url = "https://files.pythonhosted.org/packages/16/78/608407588700bd73da9b3d045142c7f697ee460deab7eb110a4b2ff16319/ta_lib-0.8.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:21c36e9788800f170f73a458bda3f9171e6bb50eddbe6af535d2163d77d90472", size = 3737988, upload-time = "2026-10-12T18:56:12.483Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/d6/5f7712801b1c2b173a7249a8010c8d2f1348b8b14b1141fcc7bff89e2b13/ta_lib-0.8.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:81b60e5afd7b321fa95f7732d23cb69402098d992087c1c5700fa00162667c72", size = 3987669, upload-time = "2026-10-12T18:56:14.665Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/b3/eb5061aba80274e405c2893fbd4658df4ec6d3b857a0d8472344c8aae92d/ta_lib-0.8.2-cp313-cp313-win32.whl", hash = "sha256:2ff3f753f6f41e1d81ac2631fb6db236f9d07bb2cb9e3ab84d5e03bb38ebcef8", size = 2673042, upload-time = "2026-10-12T18:56:19.681Z" },
+    { url = "https://files.pythonhosted.org/packages/61/e2/711e98b2e13b77652e6a0187e66371277fb65978669765d1ddd7435ccef6/ta_lib-0.8.2-cp313-cp313-win_amd64.whl", hash = "sha256:659f35fce25d7d202025ab2b474ffdc7749910d163694e12e28bf9b3610d9e47", size = 3105486, upload-time = "2026-10-12T18:56:16.307Z" },
+    { url = "https://files.pythonhosted.org/packages/df/ef/4b4b0b83bd410a7cc63a63d7484642f8a8e58d638b3b70b6c79fee1478dc/ta_lib-0.8.2-cp313-cp313-win_arm64.whl", hash = "sha256:08acce029a29c3c9d77b4198202fae76d78f8a1f555efb1e5875685c292831a0", size = 2702332, upload-time = "2026-10-12T18:56:17.835Z" },
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1467,6 +1522,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b9/1e/633e30237b94e383cf814145499079f3bb9cdd4aeafc1bc42e01b0f810a6/tiktoken-0.14.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:380873f330b741c4435574f37edb20813d04603ace2d53e0a63560e1fec83010", size = 1250980, upload-time = "2026-08-17T19:49:02.274Z" },
     { url = "https://files.pythonhosted.org/packages/cb/56/4c12f07b812f84206f38d723eb1ebfdd34bad9309b5dbc0bee6bbcff4cbf/tiktoken-0.14.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:3fd7c14b1cb45b486c39fc9b3443bb341f3e2fc7e6f31247f3435a5836651632", size = 1315434, upload-time = "2026-08-17T19:49:03.434Z" },
     { url = "https://files.pythonhosted.org/packages/c9/e0/c65603f0c44811def666d3fbf611bf2af3b5e1ef613e06c19411419830b3/tiktoken-0.14.0-cp313-cp313-win_amd64.whl", hash = "sha256:90a762670c7f968184723769a06ed51f5cf5ce5dcd1e30164f25c72d85c2d1f1", size = 940883, upload-time = "2026-08-17T19:49:04.583Z" },
+]
+
+[[package]]
+name = "toolz"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/6f/ae20c212a07aa2d156c787383d8088a5e045ee39628661edb190c97e1659/toolz-1.2.0.tar.gz", hash = "sha256:9667a038e9d6ecba37995e26cb2f59ec6420b6ad8dd9677de59db9b956b08490", size = 55442, upload-time = "2026-10-07T04:16:25.639Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/17/4c8beb6c8c4176c6bf143bfd7e1e4dd6719b00ced90738c7ac471b71c1df/toolz-1.2.0-py3-none-any.whl", hash = "sha256:890f820b1cb8152785aaf9386d8707770110809035800985ca65cb24ce1120ef", size = 60789, upload-time = "2026-10-07T04:16:24.173Z" },
 ]
 
 [[package]]
@@ -1624,6 +1688,7 @@ name = "vater-core"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "exchange-calendars" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "keyring" },
@@ -1642,10 +1707,12 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "ta-lib" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "exchange-calendars", specifier = "==4.13.2" },
     { name = "fastapi" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "keyring" },
@@ -1664,6 +1731,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "respx", specifier = ">=0.23.1" },
     { name = "ruff" },
+    { name = "ta-lib", specifier = "==0.8.2" },
 ]
 
 [[package]]
