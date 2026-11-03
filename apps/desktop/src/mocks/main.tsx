@@ -30,7 +30,17 @@ if (params.get('empty') === '1') {
   db.briefings = [];
   db.monitor = { ...db.monitor, realtime: 0, polling: 0, feeds: [] };
 }
-if (params.get('offline') === '1') db.monitor = { ...db.monitor, state: 'offline' };
+if (params.get('offline') === '1') {
+  // 사이드카처럼: 오프라인이면 모든 종목의 수신 상태도 offline
+  db.monitor = {
+    ...db.monitor,
+    state: 'offline',
+    realtime: 0,
+    polling: 0,
+    feeds: db.monitor.feeds.map((f) => ({ ...f, feed: 'offline' })),
+  };
+  db.watchQuotes = db.watchQuotes.map((q) => ({ ...q, feed: 'offline' }));
+}
 if (params.get('nokey') === '1') db.secrets.KIS_APP_KEY = false;
 
 const handlers = createHandlers(db) as RequestHandler[];

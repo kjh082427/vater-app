@@ -130,6 +130,19 @@ describe('useResource', () => {
     await waitFor(() => expect(counter.n).toBe(2));
   });
 
+  it('사이드카가 다시 시작되어 SSE를 새로 열어도(끊김 없이) 다시 불러온다', async () => {
+    const counter = countRequests('/watchlist/quotes');
+    const { Wrapper, services } = wrapper();
+    const { result } = renderHook(() => useResource('/watchlist/quotes'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
+    act(() => FakeEventSource.latest.open());
+    act(() => services.events.reconnect());
+    await waitFor(() => expect(FakeEventSource.all).toHaveLength(2));
+    act(() => FakeEventSource.latest.open());
+    await waitFor(() => expect(counter.n).toBe(2));
+  });
+
   it('처음 연결이 열릴 때는 다시 부르지 않는다', async () => {
     const counter = countRequests('/watchlist/quotes');
     const { Wrapper } = wrapper();

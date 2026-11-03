@@ -62,3 +62,11 @@ export function formatDuration(seconds: number | null | undefined): string {
   if (min === 0) return `${sec}초`;
   return sec === 0 ? `${min}분` : `${min}분 ${sec}초`;
 }
+
+/** `07:00` */
+export function formatHm(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return MISSING;
+  const p = parts(date);
+  return `${p.hour}:${p.minute}`;
+}

@@ -29,7 +29,7 @@ interface Loaded<T> {
 
 /**
  * 사이드카 자료 하나를 불러온다. 불러오기 함수가 없으면 key를 경로로 GET 한다. key가 null이면 부르지 않는다.
- * SSE가 끊겼다가 다시 열리면(사이드카 재시작 포함) 놓친 변경이 있을 수 있으므로 다시 불러온다.
+ * SSE가 다시 열리면(끊김 뒤, 사이드카 재시작 뒤) 놓친 변경이 있을 수 있으므로 다시 불러온다.
  */
 export function useResource<T = unknown>(
   key: string | null,
@@ -74,15 +74,14 @@ export function useResource<T = unknown>(
 
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
-  // SSE가 끊겼다가 다시 열리면 다시 불러온다(끊긴 동안의 변경을 놓쳤을 수 있다).
+  // SSE가 다시 열리면(끊김 뒤, 사이드카 재시작 뒤) 다시 불러온다: 그 사이의 변경을 놓쳤을 수 있다.
+  // 앱이 처음 연결될 때의 open은 빼고, 그 뒤의 open마다 부른다.
   useEffect(() => {
-    let wasDown = events.status === 'disconnected';
+    let openedBefore = events.status === 'open';
     return events.onStatus((status) => {
-      if (status === 'disconnected') wasDown = true;
-      if (status === 'open' && wasDown) {
-        wasDown = false;
-        reload();
-      }
+      if (status !== 'open') return;
+      if (openedBefore) reload();
+      openedBefore = true;
     });
   }, [events, reload]);
 

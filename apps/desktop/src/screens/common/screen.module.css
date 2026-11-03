@@ -110,3 +110,27 @@
   display: block;
   padding-left: var(--space-4);
 }
+
+/* FeedStatus와 같은 모양(점 + 12px 글자). idle 상태 전용 */
+.feedIdle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+/* 본문 안의 글자 링크 */
+.textLink {
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.textLink:hover {
+  text-decoration-color: var(--color-ink);
+}

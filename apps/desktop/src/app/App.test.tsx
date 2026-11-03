@@ -137,10 +137,9 @@ describe('오프라인 배너', () => {
   it('사이드카를 실행하지 못했으면 원인과 해결 방법', async () => {
     const { shell } = renderApp();
     act(() => shell.restart({ state: 'failed' }));
-    expect(
-      await screen.findByText('Vater 백그라운드 서비스를 실행하지 못했습니다'),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/트레이 메뉴 > 종료/)).toBeInTheDocument();
+    const title = await screen.findByText('Vater 백그라운드 서비스를 실행하지 못했습니다');
+    const banner = title.closest('[role="status"]') as HTMLElement;
+    expect(within(banner).getByText(/트레이 메뉴 > 종료/)).toBeInTheDocument();
   });
 });
 
