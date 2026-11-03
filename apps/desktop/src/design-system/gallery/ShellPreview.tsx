@@ -10,6 +10,7 @@ import { MarketState } from '../components/MarketState';
 import { Section } from '../components/Section';
 import { SidebarNav, type NavItem } from '../components/SidebarNav';
 import { StatusBar, StatusBarItem } from '../components/StatusBar';
+import { StatusDot } from '../components/StatusDot';
 import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs';
 import styles from './gallery.module.css';
 import { FlowsLine, IndexTable, WatchTable } from './parts';
@@ -29,7 +30,8 @@ export const navItems: NavItem[] = [
   { id: 'settings', label: '설정', icon: 'settings', href: '#shell' },
 ];
 
-export function StatusBarSample() {
+/** 상태 표시줄(스펙 9-1): 시장 상태, 한투 연결, AI 엔진. 감시 상태는 사이드바 아래쪽이 맡는다. */
+export function StatusBarSample({ offline = false }: { offline?: boolean }) {
   return (
     <StatusBar>
       <StatusBarItem>
@@ -38,10 +40,35 @@ export function StatusBarSample() {
       <StatusBarItem>
         <MarketState market="US" status="closed" detail="23:30 개장" variant="inline" />
       </StatusBarItem>
-      <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 폴링 1" />
-      <StatusBarItem tone="on" label="AI 엔진" detail="클라우드 전용 · 분석 1건 진행 중" />
-      <StatusBarItem align="end">알림 감시 중</StatusBarItem>
+      {offline ? (
+        <>
+          <StatusBarItem tone="caution-strong" label="한투 연결" detail="끊김 · 재연결 중" />
+          <StatusBarItem tone="off" label="AI 엔진" detail="클라우드에 연결할 수 없음" />
+        </>
+      ) : (
+        <>
+          <StatusBarItem tone="caution" label="한투 연결" detail="실시간 2 · 폴링 1" />
+          <StatusBarItem tone="on" label="AI 엔진" detail="클라우드 · 분석 1건 진행 중" />
+        </>
+      )}
+      <StatusBarItem align="end" detail="마지막 수신 14:32:05" />
     </StatusBar>
+  );
+}
+
+/** 사이드바 아래쪽: 감시 상태와 일시 중지, 연결한 서버. 감시 상태는 여기 한곳에만 둔다. */
+export function SidebarFoot({ offline = false }: { offline?: boolean }) {
+  return (
+    <>
+      <span className={styles.sideStatus}>
+        <StatusDot tone={offline ? 'caution-strong' : 'on'} />
+        {offline ? '감시 멈춤 · 오프라인' : '알림 감시 중 · 규칙 7개'}
+      </span>
+      <Button size="sm" icon={<Icon name="pause" size="sm" />} disabled={offline}>
+        감시 일시 중지
+      </Button>
+      <span className={styles.serverNote}>한투 실전 서버</span>
+    </>
   );
 }
 
@@ -58,15 +85,7 @@ export function ShellPreview({ offline }: { offline: boolean }) {
           items={navItems}
           currentId={current}
           onNavigate={setCurrent}
-          footer={
-            <>
-              <span className={styles.sideStatus}>알림 감시 중 · 규칙 7개</span>
-              <Button size="sm" icon={<Icon name="pause" size="sm" />}>
-                감시 일시 중지
-              </Button>
-              <span className={styles.serverNote}>한투 실전 서버에 연결됨</span>
-            </>
-          }
+          footer={<SidebarFoot offline={offline} />}
         />
       }
       banner={
@@ -84,7 +103,7 @@ export function ShellPreview({ offline }: { offline: boolean }) {
           </Banner>
         ) : null
       }
-      statusBar={<StatusBarSample />}
+      statusBar={<StatusBarSample offline={offline} />}
     >
       <header className={styles.shellHead}>
         <div>
@@ -128,7 +147,7 @@ export function ShellPreview({ offline }: { offline: boolean }) {
               meta="5종목"
               actions={<Button variant="quiet">종목 추가</Button>}
             >
-              <WatchTable onOpen={() => undefined} />
+              <WatchTable onOpen={() => undefined} offline={offline} />
             </Section>
           </div>
           <div className={styles.column}>
@@ -138,13 +157,13 @@ export function ShellPreview({ offline }: { offline: boolean }) {
                   <b>삼성전자</b>
                   <DecisionScale decision="Overweight" />
                 </div>
-                <ol className={styles.summaryList}>
-                  {analysisSummary.map((line) => (
-                    <li key={line}>
-                      <AiText as="span">{line}</AiText>
-                    </li>
-                  ))}
-                </ol>
+                <AiText as="div" attribution="AI 요약">
+                  <ol className={styles.summaryList}>
+                    {analysisSummary.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ol>
+                </AiText>
                 <Disclaimer analysis />
               </div>
             </Section>

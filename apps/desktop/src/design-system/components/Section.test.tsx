@@ -24,6 +24,8 @@ describe('Section: 굵은 먹선으로 나눈 구역', () => {
       </Section>,
     );
     expect(screen.getByRole('heading', { level: 3, name: '강세 측 의견' })).toBeInTheDocument();
+    // 안쪽 구역은 겉모양도 한 단계 낮다(1px 먹선, 작은 제목)
+    expect(screen.getByRole('region', { name: '강세 측 의견' })).toHaveAttribute('data-level', '3');
   });
 
   it('보조 정보와 행동이 없어도 된다', () => {

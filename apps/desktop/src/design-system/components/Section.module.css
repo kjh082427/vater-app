@@ -30,3 +30,16 @@
   gap: var(--space-2-5);
   margin-left: auto;
 }
+
+/* 구역 안의 구역(h3, h4): 1px 먹선과 한 단계 작은 제목 */
+.section[data-level='3'],
+.section[data-level='4'] {
+  border-top-width: var(--rule-hair);
+}
+
+.section[data-level='3'] .title,
+.section[data-level='4'] .title {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-semibold);
+}

@@ -56,15 +56,10 @@ describe('색 토큰', () => {
       '--color-ink-hover',
       '--color-on-ink',
       '--color-up',
-      '--color-up-bg',
-      '--color-up-ink',
       '--color-down',
-      '--color-down-bg',
-      '--color-down-ink',
       '--color-caution',
       '--color-caution-bg',
       '--color-caution-ink',
-      '--color-caution-line',
       '--color-focus',
     ];
     expect(required.filter((name) => !tokens.has(name))).toEqual([]);
@@ -91,10 +86,6 @@ describe('색 토큰', () => {
   textPairs.push(
     ['--color-on-ink', '--color-ink'],
     ['--color-on-ink', '--color-ink-hover'],
-    ['--color-up-ink', '--color-paper'],
-    ['--color-up-ink', '--color-up-bg'],
-    ['--color-down-ink', '--color-paper'],
-    ['--color-down-ink', '--color-down-bg'],
     ['--color-caution-ink', '--color-caution-bg'],
     ['--color-caution-ink', '--color-paper'],
     ['--color-caution-ink', '--color-chrome'],
@@ -142,6 +133,39 @@ describe('다크 테마 준비', () => {
 
   it('라이트 테마만 선언한다(color-scheme: light)', () => {
     expect(tokensCss).toMatch(/color-scheme:\s*light;/);
+  });
+});
+
+describe('토큰 참조', () => {
+  it('CSS가 쓰는 var(--*)는 모두 tokens.css에 정의되어 있다', () => {
+    const cssFiles = readdirSync(here, { recursive: true, encoding: 'utf8' })
+      .filter((name) => name.endsWith('.css') && name !== 'tokens.css')
+      .map((name) => join(here, name));
+    const missing = cssFiles.flatMap((path) => {
+      const used = [...readFileSync(path, 'utf8').matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]);
+      return used
+        .filter((name) => !tokens.has(name as string))
+        .map((name) => `${path.slice(here.length + 1)}: ${name}`);
+    });
+    expect(missing).toEqual([]);
+  });
+
+  it('정의만 하고 아무 데서도 쓰지 않는 색 토큰이 없다', () => {
+    const sources = readdirSync(here, { recursive: true, encoding: 'utf8' })
+      .filter(
+        // 견본(gallery)은 토큰 이름을 늘어놓을 뿐이라 "쓰임"으로 치지 않는다
+        (name) =>
+          /\.(css|tsx?)$/.test(name) &&
+          name !== 'tokens.css' &&
+          !name.includes('.test.') &&
+          !name.startsWith('gallery'),
+      )
+      .map((name) => readFileSync(join(here, name), 'utf8'))
+      .join('\n');
+    const unused = [...tokens.keys()].filter(
+      (name) => name.startsWith('--color-') && !sources.includes(`var(${name})`),
+    );
+    expect(unused).toEqual([]);
   });
 });
 

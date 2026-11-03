@@ -42,17 +42,23 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
-  it('busy면 aria-busy를 켜고 누를 수 없다(글자로 진행 중임을 말한다)', async () => {
+  it('busy면 aria-busy·aria-disabled를 켜고 누를 수 없지만 포커스는 잃지 않는다', async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    render(
+    const { rerender } = render(<Button onClick={onClick}>지금 다시 확인</Button>);
+    const button = screen.getByRole('button');
+    button.focus();
+    rerender(
       <Button busy onClick={onClick}>
         확인 중…
       </Button>,
     );
-    const button = screen.getByRole('button', { name: '확인 중…' });
+    expect(button).toHaveFocus();
+    expect(button).not.toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     await user.click(button);
+    await user.keyboard('{Enter}');
     expect(onClick).not.toHaveBeenCalled();
   });
 

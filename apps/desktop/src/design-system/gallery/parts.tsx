@@ -44,12 +44,22 @@ const watchColumns: Column<WatchRow>[] = [
   },
 ];
 
-export function WatchTable({ onOpen }: { onOpen?: (row: WatchRow) => void }) {
+export function WatchTable({
+  onOpen,
+  offline = false,
+}: {
+  onOpen?: (row: WatchRow) => void;
+  /** 오프라인이면 장중 종목의 수신 상태를 모두 끊김으로(장 마감 종목은 그대로). */
+  offline?: boolean;
+}) {
+  const rows = offline
+    ? watchlist.map((r) => (r.feed === 'closed' ? r : { ...r, feed: 'disconnected' as const }))
+    : watchlist;
   return (
     <DataTable
       caption="감시 종목"
       columns={watchColumns}
-      rows={watchlist}
+      rows={rows}
       rowKey={(r) => r.code}
       onRowActivate={onOpen}
     />

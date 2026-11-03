@@ -26,7 +26,11 @@ export function Section({
   const headingId = useId();
   const Heading = `h${headingLevel}` as const;
   return (
-    <section aria-labelledby={headingId} className={cx(styles.section, className)}>
+    <section
+      aria-labelledby={headingId}
+      className={cx(styles.section, className)}
+      data-level={headingLevel}
+    >
       <div className={styles.head}>
         <Heading id={headingId} className={styles.title}>
           {title}

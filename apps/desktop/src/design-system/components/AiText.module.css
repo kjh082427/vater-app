@@ -1,5 +1,11 @@
-/* AI가 쓴 문장만 명조(Hahmlet). 데이터에서 나온 숫자는 이 글꼴로 쓰지 않는다 */
+/*
+ * AI가 쓴 문장만 명조(Hahmlet). 데이터에서 나온 숫자는 이 글꼴로 쓰지 않는다.
+ * 함렛 한글은 대비가 낮아 1배율에서 고딕과 비슷해 보이므로, 왼쪽 1px 선과 들여쓰기로
+ * "AI의 말"을 한 번 더 표시한다(리서치 노트의 해설 단락처럼).
+ */
 .ai {
+  padding-left: var(--space-3);
+  border-left: var(--rule-hair) solid var(--color-control);
   font-family: var(--font-serif);
   font-weight: var(--weight-regular);
 }

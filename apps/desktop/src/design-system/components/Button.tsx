@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactElement } from 'react';
+import type { ButtonHTMLAttributes, MouseEvent, ReactElement } from 'react';
 import { cx } from '../internal/cx';
 import styles from './Button.module.css';
 import type { IconProps } from './Icon';
@@ -13,7 +13,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'md' | 'sm';
   /** 글자 앞 아이콘. 장식이므로 이름에 들어가지 않는다. */
   icon?: ReactElement<IconProps>;
-  /** 진행 중. 누를 수 없고 aria-busy를 켠다. 글자도 "확인 중…"처럼 바꿔 준다. */
+  /** 진행 중. 포커스는 그대로 두고 누름만 막는다(aria-busy, aria-disabled). 글자도 "확인 중…"처럼 바꿔 준다. */
   busy?: boolean;
 }
 
@@ -30,8 +30,18 @@ export function Button({
   type = 'button',
   className,
   children,
+  onClick,
   ...rest
 }: ButtonProps) {
+  // busy는 disabled를 쓰지 않는다: 포커스를 잃으면 키보드 사용자의 자리가 처음으로 돌아간다.
+  function guardedClick(event: MouseEvent<HTMLButtonElement>) {
+    if (busy) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  }
+
   return (
     <button
       {...rest}
@@ -39,8 +49,10 @@ export function Button({
       className={cx(styles.button, className)}
       data-variant={variant}
       data-size={size}
-      disabled={disabled || busy}
+      disabled={disabled}
       aria-busy={busy || undefined}
+      aria-disabled={busy || undefined}
+      onClick={guardedClick}
     >
       {icon}
       {children}

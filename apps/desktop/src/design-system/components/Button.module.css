@@ -28,11 +28,11 @@
 }
 
 /* 보조: 테두리 버튼 */
-.button[data-variant='secondary']:hover:enabled {
+.button[data-variant='secondary']:hover:enabled:not([aria-busy='true']) {
   border-color: var(--color-ink-2);
 }
 
-.button[data-variant='secondary']:active:enabled {
+.button[data-variant='secondary']:active:enabled:not([aria-busy='true']) {
   background: var(--color-hover);
 }
 
@@ -43,7 +43,7 @@
   color: var(--color-on-ink);
 }
 
-.button[data-variant='primary']:hover:enabled {
+.button[data-variant='primary']:hover:enabled:not([aria-busy='true']) {
   border-color: var(--color-ink-hover);
   background: var(--color-ink-hover);
 }
@@ -59,7 +59,7 @@
   text-underline-offset: 4px;
 }
 
-.button[data-variant='quiet']:hover:enabled {
+.button[data-variant='quiet']:hover:enabled:not([aria-busy='true']) {
   text-decoration-color: var(--color-ink);
 }
 
@@ -76,6 +76,12 @@
   text-decoration-color: var(--color-line);
 }
 
+/* 진행 중: 누를 수 없음과 구별되게 원래 색을 두고 글자만 흐리게. 글자가 "확인 중…"으로 바뀐다 */
 .button[aria-busy='true'] {
   cursor: progress;
+}
+
+.button[aria-busy='true'][data-variant='secondary'],
+.button[aria-busy='true'][data-variant='quiet'] {
+  color: var(--color-ink-2);
 }

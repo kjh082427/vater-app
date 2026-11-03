@@ -12,7 +12,6 @@ import { Section } from '../components/Section';
 import { SidebarNav } from '../components/SidebarNav';
 import { PriceChange, SignedNumber } from '../components/SignedNumber';
 import { Sparkline } from '../components/Sparkline';
-import { StatusBar, StatusBarItem } from '../components/StatusBar';
 import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs';
 import {
   formatEokChange,
@@ -28,7 +27,7 @@ import {
 import styles from './gallery.module.css';
 import { FlowsLine, IndexTable, WatchTable } from './parts';
 import { analysisSummary, brief, watchlist } from './sample';
-import { navItems, StatusBarSample } from './ShellPreview';
+import { navItems, SidebarFoot, StatusBarSample } from './ShellPreview';
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
@@ -74,11 +73,7 @@ const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
     name: '시세 방향(전용)',
     tokens: [
       ['--color-up', '상승 숫자, 선'],
-      ['--color-up-ink', '매수 쪽 의견 글자'],
-      ['--color-up-bg', '상승 옅은 바탕'],
       ['--color-down', '하락 숫자, 선'],
-      ['--color-down-ink', '매도 쪽 의견 글자'],
-      ['--color-down-bg', '하락 옅은 바탕'],
     ],
   },
   {
@@ -87,7 +82,6 @@ const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
       ['--color-caution', '폴링 점, 배너 선'],
       ['--color-caution-ink', '주의 글자'],
       ['--color-caution-bg', '배너 바탕'],
-      ['--color-caution-line', '주의 테두리'],
     ],
   },
 ];
@@ -137,7 +131,9 @@ function Colors() {
                   <code>{name}</code>
                   <span className="vt-num">
                     {hex6(values.get(name) ?? '') || MISSING} ·{' '}
-                    {ratio(values.get(name) ?? '', paper)}
+                    {group.name === '바탕' || name.endsWith('-bg')
+                      ? '바탕'
+                      : ratio(values.get(name) ?? '', paper)}
                   </span>
                 </div>
               </div>
@@ -593,13 +589,13 @@ function AiProse() {
               <DecisionScale decision="Overweight" size="lg" />
               <span className={styles.small}>삼성전자 · 기준일 11월 2일 · 클라우드 전용</span>
             </div>
-            <ol className={styles.summaryList}>
-              {analysisSummary.map((line) => (
-                <li key={line}>
-                  <AiText as="span">{line}</AiText>
-                </li>
-              ))}
-            </ol>
+            <AiText as="div" attribution="AI 요약">
+              <ol className={styles.summaryList}>
+                {analysisSummary.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ol>
+            </AiText>
             <Disclaimer analysis />
           </div>
         </Row>
@@ -626,15 +622,7 @@ function Chrome() {
           items={navItems}
           currentId="alerts"
           onNavigate={() => undefined}
-          footer={
-            <>
-              <span className={styles.sideStatus}>알림 감시 중 · 규칙 7개</span>
-              <Button size="sm" icon={<Icon name="pause" size="sm" />}>
-                감시 일시 중지
-              </Button>
-              <span className={styles.serverNote}>한투 실전 서버에 연결됨</span>
-            </>
-          }
+          footer={<SidebarFoot />}
         />
         <div className={styles.frameBody}>본문 자리</div>
       </div>
@@ -642,14 +630,7 @@ function Chrome() {
         <StatusBarSample />
       </div>
       <div className={styles.statusFrame}>
-        <StatusBar>
-          <StatusBarItem>
-            <MarketState market="KR" status="closed" detail="내일 09:00 개장" variant="inline" />
-          </StatusBarItem>
-          <StatusBarItem tone="caution-strong" label="한투 연결" detail="끊김 · 재연결 중" />
-          <StatusBarItem tone="off" label="AI 엔진" detail="로컬 모델 꺼짐" />
-          <StatusBarItem align="end">감시 일시 중지</StatusBarItem>
-        </StatusBar>
+        <StatusBarSample offline />
       </div>
     </Section>
   );

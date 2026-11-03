@@ -20,43 +20,39 @@
   gap: var(--space-0-5);
 }
 
+/* 빈 칸은 속이 빈 1px 테두리(대비 6.4:1). 채운 칸 하나만 방향 색: 매수 쪽 빨강, 매도 쪽 파랑, 보유 먹 */
 .cell {
   height: var(--size-scale-height);
-  background: var(--color-line);
+  border: var(--rule-hair) solid var(--color-ink-3);
 }
 
-.scale[data-tone='up'] {
-  color: var(--color-up-ink);
-}
-
-.scale[data-tone='up'] .cell[data-active='true'] {
-  background: var(--color-up);
-}
-
-.scale[data-tone='neutral'] {
+/* 결정 이름은 먹. 빨간 "매수" 글자가 주문 버튼처럼 읽히지 않게 색은 칸에만 둔다 */
+.scale {
   color: var(--color-ink);
 }
 
+.scale[data-tone='up'] .cell[data-active='true'] {
+  border-color: var(--color-up);
+  background: var(--color-up);
+}
+
 .scale[data-tone='neutral'] .cell[data-active='true'] {
+  border-color: var(--color-ink);
   background: var(--color-ink);
 }
 
-.scale[data-tone='down'] {
-  color: var(--color-down-ink);
-}
-
 .scale[data-tone='down'] .cell[data-active='true'] {
+  border-color: var(--color-down);
   background: var(--color-down);
 }
 
-/* 검토 필요: 눈금 밖. 칸을 비우고 황토 테두리만 */
+/* 검토 필요: 눈금 밖. 다섯 칸 모두 비우고 황토 테두리, 이름도 황토 */
 .scale[data-tone='caution'] {
   color: var(--color-caution-ink);
 }
 
 .scale[data-tone='caution'] .cell {
-  border: var(--rule-hair) solid var(--color-caution);
-  background: transparent;
+  border-color: var(--color-caution);
 }
 
 /* 큰 크기: 분석 결과 머리. 양 끝에 매도·매수를 적어 눈금의 방향을 알려 준다 */

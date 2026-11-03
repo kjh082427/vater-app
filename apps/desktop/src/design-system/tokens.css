@@ -35,17 +35,12 @@
 
   /* 시세 방향 전용: 상승 빨강, 하락 파랑(미국 종목도 같음). 다른 뜻으로 쓰지 않는다 */
   --color-up: #c62a2f;
-  --color-up-bg: #fcebeb;
-  --color-up-ink: #8d1c20;
   --color-down: #1d57bf;
-  --color-down-bg: #e8effb;
-  --color-down-ink: #163e88;
 
   /* 주의(황토): 폴링, 끊김, 오프라인, 오류, 검토 필요. 오류에 빨강을 쓰지 않는다 */
   --color-caution: #b7791f;
   --color-caution-bg: #fff4d8;
   --color-caution-ink: #6f4600;
-  --color-caution-line: #ebcf88;
 
   --color-focus: #141414;
 
