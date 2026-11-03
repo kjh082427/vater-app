@@ -19,7 +19,7 @@ from vater_core.api.errors import VaterError
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 Timing = Literal["realtime", "close"]
-MonitorState = Literal["running", "paused", "offline", "closed"]
+MonitorState = Literal["running", "paused", "offline", "auth_invalid", "closed"]
 
 
 class RuleCreate(BaseModel):
