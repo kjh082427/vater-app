@@ -1,7 +1,8 @@
 """알림 규칙·발생 이력·감시 상태 API (스펙 2-3, 4장).
 
 규칙의 params는 종류별 모델로 검사하고, 기본값을 채운 형태로 저장한다.
-SSE: `alert.fired`(발생한 알림), `alerts.state` `{state, realtime, polling}`.
+SSE: `alert.fired`(발생한 알림), `alerts.state` `{state, realtime, polling, markets, feeds}`,
+`quote`(감시 종목 시세 갱신).
 """
 
 from typing import Annotated, Any, Literal
@@ -58,10 +59,20 @@ class AlertEventOut(BaseModel):
     kind: str | None
 
 
+class FeedOut(BaseModel):
+    market: str
+    code: str
+    feed: Literal["realtime", "polling", "idle", "closed", "offline"]
+
+
 class MonitorStatus(BaseModel):
     state: MonitorState
     realtime: int
     polling: int
+    markets: dict[
+        str, Literal["open", "closed"]
+    ]  # {"KR": ..., "US": ...}, 첫 확인 전에는 비어 있음
+    feeds: list[FeedOut]  # 감시 종목별 수신 상태
 
 
 class MonitorStateOut(BaseModel):

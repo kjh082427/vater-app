@@ -89,7 +89,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `evaluator.py` | **거짓→참일 때만** 알림, 첫 평가는 기준값만 저장, 같은 규칙은 그 시장 날짜 기준 하루 1번. 분석 완료·실패를 이력에 기록 |
 | `monitor.py` | 감시 루프: 열린 시장은 WebSocket(한도 안) + 넘친 종목·끊김·서버가 거부한 구독은 REST 폴링. 마감 평가는 일봉이 확정된 가장 최근 세션을 종목마다 1번(앱이 꺼져 있었으면 다음 실행 때 따라잡고, 그 세션 봉이 없으면 5분 뒤 다시). 인터넷이 끊기면 `offline` 후 자동 재개 |
 
-이벤트(SSE): `alert.fired` (발생한 알림, `GET /alerts/events`의 항목과 같은 형식), `alerts.state` `{state: running|paused|offline|closed, realtime, polling}`
+이벤트(SSE): `alert.fired` (발생한 알림, `GET /alerts/events`의 항목과 같은 형식), `alerts.state` `{state: running|paused|offline|closed, realtime, polling, markets: {KR, US: open|closed}, feeds: [{market, code, feed: realtime|polling|idle|closed|offline}]}`, `quote` `{market, code, price, change, change_pct, at, source: realtime|polling|rest}` (감시 종목 시세 갱신, 종목당 1초 1번. 전일 대비 금액은 REST 시세나 받아 둔 일봉의 전 세션 종가로 계산하고, 모르면 null)
 
 ### `briefing/` 일일 시장 브리핑
 | 파일 | 역할 |
@@ -107,7 +107,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 분석: `POST /analyses` · `GET /analyses?market=&code=` · `GET /analyses/{id}` · `POST /analyses/{id}/cancel` · `POST /analyses/{id}/retry`
 
-감시·알림: `GET/POST /watchlist` · `DELETE /watchlist/{id}` · `GET/POST /alerts/rules` · `PATCH/DELETE /alerts/rules/{id}` · `GET /alerts/events` · `POST /alerts/pause` · `POST /alerts/resume` · `GET /alerts/status` · `GET /alerts/kinds`
+감시·알림: `GET/POST /watchlist` · `GET /watchlist/quotes`(홈 화면 감시 종목 시세·수신 상태) · `DELETE /watchlist/{id}` · `GET/POST /alerts/rules` · `PATCH/DELETE /alerts/rules/{id}` · `GET /alerts/events` · `POST /alerts/pause` · `POST /alerts/resume` · `GET /alerts/status` · `GET /alerts/kinds`
 
 브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run`
 

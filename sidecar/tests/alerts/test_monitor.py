@@ -46,6 +46,11 @@ def db(tmp_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def counts(status: dict[str, Any]) -> dict[str, Any]:
+    """상태 중 감시 루프 개수 부분(markets·feeds는 따로 확인한다)."""
+    return {k: status[k] for k in ("state", "realtime", "polling")}
+
+
 class Clock:
     def __init__(self, at: datetime) -> None:
         self.at = at
@@ -100,11 +105,14 @@ class Market:
     def __init__(self, db: sqlite3.Connection) -> None:
         self.db = db
         self.prices: dict[str, float] = {}
+        self.changes: dict[str, float] = {}  # 전일 대비 금액(REST 현재가에만 있음)
         self.price_calls: list[str] = []
         self.bar_calls: list[tuple[str, date]] = []
         self.closes: dict[tuple[str, date], float] = {}  # (종목, 날짜) → 그날 확정 종가
         self.fail: Exception | None = None
         self.fail_for: dict[str, Exception] = {}  # 종목별 오류
+        self.bar_fail_for: dict[str, Exception] = {}  # 일봉만 실패
+        self.price_delay = 0.0  # 현재가 응답에 걸리는 시간(동시 요청 확인용)
 
     async def price(self, item: WatchItem) -> Quote:
         self.price_calls.append(item.code)
@@ -112,8 +120,11 @@ class Market:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
+        if self.price_delay:
+            await asyncio.sleep(self.price_delay)
         price = self.prices.get(item.code, 100.0)
-        return Quote(item.market, item.code, price, 0.0, 0.0, 1000)  # type: ignore[arg-type]
+        change = self.changes.get(item.code, 0.0)
+        return Quote(item.market, item.code, price, change, 0.0, 1000)  # type: ignore[arg-type]
 
     async def bars(self, item: WatchItem, through: date) -> int:
         """refresh_bars처럼: 이미 `through`까지 있으면 한투를 부르지 않는다."""
@@ -125,6 +136,8 @@ class Market:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
+        if item.code in self.bar_fail_for:
+            raise self.bar_fail_for[item.code]
         if (item.code, through) not in self.closes:
             return 1  # 예전 봉만 왔다(그날 확정 봉은 아직 없음)
         c = self.closes[(item.code, through)]
@@ -219,7 +232,7 @@ async def test_open_market_subscribes_up_to_limit_and_polls_the_rest(
 
     assert rig.realtime is not None and rig.realtime.subs == [("KR", "005930"), ("KR", "000660")]
     assert rig.market.price_calls == ["035420"]
-    assert rig.monitor.status() == {"state": "running", "realtime": 2, "polling": 1}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 2, "polling": 1}
 
 
 async def test_polling_waits_for_the_poll_interval(db: sqlite3.Connection) -> None:
@@ -291,13 +304,13 @@ async def test_reconnecting_websocket_falls_back_to_polling(db: sqlite3.Connecti
     rig.clock.at = KR_OPEN + timedelta(seconds=30)
     await rig.monitor.tick_once()
     assert sorted(rig.market.price_calls) == sorted(CODES)
-    assert rig.monitor.status() == {"state": "running", "realtime": 0, "polling": 3}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 0, "polling": 3}
 
     rig.realtime.state = "connected"
     rig.clock.at = KR_OPEN + timedelta(seconds=60)
     await rig.monitor.tick_once()
     assert len(rig.market.price_calls) == 3
-    assert rig.monitor.status() == {"state": "running", "realtime": 3, "polling": 0}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 3, "polling": 0}
 
 
 @pytest.mark.parametrize(
@@ -352,7 +365,7 @@ async def test_after_close_refreshes_bars_and_evaluates_close_rules_once(
     assert ("000660", DAY) in rig.market.bar_calls and ("005930", DAY) in rig.market.bar_calls
     assert rig.state(rule) is True
     assert [n[0] for n in rig.notes.sent] == ["알림: SK하이닉스"]
-    assert rig.monitor.status() == {"state": "closed", "realtime": 0, "polling": 0}
+    assert counts(rig.monitor.status()) == {"state": "closed", "realtime": 0, "polling": 0}
 
     calls = len(rig.market.bar_calls)
     rig.clock.at = KR_AFTER + timedelta(minutes=5)
@@ -581,4 +594,288 @@ async def test_subscription_rejected_by_the_server_is_polled(db: sqlite3.Connect
     await rig.monitor.tick_once()
 
     assert rig.market.price_calls == ["000660"]
-    assert rig.monitor.status() == {"state": "running", "realtime": 1, "polling": 1}
+    assert counts(rig.monitor.status()) == {"state": "running", "realtime": 1, "polling": 1}
+
+
+def quotes(events: list[Any]) -> list[dict[str, Any]]:
+    return [e.data for e in events if e.type == "quote"]
+
+
+def drained(sub: Any) -> list[Any]:
+    out = []
+    while not sub.queue.empty():
+        out.append(sub.queue.get_nowait())
+    return out
+
+
+async def test_ticks_publish_quotes_at_most_once_per_second(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN, throttle=0.05)
+    rig.watch("005930")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 70000, 1.0, 1000, "100001"))
+    rig.mono.t += 0.01
+    rig.realtime.on_tick(Tick("KR", "005930", 70100, 1.1, 1100, "100001"))  # 1초 안: 미룸
+    got = quotes(drained(sub))
+    assert got == [
+        {
+            "market": "KR",
+            "code": "005930",
+            "price": 70000.0,
+            "change": None,  # 전일 종가를 아직 모른다: 지어내지 않는다
+            "change_pct": 1.0,
+            "at": "2026-11-03T10:00:00+09:00",
+            "source": "realtime",
+        }
+    ]
+    await asyncio.sleep(0.15)
+    assert [q["price"] for q in quotes(drained(sub))] == [70100.0]
+
+
+async def test_polled_quote_teaches_the_previous_close_for_ticks(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.market.prices["005930"] = 70000.0
+    rig.market.changes["005930"] = 1200.0  # 전일 종가 68,800
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.state = "reconnecting"  # 끊긴 동안: REST로 받는다
+    sub = rig.bus.subscribe()
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    polled = quotes(drained(sub))
+    assert [(q["price"], q["change"], q["source"]) for q in polled] == [
+        (70000.0, 1200.0, "polling")
+    ]
+
+    rig.realtime.state = "connected"
+    rig.realtime.on_tick(Tick("KR", "005930", 69000, 0.29, 1000, "100500"))
+    ticked = quotes(drained(sub))
+    assert [(q["price"], q["change"], q["source"]) for q in ticked] == [
+        (69000.0, 200.0, "realtime")
+    ]
+    assert rig.monitor.quotes()[("KR", "005930")].change == 200.0
+
+
+async def test_status_reports_markets_and_per_symbol_feeds(db: sqlite3.Connection) -> None:
+    SettingsRepo(db).update({"kis.ws_max_subscriptions": 2})
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")  # 실시간
+    rig.watch("000660")  # 실시간
+    rig.watch("035420")  # 한도를 넘어 폴링
+    rig.watch("005380", "ma_break", period=3)  # 실시간 규칙 없음: 장중 감시 안 함
+    rig.watch("AAPL", market="US")  # 미국은 장 전
+    await rig.monitor.tick_once()  # 첫 회차: 연결 중이라 모두 폴링
+    await rig.monitor.tick_once()
+    status = rig.monitor.status()
+    assert status["markets"] == {"KR": "open", "US": "closed"}
+    assert status["feeds"] == [
+        {"market": "KR", "code": "005930", "feed": "realtime"},
+        {"market": "KR", "code": "000660", "feed": "realtime"},
+        {"market": "KR", "code": "035420", "feed": "polling"},
+        {"market": "KR", "code": "005380", "feed": "idle"},
+        {"market": "US", "code": "AAPL", "feed": "closed"},
+    ]
+    assert (status["state"], status["realtime"], status["polling"]) == ("running", 2, 1)
+
+
+async def test_rejected_or_disconnected_symbols_show_polling(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.subscription_errors[("H0STCNT0", "000660")] = "거부"
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    feeds = {f["code"]: f["feed"] for f in rig.monitor.status()["feeds"]}
+    assert feeds == {"005930": "realtime", "000660": "polling"}
+
+    rig.realtime.state = "reconnecting"
+    rig.clock.at = KR_OPEN + timedelta(seconds=60)
+    await rig.monitor.tick_once()
+    feeds = {f["code"]: f["feed"] for f in rig.monitor.status()["feeds"]}
+    assert feeds == {"005930": "polling", "000660": "polling"}
+
+
+async def test_offline_marks_every_symbol_offline(db: sqlite3.Connection) -> None:
+    SettingsRepo(db).update({"kis.ws_max_subscriptions": 1})
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.fail = VaterError("KIS_UNREACHABLE", "끊김", status=503)
+    await rig.monitor.tick_once()
+    status = rig.monitor.status()
+    assert status["state"] == "offline"
+    assert {f["feed"] for f in status["feeds"]} == {"offline"}
+
+
+async def test_removed_symbol_leaves_quotes_and_feeds(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    rig.realtime.on_tick(Tick("KR", "005930", 70000, 1.0, 1000, "100001"))
+    assert ("KR", "005930") in rig.monitor.quotes()
+
+    WatchlistRepo(db).remove(item.id)
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    assert rig.monitor.quotes() == {}
+    assert rig.monitor.status()["feeds"] == []
+
+
+async def test_watch_quotes_use_fresh_monitor_quotes(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    await rig.monitor.tick_once()  # 가짜 실시간은 처음부터 연결됨: 폴링 없이 실시간
+    assert rig.realtime is not None
+    await rig.monitor.tick_once()
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 1.2, 1000, "100001"))
+    calls = len(rig.market.price_calls)
+
+    got = await rig.monitor.watch_quotes()
+
+    assert len(rig.market.price_calls) == calls  # 30초 안의 시세는 한투를 다시 부르지 않는다
+    assert got == [
+        {
+            "watchlist_id": item.id,
+            "market": "KR",
+            "code": "005930",
+            "name": "삼성전자",
+            "price": 71000.0,
+            "change": None,  # REST 시세를 받은 적이 없어 전일 종가를 모른다
+            "change_pct": 1.2,
+            "at": "2026-11-03T10:00:00+09:00",
+            "source": "realtime",
+            "feed": "realtime",
+        }
+    ]
+
+
+async def test_watch_quotes_fall_back_to_rest_and_cache_it(db: sqlite3.Connection) -> None:
+    # 장 마감 뒤 앱을 켜서 감시 루프에 시세가 없다
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.prices["005930"] = 70000.0
+    rig.market.changes["005930"] = -500.0
+    await rig.monitor.tick_once()
+    calls = len(rig.market.price_calls)
+
+    first = await rig.monitor.watch_quotes()
+    rig.clock.at = KR_AFTER + timedelta(seconds=20)
+    await rig.monitor.watch_quotes()
+    assert len(rig.market.price_calls) == calls + 1  # 30초 캐시
+    assert (first[0]["price"], first[0]["change"], first[0]["source"], first[0]["feed"]) == (
+        70000.0,
+        -500.0,
+        "rest",
+        "closed",
+    )
+
+    rig.clock.at = KR_AFTER + timedelta(seconds=31)
+    await rig.monitor.watch_quotes()
+    assert len(rig.market.price_calls) == calls + 2
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        KisApiError("EGW00500", "일시 오류"),
+        VaterError("KIS_UNREACHABLE", "끊김", status=503),
+        VaterError("KIS_NOT_CONFIGURED", "키 없음", status=409),
+    ],
+)
+async def test_watch_quotes_never_fail_as_a_whole(db: sqlite3.Connection, error: Exception) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.prices["000660"] = 198700.0
+    rig.market.fail_for["005930"] = error
+
+    got = {q["code"]: q for q in await rig.monitor.watch_quotes()}
+
+    assert got["005930"]["price"] is None and got["005930"]["source"] is None
+    assert got["000660"]["price"] == 198700.0
+
+
+async def test_realtime_change_uses_the_previous_daily_close(db: sqlite3.Connection) -> None:
+    # 실시간으로 잘 연결된 종목은 REST 시세를 받을 일이 없다: 받아 둔 일봉의 전 세션 종가를 쓴다
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    BarRepo(db).upsert("KR", "005930", [Bar(DAY - timedelta(days=1), 1, 1, 1, 69000, 1000)])
+    BarRepo(db).upsert("KR", "005930", [Bar(DAY - timedelta(days=2), 1, 1, 1, 68000, 1000)])
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1000, "100001"))
+
+    assert [(q["price"], q["change"]) for q in quotes(drained(sub))] == [(71000, 2000.0)]
+    assert len(rig.market.price_calls) == 0  # 한투를 더 부르지 않는다
+
+
+async def test_previous_close_waits_for_the_last_sessions_bar(db: sqlite3.Connection) -> None:
+    # 직전 세션 일봉 받기가 실패한 동안은 더 오래된 일봉으로 전일 대비를 지어내지 않는다
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    friday = DAY - timedelta(days=4)  # 금요일 일봉만 있다(월요일 일봉은 아직 못 받음)
+    BarRepo(db).upsert("KR", "005930", [Bar(friday, 1, 1, 1, 66000, 1000)])
+    rig.market.bar_fail_for["005930"] = KisApiError("EGW00201", "초당 거래건수 초과")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1000, "100001"))
+    assert [q["change"] for q in quotes(drained(sub))] == [None]
+
+    del rig.market.bar_fail_for["005930"]
+    rig.market.closes[("005930", DAY - timedelta(days=1))] = 69000  # 월요일 종가
+    rig.clock.at = KR_OPEN + timedelta(minutes=5)
+    await rig.monitor.tick_once()  # 다시 받아 직전 세션 일봉이 생겼다
+    rig.mono.t += 2
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1100, "100501"))
+    assert [q["change"] for q in quotes(drained(sub))] == [2000.0]
+
+
+async def test_watch_quotes_do_not_call_kis_while_offline(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.fail = VaterError("KIS_UNREACHABLE", "끊김", status=503)
+    await rig.monitor.tick_once()
+    assert rig.monitor.status()["state"] == "offline"
+    calls = len(rig.market.price_calls)
+
+    got = await rig.monitor.watch_quotes()
+
+    assert len(rig.market.price_calls) == calls  # 끊긴 동안 종목마다 15초씩 기다리지 않는다
+    assert got[0]["price"] is None and got[0]["feed"] == "offline"
+
+
+async def test_concurrent_watch_quotes_share_one_call_per_symbol(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.price_delay = 0.05
+
+    a, b = await asyncio.gather(rig.monitor.watch_quotes(), rig.monitor.watch_quotes())
+
+    assert sorted(rig.market.price_calls) == ["000660", "005930"]
+    assert [q["price"] for q in a] == [q["price"] for q in b]
+
+
+async def test_a_failing_symbol_is_retried_once_per_window(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.fail_for["005930"] = KisApiError("EGW00500", "조회할 수 없는 종목")
+
+    for seconds in (0, 5, 10):
+        rig.clock.at = KR_AFTER + timedelta(seconds=seconds)
+        await rig.monitor.watch_quotes()
+    assert rig.market.price_calls == ["005930"]
+
+    rig.clock.at = KR_AFTER + timedelta(seconds=31)
+    await rig.monitor.watch_quotes()
+    assert rig.market.price_calls == ["005930", "005930"]

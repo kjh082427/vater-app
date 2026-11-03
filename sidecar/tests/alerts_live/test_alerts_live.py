@@ -216,10 +216,72 @@ async def test_monitor_one_tick_with_real_kis(db: sqlite3.Connection, tmp_path: 
         assert BarRepo(db).last_day("KR", CODE) == last
         assert rules.get(close_rule.id).last_state is not None  # 전 세션 종가로 기준값
         if is_open:
-            assert status == {"state": "running", "realtime": 1, "polling": 0}
+            assert (status["state"], status["realtime"], status["polling"]) == ("running", 1, 0)
+            assert status["feeds"] == [{"market": "KR", "code": CODE, "feed": "realtime"}]
             assert rules.get(live_rule.id).last_state is True  # 틱(현재가 > 1,000원)으로 기준값
         else:
             assert status["state"] == "closed"
+    finally:
+        await monitor.stop()
+        if deps.http is not None:
+            await deps.http.aclose()
+
+
+async def test_watch_quotes_with_real_kis(db: sqlite3.Connection, tmp_path: Path) -> None:
+    """실제 키: 홈 화면 시세(REST 보충), 장중이면 실제 틱의 SSE quote와 전일 대비."""
+    if not ROOT_ENV.exists():
+        pytest.skip("no root .env")
+    from typing import cast
+
+    from vater_core.alerts.monitor import get_alerts
+    from vater_core.api.deps import AppDeps
+    from vater_core.secrets.store import SecretStore
+
+    bus = EventBus()
+    deps = AppDeps(
+        token="t",
+        dev=True,
+        data_dir=tmp_path,
+        db=db,
+        secrets=cast(SecretStore, DevStore()),
+        events=bus,
+    )
+    item = WatchlistRepo(db).add(resolve_target(db, "KR", CODE))
+    RuleRepo(db).create(item.id, "price_above", {"price": 1000.0}, "realtime", True)
+    monitor = get_alerts(deps)
+    try:
+        rest = (await monitor.watch_quotes())[0]
+        print(f"\nREST quote: {rest}")
+        assert rest["price"] and rest["price"] > 0 and rest["change"] is not None
+        assert rest["source"] == "rest"
+
+        await monitor.tick_once()
+        if not await monitor._clock.is_open("KR"):  # 테스트에서만 들여다본다
+            print("KR market closed: realtime quote check skipped")
+            return
+        for _ in range(40):
+            rt = monitor._rt
+            if rt is not None and rt.state == "connected":
+                break
+            await asyncio.sleep(0.5)
+        await monitor.tick_once()
+        sub = bus.subscribe()
+        tick = None
+        for _ in range(40):
+            while not sub.queue.empty():
+                ev = sub.queue.get_nowait()
+                if ev.type == "quote" and ev.data["source"] == "realtime":
+                    tick = ev.data
+            if tick is not None:
+                break
+            await asyncio.sleep(0.5)
+        status = monitor.status()
+        print(f"realtime quote: {tick}\nstatus markets {status['markets']} feeds {status['feeds']}")
+        assert tick is not None and tick["change"] is not None
+        prev_close = rest["price"] - rest["change"]
+        assert abs(tick["change"] - (tick["price"] - prev_close)) < 1  # 전일 종가가 REST와 같다
+        assert status["markets"]["KR"] == "open"
+        assert status["feeds"] == [{"market": "KR", "code": CODE, "feed": "realtime"}]
     finally:
         await monitor.stop()
         if deps.http is not None:
