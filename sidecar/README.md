@@ -19,7 +19,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `VATER_DEV` | | `1`이면 개발 모드 (CORS에 `http://localhost:5173` 허용) |
 | `VATER_SECRET_BACKEND` | | `keyring`(Windows 기본) 또는 `envfile`(그 외 기본) |
 | `VATER_ENV_FILE` | | envfile 백엔드가 쓰는 파일. 기본 `./.env`. 개발 중에는 `../.env`(저장소 루트, git 제외) |
-| `VATER_BACKGROUND_JOBS` | | `0`이면 백그라운드 작업(종목 마스터 갱신, 알림 감시)을 띄우지 않는다. 테스트용 |
+| `VATER_BACKGROUND_JOBS` | | `0`이면 백그라운드 작업(종목 마스터 갱신, 알림 감시, 브리핑 일정)을 띄우지 않는다. 테스트용 |
 
 ## 구조
 | 폴더 / 파일 | 역할 |
@@ -35,6 +35,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `src/vater_core/llm/` | LLM 엔진 관리(하드웨어, 카탈로그, Ollama, 프리셋) — 아래 표 |
 | `src/vater_core/analysis/` | AI 종목 분석(TradingAgents 실행, 작업 큐, 국내 데이터 공급자 `kis`) — 아래 표 |
 | `src/vater_core/alerts/` | 감시 종목, 가격·지표 알림 규칙, 장중 실시간·폴링 감시 — 아래 표 |
+| `src/vater_core/briefing/` | 일일 시장 브리핑(한투 수집 + LLM 해석 1회) — 아래 표 |
 
 ### `kis/` 한국투자증권 연동
 | 파일 | 역할 |
@@ -45,7 +46,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 | `client.py` | REST GET 전용 클라이언트: 공통 헤더, `EGW00201` 재시도, 토큰 만료 1회 재발급, 오류 변환 |
 | `quotes.py` | 국내·해외 현재가, 일봉(100행 넘으면 이어 받기), 국내 휴장일 |
 | `fundamentals.py` | 국내 재무제표·재무비율·뉴스 제목 (국내 분석 공급자용) |
-| `market.py` | 지수, 업종(상승·하락 종목 수), 등락률·거래대금 순위, 투자자 수급, 해외 지수(SPX/COMP/NDX) |
+| `market.py` | 지수(현재값·일봉), 업종(상승·하락 종목 수), 등락률·거래대금 순위, 투자자 수급, 해외 지수(SPX/COMP/NDX) |
 | `ws.py` | 실시간 체결(국내 H0STCNT0, 미국 HDFSCNT0), PINGPONG, 재연결·재구독, 구독 한도 |
 | `master.py` | 종목 마스터 다운로드·파싱·검색 (`symbols` 테이블) |
 | `services.py` | 현재 키·설정으로 부품 조립. 키·서버·한도가 바뀌면 자동 재조립 |
@@ -90,12 +91,25 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 이벤트(SSE): `alert.fired` (발생한 알림, `GET /alerts/events`의 항목과 같은 형식), `alerts.state` `{state: running|paused|offline|closed, realtime, polling}`
 
+### `briefing/` 일일 시장 브리핑
+| 파일 | 역할 |
+|---|---|
+| `schedule.py` | 국내 16:00·미국 07:00 KST(설정 가능, 마감 + 10분 이전으로는 당겨지지 않음), 휴장일, 놓친 브리핑은 다음 세션이 열리기 전까지 가장 최근 1회분만 |
+| `collect.py` | 한투 수집: 지수(국내·미국 모두 현재값 + 최근 30거래일 종가), 국내 업종·상위 종목·수급, 감시 종목, 그 세션의 알림. 항목 단위로 실패를 `missing`에 남긴다 |
+| `interpret.py` | deep 모델 1회 호출(TradingAgents의 LLM 생성 함수만 사용). **숫자를 쓰지 않게** 하고, 숫자가 든 문장은 뺀다. 키는 환경변수가 아니라 인자로 넘긴다 |
+| `store.py` | `briefings` 테이블. 같은 시장·날짜는 덮어쓴다 |
+| `service.py` | 만들기(수집 → 해석 → 저장 → 알림), 1분마다 일정 확인, 실패하면 5분 뒤 다시, 한 번에 1건. LLM이 실패해도 데이터만으로 저장 |
+
+이벤트(SSE): `briefing.status` `{market, date, status: running|done|partial|failed, id?, error?}`
+
 ## API (현재)
 `GET /health` · `POST /shutdown` · `GET/PATCH /settings` · `GET /secrets` · `PUT/DELETE /secrets/{name}` · `GET /events` (SSE) · `GET /symbols/search?q=` · `POST /settings/kis/test`
 
 분석: `POST /analyses` · `GET /analyses?market=&code=` · `GET /analyses/{id}` · `POST /analyses/{id}/cancel` · `POST /analyses/{id}/retry`
 
 감시·알림: `GET/POST /watchlist` · `DELETE /watchlist/{id}` · `GET/POST /alerts/rules` · `PATCH/DELETE /alerts/rules/{id}` · `GET /alerts/events` · `POST /alerts/pause` · `POST /alerts/resume` · `GET /alerts/status` · `GET /alerts/kinds`
+
+브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run`
 
 LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `POST /llm/ollama/start` · `POST /llm/ollama/install` · `POST /llm/models/{tag}/pull` · `DELETE /llm/models/{tag}` · `GET /llm/check?preset=` · `POST /settings/llm/test?provider=`
 
@@ -104,6 +118,8 @@ LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `P
 uv run pytest -q                    # 실제 키·LLM이 필요한 테스트는 기본 제외 (kis_live, llm)
 uv run pytest -m kis_live -q -s     # 한투 실연동 (루트 .env 키 읽기, 토큰 캐시 ~/.local/share/vater/dev-kis-cache.env)
 uv run pytest -m kis_live tests/alerts_live -q -s   # 알림 실연동 (국내 실시간 체결은 장중에만, 아니면 skip)
+uv run pytest -m kis_live tests/briefing_live -q -s   # 브리핑 수집 실연동 (국내·미국)
+uv run pytest -m llm tests/briefing_live -q -s        # 실제 LLM으로 국내 브리핑 1건 (Gemini 무료 등급 약 6분)
 uv run pytest -m llm tests/llm_live -q -s   # GPU·Ollama·클라우드 키 실연동 (없으면 skip)
 uv run pytest -m llm tests/analysis_live -q -s   # 실제 분석 2건(국내·미국, Gemini + 한투), 약 30분
 uv run ruff check . && uv run ruff format --check . && uv run mypy src tests

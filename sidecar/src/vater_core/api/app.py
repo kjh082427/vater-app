@@ -10,6 +10,7 @@ from vater_core.api.errors import ERROR_RESPONSES, install_error_handlers
 from vater_core.api.routes import (
     alerts,
     analyses,
+    briefings,
     events,
     kis,
     llm,
@@ -55,6 +56,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     authed.include_router(analyses.router)
     authed.include_router(watchlist.router)
     authed.include_router(alerts.router)
+    authed.include_router(briefings.router)
     app.include_router(authed)
     # SSE는 브라우저 EventSource가 헤더를 못 붙이므로 쿼리 토큰도 받는 별도 인증을 쓴다.
     app.include_router(events.router)
