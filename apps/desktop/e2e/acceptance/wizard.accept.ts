@@ -46,7 +46,10 @@ test('U1 첫 실행: 마법사 5단계를 마치면 홈으로 가고, 감시 종
 
   // ⑤ 완료: 부팅 시 자동 실행(기본 켬)
   await expect(page.getByRole('heading', { level: 2, name: '준비가 끝났습니다' })).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: '부팅 시 자동 실행' })).toBeChecked();
+  await expect(page.getByRole('switch', { name: '부팅 시 자동 실행' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
   await page.getByRole('button', { name: '시작하기' }).click();
 
   await expect(page).toHaveURL(/#\/home$/);

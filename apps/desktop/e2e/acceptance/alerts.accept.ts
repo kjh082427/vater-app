@@ -127,7 +127,7 @@ test('U4 시세: 틱이 오면 홈 감시 종목의 현재가·전일 대비·�
   await expect(watchRow(page).getByText('실시간', { exact: true })).toBeVisible();
 });
 
-test('U5 한투 WebSocket이 끊기면 수신 상태가 실시간 → 폴링, 다시 붙으면 실시간', async ({
+test('U5 한투 WebSocket이 끊기면 수신 상태가 실시간 → 폴링(주기 확인), 다시 붙으면 실시간', async ({
   page,
   stack,
   shell,
@@ -141,8 +141,9 @@ test('U5 한투 WebSocket이 끊기면 수신 상태가 실시간 → 폴링, �
   await expect(status.getByText(/실시간 1/)).toBeVisible();
 
   await stack.ctl('/ws', { down: true });
-  await expect(watchRow(page).getByText(/^폴링/)).toBeVisible({ timeout: 25_000 });
-  await expect(status.getByText(/폴링 1/)).toBeVisible();
+  // 폴링은 화면에서 "10초마다 확인"(감시 종목)·"주기 확인 1"(상태 표시줄)로 보인다
+  await expect(watchRow(page).getByText('10초마다 확인')).toBeVisible({ timeout: 25_000 });
+  await expect(status.getByText(/주기 확인 1/)).toBeVisible();
 
   await stack.ctl('/ws', { down: false });
   await expect(watchRow(page).getByText('실시간', { exact: true })).toBeVisible({
@@ -187,14 +188,11 @@ test('U10a 한투 키 만료: 설정 > 연결 테스트가 KIS_AUTH_INVALID의 �
   await expect(kis.getByText(/앱키와 .*서버 선택을 확인해 주세요/)).toBeVisible();
 });
 
-test('U10 한투 키 만료: 화면에 "키를 확인하세요"와 설정으로 가는 길(스펙 8장)', async ({
+test('U10 한투 키 만료: "한국투자증권 키를 확인하세요" 배너와 [설정 열기](스펙 8장)', async ({
   page,
   stack,
   shell,
 }) => {
-  // 제품 결함: 감시 중 한투가 키를 거절해도(KIS_AUTH_INVALID) 감시 루프는 종목별 경고 로그만 남기고
-  // 상태는 running이다. 화면에도 "키를 확인하세요"나 설정 바로가기가 없다(스펙 8장 표와 다름).
-  test.fail();
   void shell;
   await stack.setup();
   await stack.watchAbove('005930', 90000);
@@ -202,6 +200,10 @@ test('U10 한투 키 만료: 화면에 "키를 확인하세요"와 설정으로 
   await waitRealtime(page, stack);
   await stack.ctl('/auth', { ok: false });
   await stack.ctl('/ws', { drop: true }); // 다시 붙을 때 승인키가 거절된다
-  await expect(page.getByText(/키를 확인하세요/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('link', { name: /설정/ }).last()).toHaveAttribute('href', /settings/);
+  await expect(page.getByText('한국투자증권 키를 확인하세요')).toBeVisible({ timeout: 30_000 });
+  const open = page.getByRole('link', { name: '설정 열기' });
+  await expect(open).toHaveAttribute('href', '#/settings');
+  await open.click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(main(page).getByRole('heading', { level: 1, name: '설정' })).toBeVisible();
 });

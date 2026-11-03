@@ -3,6 +3,7 @@
  * 가짜 엔진은 실제 엔진처럼 5단계(analysts→research→trader→risk→portfolio) 진행을 보낸다.
  */
 import type { Page } from '@playwright/test';
+import { defaultDoc } from '../../src/dashboard/layout/defaults';
 import { expect, main, openApp, test, type Stack } from './harness';
 
 const STAGE_LABELS = [
@@ -65,6 +66,14 @@ test('U11 분석 끝까지: 5단계 진행 → 결과(눈금·3줄 요약·에�
 }) => {
   void shell;
   await stack.setup();
+  // 기본 대시보드의 '최근 알림' 칸을 '진행 중인 분석'으로 바꿔 둔다(사용자가 칸 내용을 바꾼 것과 같음)
+  const doc = defaultDoc();
+  const home = doc.dashboards[0];
+  if (!home) throw new Error('기본 대시보드가 없습니다');
+  home.panels = home.panels.map((p) =>
+    p.type === 'recent-alerts' ? { type: 'running-analyses', options: {} } : p,
+  );
+  await stack.json('/ui/dashboards', { method: 'PUT', body: JSON.stringify(doc) });
   await stack.ctl('/analysis', { stage_sec: 1.5 });
   const sse = listen(stack);
   const id = await startFromScreen(page);
@@ -78,8 +87,9 @@ test('U11 분석 끝까지: 5단계 진행 → 결과(눈금·3줄 요약·에�
 
   // 홈의 "진행 중인 분석"에 있다가, 끝나면 사라진다
   await openApp(page, '#/home');
-  const active = main(page).getByRole('region', { name: '진행 중인 분석' });
+  const active = main(page).getByRole('region', { name: /: 진행 중인 분석$/ });
   await expect(active.getByRole('link', { name: '삼성전자' })).toBeVisible();
+  await expect(active.getByRole('progressbar', { name: '삼성전자 분석 진행' })).toBeVisible();
   await expect(active.getByText('진행 중인 분석이 없습니다', { exact: false })).toBeVisible({
     timeout: 20_000,
   });
@@ -151,7 +161,7 @@ test('U12 분석 실패(LLM 오류) → "분석 실패: 원인" → [다시 시�
   await expect(
     failed.getByText('다시 시도하거나 설정 > 로그 폴더에서 원인을 확인하세요.', { exact: false }),
   ).toBeVisible();
-  await expect(failed.getByRole('button', { name: '프리셋 바꿔 새로 분석' })).toBeVisible();
+  await expect(failed.getByRole('button', { name: 'AI 사용 방식 바꿔 새로 분석' })).toBeVisible();
   const steps = failed.getByRole('list', { name: '진행 단계' }).getByRole('listitem');
   // 실패한 분석은 단계별 시간이 저장되지 않아(사이드카가 실패 때 timings를 남기지 않음) 모든 단계가
   // '진행 안 됨'으로 보인다. 스펙이 요구하지는 않아 여기서는 다섯 단계가 보이는지만 본다.

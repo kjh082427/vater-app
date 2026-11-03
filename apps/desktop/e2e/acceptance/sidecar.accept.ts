@@ -99,20 +99,17 @@ test('U7 사이드카가 끝내 안 뜸(failed): 오류 화면과 해결 방법'
   ).toBeVisible();
 });
 
-test('U7b 오류 화면의 [로그 폴더 열기](스펙 8장 표: 사이드카 비정상 종료)', async ({
+test('U7b 오류 화면의 [로그 폴더 열기]는 셸 커맨드 open_log_folder를 부른다(스펙 8장)', async ({
   page,
   shell,
 }) => {
-  // 제품 결함: 사이드카 실패 화면에 [로그 폴더 열기]가 없다(셸 커맨드도 없음). 스펙 8장 표와 다르다.
-  test.fail();
   shell.state = 'failed';
   await openApp(page);
   await expect(
     page.getByText('Vater 백그라운드 서비스를 실행하지 못했습니다').first(),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: '로그 폴더 열기' })).toBeVisible({
-    timeout: 3_000,
-  });
+  await page.getByRole('button', { name: '로그 폴더 열기' }).click();
+  await expect.poll(() => shell.count('open_log_folder')).toBe(1);
 });
 
 test('U8 사이드카가 늦게 뜸(starting 40초 → ready): 화면이 포기하지 않고 붙는다', async ({

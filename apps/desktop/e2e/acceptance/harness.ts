@@ -240,6 +240,8 @@ export class FakeShell {
       case 'set_autostart':
         this.autostart = Boolean(args.enabled);
         return this.autostart;
+      case 'open_log_folder':
+        return null;
       default:
         throw new Error(`가짜 셸에 없는 커맨드: ${cmd}`);
     }
