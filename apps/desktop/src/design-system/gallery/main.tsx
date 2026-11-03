@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import '../styles.css';
 
 // 디자인 시스템 견본(gallery.html). 컴포넌트가 생기는 대로 여기에 실제 상태로 늘어놓는다.
 const root = document.getElementById('root');
