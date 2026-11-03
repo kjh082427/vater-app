@@ -195,11 +195,17 @@ async def test_monitor_one_tick_with_real_kis(db: sqlite3.Connection, tmp_path: 
         is_open = await clock.is_open("KR")
         first = monitor.status()  # 첫 회차에는 WebSocket이 아직 연결 중이라 폴링으로 감시한다
         if is_open:
-            for _ in range(20):  # 틱이 와서 평가될 때까지 최대 10초
-                if rules.get(live_rule.id).last_state is not None:
+            # 첫 회차의 폴링이 기준값을 먼저 잡을 수 있으므로, 기준값이 아니라 연결을 기다린다
+            for _ in range(40):  # 최대 20초
+                rt = monitor._rt  # 테스트에서만 들여다본다
+                if rt is not None and rt.state == "connected":
                     break
                 await asyncio.sleep(0.5)
             await monitor.tick_once()  # 연결된 뒤: 실시간으로 넘어간다
+            for _ in range(20):  # 실제 틱으로 평가될 때까지 최대 10초
+                if rules.get(live_rule.id).last_state is not None:
+                    break
+                await asyncio.sleep(0.5)
         status = monitor.status()
         print(
             f"\nlast closed KR session {last}, open={is_open}, first {first}, status {status}, "
