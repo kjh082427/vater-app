@@ -373,6 +373,19 @@ def briefing_data(market: str, session: date) -> dict[str, Any]:
             for i in range(30)
         ]
 
+    if market == "US":  # 미국 브리핑은 지수만 모은다(실제 수집과 같음)
+        return {
+            "market": market,
+            "session": session.isoformat(),
+            "indices": [
+                {"code": "SPX", "name": "S&P 500", "value": 6012.4, "change": 12.3,
+                 "change_pct": 0.21, "closes": closes(5980)},
+                {"code": "COMP", "name": "나스닥", "value": 19870.2, "change": -40.1,
+                 "change_pct": -0.2, "closes": closes(19800)},
+            ],  # fmt: skip
+            "watchlist": [],
+            "alerts": [],
+        }
     return {
         "market": market,
         "session": session.isoformat(),

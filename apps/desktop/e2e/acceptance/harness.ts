@@ -326,7 +326,10 @@ function installFakeTauri() {
 }
 
 export interface PageLog {
+  /** 콘솔 오류와 잡히지 않은 예외. 브라우저가 4xx·5xx 응답마다 남기는 "Failed to load resource" 줄은
+   * 화면이 처리하는 API 오류이므로 빼고 httpErrors에 따로 모은다. */
   errors: string[];
+  httpErrors: string[];
   requests: Request[];
 }
 
@@ -344,9 +347,19 @@ async function routeApp(page: Page) {
 }
 
 export function watchPage(page: Page): PageLog {
-  const log: PageLog = { errors: [], requests: [] };
+  const log: PageLog = { errors: [], httpErrors: [], requests: [] };
   page.on('console', (msg) => {
-    if (msg.type() === 'error') log.errors.push(msg.text());
+    if (msg.type() !== 'error') return;
+    if (/^Failed to load resource: the server responded with a status of \d+/.test(msg.text())) {
+      return;
+    }
+    log.errors.push(msg.text());
+  });
+  page.on('response', (res) => {
+    if (res.status() >= 400) {
+      const url = new URL(res.url());
+      log.httpErrors.push(`${res.status()} ${res.request().method()} ${url.pathname}`);
+    }
   });
   page.on('pageerror', (e) => log.errors.push(`pageerror: ${e.message}`));
   page.on('request', (req) => log.requests.push(req));
