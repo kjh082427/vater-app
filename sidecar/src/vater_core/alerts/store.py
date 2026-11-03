@@ -262,6 +262,15 @@ class BarRepo:
             volume=tuple(float(r[5]) for r in rows),
         )
 
+    def close_before(self, market: str, code: str, day: date) -> float | None:
+        """그 날짜 전의 가장 최근 종가(실시간 틱의 전일 대비 계산용)."""
+        r = self._conn.execute(
+            "SELECT close FROM daily_bars WHERE market = ? AND code = ? AND day < ? "
+            "ORDER BY day DESC LIMIT 1",
+            (market, code, day.isoformat()),
+        ).fetchone()
+        return float(r[0]) if r else None
+
     def last_day(self, market: str, code: str) -> date | None:
         r = self._conn.execute(
             "SELECT max(day) FROM daily_bars WHERE market = ? AND code = ?", (market, code)

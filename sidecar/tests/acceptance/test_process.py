@@ -170,7 +170,8 @@ def test_a7_sse_stream_delivers_events(dirs: tuple[Path, Path]) -> None:
         assert s.http.post("/alerts/pause").json() == {"state": "paused"}
         t.join(timeout=10)
         events = [json.loads(x[5:]) for x in seen if x.startswith("data:")]
-        assert {"state": "paused", "realtime": 0, "polling": 0} in events
+        paused = [e for e in events if e.get("state") == "paused"]
+        assert paused and (paused[-1]["realtime"], paused[-1]["polling"]) == (0, 0)
         assert any(x.strip() == "event: alerts.state" for x in seen)
         assert s.stop() == 0
     finally:

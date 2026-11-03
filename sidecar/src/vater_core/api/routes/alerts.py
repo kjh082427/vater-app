@@ -1,7 +1,8 @@
 """알림 규칙·발생 이력·감시 상태 API (스펙 2-3, 4장).
 
 규칙의 params는 종류별 모델로 검사하고, 기본값을 채운 형태로 저장한다.
-SSE: `alert.fired`(발생한 알림), `alerts.state` `{state, realtime, polling}`.
+SSE: `alert.fired`(발생한 알림), `alerts.state` `{state, realtime, polling, markets, feeds}`,
+`quote`(감시 종목 시세 갱신).
 """
 
 from typing import Annotated, Any, Literal
@@ -35,6 +36,19 @@ class RulePatch(BaseModel):
     enabled: bool | None = None
 
 
+class RulePreviewIn(BaseModel):
+    watchlist_id: int
+    kind: str
+    params: dict[str, Any] | None = None  # 없으면 기본값
+    timing: Timing | None = None  # 없으면 종류별 기본값
+
+
+class RulePreviewOut(BaseModel):
+    state: bool | None  # 지금 조건이 참인가. null = 데이터가 부족해 계산할 수 없음
+    value: float | None  # 그 규칙이 보는 값(현재가, RSI, 이동평균과의 차이 등)
+    message: str  # 한국어 설명(종목명 없이 조건 부분만)
+
+
 class RuleOut(BaseModel):
     id: int
     watchlist_id: int
@@ -58,10 +72,20 @@ class AlertEventOut(BaseModel):
     kind: str | None
 
 
+class FeedOut(BaseModel):
+    market: str
+    code: str
+    feed: Literal["realtime", "polling", "idle", "closed", "offline"]
+
+
 class MonitorStatus(BaseModel):
     state: MonitorState
     realtime: int
     polling: int
+    markets: dict[
+        str, Literal["open", "closed"]
+    ]  # {"KR": ..., "US": ...}, 첫 확인 전에는 비어 있음
+    feeds: list[FeedOut]  # 감시 종목별 수신 상태
 
 
 class MonitorStateOut(BaseModel):
@@ -128,6 +152,18 @@ async def create_rule(body: RuleCreate, deps: AppDeps = Depends(get_deps)) -> Ru
     timing = body.timing or default_timing(body.kind)
     rule = RuleRepo(db).create(body.watchlist_id, body.kind, params, timing, body.enabled)
     return _rule_out(rule)
+
+
+@router.post("/rules/preview")
+async def preview_rule(
+    body: RulePreviewIn,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> RulePreviewOut:
+    """규칙을 저장하지 않고 지금 조건과 값을 계산한다(규칙 편집기의 미리보기)."""
+    item = WatchlistRepo(_db(deps)).get(body.watchlist_id)
+    timing = body.timing or default_timing(body.kind)
+    reading = await get_alerts(deps).preview(item, body.kind, body.params or {}, timing)
+    return RulePreviewOut(state=reading.state, value=reading.value, message=reading.message)
 
 
 @router.patch("/rules/{rid}")
