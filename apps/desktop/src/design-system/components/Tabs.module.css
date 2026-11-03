@@ -1,0 +1,64 @@
+/* line: 본문 탭(분석 결과의 에이전트별 탭). 선택된 탭 아래 2px 먹선 */
+.list[data-variant='line'] {
+  display: flex;
+  gap: var(--space-5);
+  border-bottom: var(--rule-hair) solid var(--color-line);
+}
+
+.list[data-variant='line'] .tab {
+  height: var(--size-section-head);
+  margin-bottom: calc(var(--rule-hair) * -1);
+  padding: 0;
+  border: 0;
+  border-bottom: var(--rule-section) solid transparent;
+  background: none;
+  color: var(--color-ink-2);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.list[data-variant='line'] .tab:hover {
+  color: var(--color-ink);
+}
+
+.list[data-variant='line'] .tab[aria-selected='true'] {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+
+/* segment: 구역 머리의 작은 전환(국내/미국) */
+.list[data-variant='segment'] {
+  display: inline-flex;
+  gap: var(--space-0-5);
+}
+
+.list[data-variant='segment'] .tab {
+  height: var(--size-control-sm);
+  padding: 0 var(--space-2-5);
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.list[data-variant='segment'] .tab:hover {
+  border-color: var(--color-control);
+  color: var(--color-ink);
+}
+
+.list[data-variant='segment'] .tab[aria-selected='true'] {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-weight: var(--weight-semibold);
+}
+
+.panel:focus-visible {
+  outline-offset: 4px;
+}

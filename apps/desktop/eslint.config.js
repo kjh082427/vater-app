@@ -19,6 +19,11 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
+      // WAI-ARIA 탭 패턴은 tabpanel에 tabindex="0"을 둔다(jsx-a11y recommended와 같은 설정)
+      'jsx-a11y/no-noninteractive-tabindex': [
+        'error',
+        { tags: [], roles: ['tabpanel'], allowExpressionValues: true },
+      ],
     },
   },
   {
