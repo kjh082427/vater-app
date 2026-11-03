@@ -17,10 +17,10 @@ from typing import Any, Literal, Protocol
 
 import httpx
 
-from vater_core.alerts.clock import KST
+from vater_core.alerts.clock import KST, session_bounds
 from vater_core.alerts.store import EventRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
-from vater_core.briefing.schedule import BriefingMarket, session_open
+from vater_core.briefing.schedule import BriefingMarket
 from vater_core.kis.client import KisClient
 from vater_core.kis.config import Priority
 from vater_core.kis.market import (
@@ -182,7 +182,7 @@ async def _watchlist(
 def _alerts(
     market: BriefingMarket, session: date, db: sqlite3.Connection, until: datetime
 ) -> list[dict[str, Any]]:
-    start = session_open(market, session)
+    start = session_bounds(market, session)[0]
     picked = [
         e
         for e in EventRepo(db).list(EVENT_SCAN)

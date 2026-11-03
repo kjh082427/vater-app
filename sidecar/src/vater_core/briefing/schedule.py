@@ -8,40 +8,19 @@
 """
 
 from datetime import date, datetime, time, timedelta
-from functools import cache
-from typing import Any, Literal
+from typing import Literal
 
-from vater_core.alerts.clock import KR_CLOSE, KR_OPEN, KST, NY, SETTLE, MarketClock
+from vater_core.alerts.clock import KST, NY, SETTLE, MarketClock, session_bounds
 
 BriefingMarket = Literal["KR", "US"]
 LOOKBACK_DAYS = 15  # 설·추석 연휴를 넘어 지난 세션을 찾는 범위
 
 
-@cache
-def _xnys() -> Any:
-    import exchange_calendars as xcals
-
-    return xcals.get_calendar("XNYS")
-
-
-def session_open(market: BriefingMarket, day: date) -> datetime:
-    if market == "KR":
-        return datetime.combine(day, KR_OPEN, tzinfo=KST)
-    opened: datetime = _xnys().session_open(day.isoformat()).to_pydatetime()
-    return opened
-
-
-def _close(market: BriefingMarket, day: date) -> datetime:
-    if market == "KR":
-        return datetime.combine(day, KR_CLOSE, tzinfo=KST)
-    closed: datetime = _xnys().session_close(day.isoformat()).to_pydatetime()
-    return closed
-
-
 def slot_time(market: BriefingMarket, session: date, at: time) -> datetime:
     """세션 S의 브리핑 시각. 휴장 여부는 보지 않는다."""
     day = session if market == "KR" else session + timedelta(days=1)
-    return max(datetime.combine(day, at, tzinfo=KST), _close(market, session) + SETTLE)
+    close = session_bounds(market, session)[1]  # 수능날처럼 늦게 닫는 날도 이 함수가 안다
+    return max(datetime.combine(day, at, tzinfo=KST), close + SETTLE)
 
 
 async def next_open(market: BriefingMarket, session: date, clock: MarketClock) -> datetime:
@@ -49,9 +28,9 @@ async def next_open(market: BriefingMarket, session: date, clock: MarketClock) -
     day = session + timedelta(days=1)
     for _ in range(LOOKBACK_DAYS):
         if await clock.is_session_day(market, day):
-            return session_open(market, day)
+            return session_bounds(market, day)[0]
         day += timedelta(days=1)
-    return session_open(market, day)
+    return session_bounds(market, day)[0]
 
 
 async def due_session(

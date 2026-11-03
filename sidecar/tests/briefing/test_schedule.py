@@ -86,3 +86,19 @@ async def test_no_session_in_lookback_gives_none() -> None:
     now = kst(11, 3, 20, 0)
     clock = MarketClock(never, now=lambda: now)
     assert await due_session("KR", now, clock, time(16, 0)) is None
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        (
+            kst(11, 19, 16, 0),
+            None,
+        ),  # 수능날: 16:00에는 아직 장중(16:30 마감), 전날 세션은 10:00 개장으로 기한 지남
+        (kst(11, 19, 16, 39), None),
+        (kst(11, 19, 16, 40), date(2026, 11, 19)),  # 16:30 마감 + 10분
+        (kst(11, 19, 9, 59), date(2026, 11, 18)),  # 수능날은 10:00에 열리므로 그 전까지는 전날 세션
+    ],
+)
+async def test_kr_csat_day_waits_for_the_late_close(now: datetime, expected: date | None) -> None:
+    assert await due("KR", now, "16:00") == expected
