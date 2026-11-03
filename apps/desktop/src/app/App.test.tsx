@@ -133,6 +133,29 @@ describe('사이드카 시작·재시작(셸 계약: sidecar-state 먼저 구독
     );
   });
 
+  it('사이드카 실행 실패: [로그 폴더 열기], 실패하면 그 문구', async () => {
+    window.location.hash = '#/settings';
+    const { shell } = renderWithServices(<App />, { sidecar: { state: 'failed' } });
+    await screen.findByText('Vater 백그라운드 서비스를 실행하지 못했습니다');
+    await userEvent.click(screen.getByRole('button', { name: '로그 폴더 열기' }));
+    await waitFor(() => expect(shell.logFolderOpened).toBe(1));
+    shell.failLogFolder(new Error('로그 폴더를 열지 못했습니다: 권한 없음'));
+    await userEvent.click(screen.getByRole('button', { name: '로그 폴더 열기' }));
+    expect(await screen.findByText('로그 폴더를 열지 못했습니다: 권한 없음')).toBeInTheDocument();
+  });
+
+  it('한투 키 거절(auth_invalid)이면 오프라인과 다른 배너와 [설정 열기], 회복되면 사라진다', async () => {
+    mock.db.monitor = { ...mock.db.monitor, state: 'auth_invalid' };
+    window.location.hash = '#/alerts';
+    const { stream } = renderWithServices(<App />);
+    const banner = await screen.findByText('한국투자증권 키를 확인하세요');
+    expect(screen.queryByText(/오프라인: 알림 감시 일시 중지/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '설정 열기' })).toHaveAttribute('href', '#/settings');
+    const source = await stream();
+    emit(source, 'alerts.state', { ...mock.db.monitor, state: 'running' });
+    await waitFor(() => expect(banner).not.toBeInTheDocument());
+  });
+
   it('처음에 연결하지 못해도 사이드카가 준비되면 키를 다시 확인해 마법사로 보낸다', async () => {
     mock.db.secrets.KIS_APP_KEY = false;
     window.location.hash = '#/home';

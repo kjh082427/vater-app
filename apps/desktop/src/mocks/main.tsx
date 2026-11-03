@@ -105,6 +105,7 @@ const platform: Platform = {
   onNavigate: () => () => undefined,
   getAutostart: async () => true,
   setAutostart: async () => undefined,
+  openLogFolder: async () => undefined,
 };
 
 /** 열리면 감시 상태를 한 번 보내는 흉내 EventSource. */

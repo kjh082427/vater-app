@@ -187,6 +187,14 @@ function Shell({ route }: { route: Route }) {
   const analyses = useActiveAnalyses();
   const lastEventAt = useLastEventAt();
   const badge = useAlertBadge(route);
+  const { platform } = useServices();
+  const [logError, setLogError] = useState<string | null>(null);
+  const openLogs = () => {
+    setLogError(null);
+    platform.openLogFolder().catch((e: unknown) => {
+      setLogError(e instanceof Error ? e.message : String(e));
+    });
+  };
 
   const items: NavItem[] = NAV.map((item) =>
     item.id === 'alerts' && badge > 0
@@ -198,8 +206,16 @@ function Shell({ route }: { route: Route }) {
   let banner: ReactNode = null;
   if (sidecar === 'failed' || sidecar === 'stopped') {
     banner = (
-      <Banner tone="caution" title="Vater 백그라운드 서비스를 실행하지 못했습니다">
-        앱을 완전히 종료(트레이 메뉴 &gt; 종료)한 뒤 다시 실행하세요.
+      <Banner
+        tone="caution"
+        title="Vater 백그라운드 서비스를 실행하지 못했습니다"
+        action={
+          <Button size="sm" onClick={openLogs}>
+            로그 폴더 열기
+          </Button>
+        }
+      >
+        {logError ?? '앱을 완전히 종료(트레이 메뉴 > 종료)한 뒤 다시 실행하세요.'}
       </Banner>
     );
   } else if (stream === 'disconnected') {
@@ -224,6 +240,21 @@ function Shell({ route }: { route: Route }) {
     banner = (
       <Banner tone="info" title="Vater 백그라운드 서비스를 시작하는 중입니다">
         준비되면 화면을 다시 불러옵니다.
+      </Banner>
+    );
+  } else if (monitor.data?.state === 'auth_invalid') {
+    // 스펙 8장: 한투가 키를 거절하면 감시가 멈춘다. 오프라인(다시 시도)과 달리 사용자가 키를 고쳐야 한다
+    banner = (
+      <Banner
+        tone="caution"
+        title="한국투자증권 키를 확인하세요"
+        action={
+          <a className={styles.bannerLink} href="#/settings">
+            설정 열기
+          </a>
+        }
+      >
+        한국투자증권이 앱키를 거절해 알림 감시를 멈췄습니다. 설정에서 키를 다시 저장하세요.
       </Banner>
     );
   } else if (monitor.data?.state === 'offline') {
