@@ -1,0 +1,33 @@
+/* AI가 쓴 문장만 명조(Hahmlet). 데이터에서 나온 숫자는 이 글꼴로 쓰지 않는다 */
+.ai {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-regular);
+}
+
+.ai[data-size='lead'] {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-ink);
+  text-wrap: balance;
+}
+
+.ai[data-size='body'] {
+  max-width: var(--size-prose);
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  color: var(--color-ink-2);
+  text-wrap: pretty;
+}
+
+/* 출처 꼬리표는 고딕: 앱이 붙인 말이지 AI가 쓴 말이 아니다 */
+.attribution {
+  margin-left: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  letter-spacing: normal;
+  color: var(--color-ink-3);
+  white-space: nowrap;
+}
