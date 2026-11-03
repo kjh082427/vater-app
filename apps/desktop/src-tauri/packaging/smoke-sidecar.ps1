@@ -42,6 +42,10 @@ try {
     $health = Invoke-WebRequest -Uri "http://127.0.0.1:$port/health" -Headers $headers -UseBasicParsing
     "GET /health -> $($health.StatusCode) $($health.Content)"
     if ($health.StatusCode -ne 200) { throw 'health check failed' }
+    # 포장본의 버전이 pyproject와 같아야 한다(메타데이터를 빠뜨리면 0.0.0-dev가 된다)
+    $expected = (Select-String -Path (Join-Path $repo 'sidecar/pyproject.toml') -Pattern '^version = "(.+)"$').Matches[0].Groups[1].Value
+    $actual = ($health.Content | ConvertFrom-Json).version
+    if ($actual -ne $expected) { throw "/health version '$actual' != pyproject '$expected'" }
 
     $shutdown = Invoke-WebRequest -Uri "http://127.0.0.1:$port/shutdown" -Method Post -Headers $headers -UseBasicParsing
     "POST /shutdown -> $($shutdown.StatusCode)"
