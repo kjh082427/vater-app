@@ -5,6 +5,7 @@
 - 인터넷 끊김은 그대로 올린다(서비스가 나중에 다시 시도). 한투 항목이 모두 실패하면
   `BRIEFING_NO_DATA`.
 - 미국: 한투에 미국 업종·순위·수급 API가 없어서 지수·감시 종목·알림만 있다(빠진 것이 아님).
+- 지수는 국내·미국 모두 현재값과 최근 30거래일 종가(미니 차트용)를 함께 둔다.
 """
 
 import dataclasses
@@ -32,13 +33,14 @@ from vater_core.kis.market import (
     RankItem,
     SectorBoard,
     fluctuation_rank,
+    index_daily,
     index_quote,
     investor_flows,
     overseas_index,
     sector_board,
     trading_value_rank,
 )
-from vater_core.kis.models import Quote, UsExchange
+from vater_core.kis.models import Bar, Quote, UsExchange
 from vater_core.kis.quotes import domestic_price, overseas_price
 
 logger = logging.getLogger(__name__)
@@ -46,12 +48,14 @@ logger = logging.getLogger(__name__)
 DOMESTIC: tuple[DomesticMarket, ...] = ("KOSPI", "KOSDAQ")
 US_INDICES: tuple[OverseasIndexCode, ...] = ("SPX", "COMP", "NDX")
 RANK_LIMIT = 10
-INDEX_CLOSES = 30  # 미국 지수 미니 차트용 최근 종가 수
+INDEX_CLOSES = 30  # 지수 미니 차트용 최근 종가 수 (국내·미국)
+INDEX_LOOKBACK = timedelta(days=60)  # 30거래일을 넉넉히 덮는 기간
 EVENT_SCAN = 500
 
 
 class Feeds(Protocol):
     async def index_quote(self, m: DomesticMarket) -> IndexQuote: ...
+    async def index_daily(self, m: DomesticMarket, start: date, end: date) -> list[Bar]: ...
     async def sector_board(self, m: DomesticMarket) -> SectorBoard: ...
     async def fluctuation_rank(
         self, direction: Literal["up", "down"], limit: int = RANK_LIMIT
@@ -72,6 +76,9 @@ class KisFeeds:
 
     async def index_quote(self, m: DomesticMarket) -> IndexQuote:
         return await index_quote(self._c, m)
+
+    async def index_daily(self, m: DomesticMarket, start: date, end: date) -> list[Bar]:
+        return await index_daily(self._c, m, start, end)
 
     async def sector_board(self, m: DomesticMarket) -> SectorBoard:
         return await sector_board(self._c, m)
@@ -124,10 +131,21 @@ def _offline(e: BaseException) -> bool:
     return isinstance(e, httpx.TransportError)
 
 
+def _closes(bars: list[Bar], session: date) -> list[dict[str, Any]]:
+    """세션 날짜까지의 최근 종가. 그 뒤의 (장중 미확정) 봉은 뺀다."""
+    kept = [{"day": b.day.isoformat(), "close": b.close} for b in bars if b.day <= session]
+    return kept[-INDEX_CLOSES:]
+
+
 async def _us_index(feeds: Feeds, code: OverseasIndexCode, session: date) -> dict[str, Any]:
-    idx = await feeds.overseas_index(code, session - timedelta(days=60), session)
-    closes = [{"day": b.day.isoformat(), "close": b.close} for b in idx.bars if b.day <= session]
-    return {**_plain(idx.quote), "closes": closes[-INDEX_CLOSES:]}
+    idx = await feeds.overseas_index(code, session - INDEX_LOOKBACK, session)
+    return {**_plain(idx.quote), "closes": _closes(idx.bars, session)}
+
+
+async def _kr_index(feeds: Feeds, m: DomesticMarket, session: date) -> dict[str, Any]:
+    quote = await feeds.index_quote(m)
+    bars = await feeds.index_daily(m, session - INDEX_LOOKBACK, session)
+    return {**_plain(quote), "closes": _closes(bars, session)}
 
 
 def _kis_sections(
@@ -141,7 +159,7 @@ def _kis_sections(
         return {"indices": us_indices}
 
     async def indices() -> Any:
-        return [await feeds.index_quote(m) for m in DOMESTIC]
+        return [await _kr_index(feeds, m, session) for m in DOMESTIC]
 
     async def sectors() -> Any:
         return {m: await feeds.sector_board(m) for m in DOMESTIC}

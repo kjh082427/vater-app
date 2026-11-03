@@ -106,6 +106,8 @@ async def test_collect_both_markets(client: KisClient, db: sqlite3.Connection) -
         assert got.missing == []
         if market == "KR":
             assert len(d["indices"]) == 2 and set(d["sectors"]) == {"KOSPI", "KOSDAQ"}
+            assert all(len(i["closes"]) == 30 for i in d["indices"])  # 국내 지수 미니 차트
+            assert all(c["day"] <= session.isoformat() for i in d["indices"] for c in i["closes"])
             assert all(len(d["movers"][k]) > 0 for k in ("up", "down", "value"))
             assert set(d["flows"]) == {"KOSPI", "KOSDAQ"}
         else:
