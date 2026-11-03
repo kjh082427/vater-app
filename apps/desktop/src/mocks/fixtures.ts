@@ -3,6 +3,9 @@
  * 시세와 문장은 모두 예시 데이터다. 형식은 OpenAPI 타입(src/api/types.ts)을 따른다.
  */
 import type {
+  CatalogOut,
+  HardwareOut,
+  OllamaStatus,
   AlertEvent,
   AlertKindInfo,
   AlertRule,
@@ -340,7 +343,11 @@ export const secrets: Record<string, boolean> = {
   KIS_APP_KEY: true,
   KIS_APP_SECRET: true,
   KIS_HTS_ID: true,
-  GOOGLE_API_KEY: true,
+  LLM_ANTHROPIC_KEY: false,
+  LLM_OPENAI_KEY: false,
+  LLM_GOOGLE_KEY: true,
+  LLM_COMPAT_KEY: false,
+  LLM_COMPAT_BASE_URL: false,
 };
 
 function closes(start: number, steps: number[]): { day: string; close: number }[] {
@@ -515,4 +522,79 @@ export const briefingUs: BriefingDetail = {
     watchlist: [{ code: 'AAPL', name: '애플', price: 227.48, change_pct: 0.95 }],
     alerts: [],
   },
+};
+
+const localModels: CatalogOut['local_models'] = [
+  {
+    tag: 'qwen3.5:4b',
+    variant: 'qwen3.5:4b-16k',
+    label: 'Qwen 3.5 4B',
+    size_gb: 3.32,
+    num_ctx: 16384,
+    min_vram_mb: 6000,
+    note: '8GB GPU에 다 올라갑니다. 보고서가 비거나 수치를 지어낼 수 있습니다. (예시)',
+  },
+  {
+    tag: 'qwen3.5:9b',
+    variant: 'qwen3.5:9b-16k',
+    label: 'Qwen 3.5 9B',
+    size_gb: 6.55,
+    num_ctx: 16384,
+    min_vram_mb: 11000,
+    note: '12GB 이상 GPU에 권장합니다. (예시)',
+  },
+];
+
+export const catalog: CatalogOut = {
+  version: '2026-11',
+  tiers: [],
+  local_models: localModels,
+  cloud: {
+    google: {
+      id: 'google',
+      label: 'Google Gemini',
+      secret: 'LLM_GOOGLE_KEY',
+      base_url_secret: null,
+      deep: 'gemini-3-pro',
+      quick: 'gemini-3-flash',
+      free_tier: true,
+    },
+    anthropic: {
+      id: 'anthropic',
+      label: 'Anthropic Claude',
+      secret: 'LLM_ANTHROPIC_KEY',
+      base_url_secret: null,
+      deep: 'claude-sonnet-5-5',
+      quick: 'claude-haiku-5-5',
+      free_tier: false,
+    },
+    compat: {
+      id: 'compat',
+      label: 'OpenAI 호환 서버 (기타)',
+      secret: 'LLM_COMPAT_KEY',
+      base_url_secret: 'LLM_COMPAT_BASE_URL',
+      deep: null,
+      quick: null,
+      free_tier: false,
+    },
+  },
+};
+
+export const hardware: HardwareOut = {
+  tier: 'nvidia_12',
+  tier_label: 'NVIDIA GPU (VRAM 12~16GB)',
+  gpus: [{ name: 'NVIDIA GeForce RTX 4070', vram_mb: 12282 }],
+  ram_mb: 32768,
+  default_preset: 'mixed',
+  recommended: localModels[1] ?? null,
+  alternatives: localModels.slice(0, 1),
+  expected_minutes: null,
+};
+
+export const ollamaStatus: OllamaStatus = {
+  installed: true,
+  running: true,
+  version: '0.40.13',
+  models: [{ name: 'qwen3.5:4b-16k', size: 3_320_000_000 }],
+  loaded: [],
 };

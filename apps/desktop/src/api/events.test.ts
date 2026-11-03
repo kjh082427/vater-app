@@ -98,9 +98,11 @@ describe('EventHub', () => {
     expect(FakeEventSource.all).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1000);
     expect(FakeEventSource.all).toHaveLength(2);
+    // 다시 여는 동안에도 끊김으로 둔다(배너가 깜빡이지 않게), 열려야 open
+    expect(hub.status).toBe('disconnected');
     FakeEventSource.latest.open();
     expect(hub.status).toBe('open');
-    expect(statuses).toEqual(['open', 'disconnected', 'connecting', 'open']);
+    expect(statuses).toEqual(['open', 'disconnected', 'open']);
   });
 
   it('연달아 실패하면 간격을 늘리고, 열리면 처음 간격으로 돌아간다', async () => {

@@ -10,6 +10,7 @@ import { AnalysisDetailScreen } from '../screens/analysis/AnalysisDetailScreen';
 import { BriefingDetailScreen } from '../screens/briefing/BriefingDetailScreen';
 import { BriefingsScreen } from '../screens/briefing/BriefingsScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { formatClock } from '../screens/common/time';
 import styles from './app.module.css';
 import { AppStatusBar } from './AppStatusBar';
@@ -95,14 +96,6 @@ function useAlertBadge(route: Route): number {
   return onAlerts ? 0 : count;
 }
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <>
-      <ScreenHeader title={title} lede="이 화면은 다음 작업에서 채웁니다." />
-    </>
-  );
-}
-
 function NotFound() {
   return (
     <ScreenHeader
@@ -136,7 +129,7 @@ function screenFor(route: Route): ReactNode {
     case 'briefing':
       return <BriefingDetailScreen key={route.id} id={route.id} />;
     case 'settings':
-      return <Placeholder title="설정" />;
+      return <SettingsScreen />;
     default:
       return <NotFound />;
   }

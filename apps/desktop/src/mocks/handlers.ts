@@ -11,6 +11,8 @@ import type {
   AnalysisDetail,
   BriefingDetail,
   ErrorBody,
+  HardwareOut,
+  OllamaStatus,
   MonitorStatus,
   RuleCreate,
   RulePatch,
@@ -31,6 +33,8 @@ export interface MockDb {
   briefings: BriefingDetail[];
   settings: Record<string, unknown>;
   secrets: Record<string, boolean>;
+  ollama: OllamaStatus;
+  hardware: HardwareOut;
   symbols: SymbolOut[];
   nextId: number;
 }
@@ -48,6 +52,8 @@ export function createMockDb(): MockDb {
     briefings: clone([fx.briefingKr, fx.briefingUs]),
     settings: clone(fx.settings),
     secrets: clone(fx.secrets),
+    ollama: clone(fx.ollamaStatus),
+    hardware: clone(fx.hardware),
     symbols: clone(fx.symbols),
     nextId: 100,
   };
@@ -64,12 +70,80 @@ export function createHandlers(db: MockDb) {
   return [
     http.get('*/health', () => HttpResponse.json({ status: 'ok', version: '0.1.0' })),
     http.get('*/secrets', () => HttpResponse.json(db.secrets)),
+    http.put('*/secrets/:name', async ({ params, request }) => {
+      const name = String(params.name);
+      if (!(name in db.secrets)) {
+        return errorResponse(400, 'SECRET_NAME_INVALID', '저장할 수 없는 비밀키 이름입니다.');
+      }
+      const body = (await request.json()) as { value?: unknown };
+      if (typeof body.value !== 'string' || body.value.trim() === '') {
+        return errorResponse(400, 'SECRET_VALUE_EMPTY', '값이 비어 있습니다.');
+      }
+      db.secrets[name] = true; // 흉내도 값은 저장하지 않는다(있다는 사실만)
+      return new HttpResponse(null, { status: 204 });
+    }),
     http.get('*/settings', () => HttpResponse.json(db.settings)),
     http.patch('*/settings', async ({ request }) => {
-      Object.assign(db.settings, (await request.json()) as Record<string, unknown>);
+      const changes = (await request.json()) as Record<string, unknown>;
+      for (const [key, value] of Object.entries(changes)) {
+        if (
+          key.endsWith('.time') &&
+          !(typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value))
+        ) {
+          return errorResponse(
+            422,
+            'SETTING_INVALID',
+            `설정 '${key}' 값이 올바르지 않습니다: HH:MM 형식(00:00~23:59)이어야 합니다`,
+          );
+        }
+      }
+      Object.assign(db.settings, changes);
       return HttpResponse.json(db.settings);
     }),
+    http.post('*/settings/kis/test', () =>
+      HttpResponse.json({
+        ok: true,
+        server: String(db.settings['kis.server'] ?? 'prod'),
+        sample: { code: '005930', price: 71400 },
+      }),
+    ),
+    http.post('*/settings/llm/test', ({ request }) => {
+      const provider = new URL(request.url).searchParams.get('provider') ?? 'google';
+      return HttpResponse.json({ ok: true, provider, model_count: 12, defaults_available: true });
+    }),
     http.get('*/llm/check', () => HttpResponse.json(fx.llmCheck)),
+    http.get('*/llm/catalog', () => HttpResponse.json(fx.catalog)),
+    http.get('*/llm/hardware', () => HttpResponse.json(db.hardware)),
+    http.get('*/llm/ollama/status', () => HttpResponse.json(db.ollama)),
+    http.post('*/llm/ollama/start', () => {
+      db.ollama.running = db.ollama.installed;
+      return HttpResponse.json({ running: db.ollama.running });
+    }),
+    http.post('*/llm/ollama/install', () =>
+      HttpResponse.json({ started: !db.ollama.running }, { status: 202 }),
+    ),
+    http.post('*/llm/models/:tag/pull', ({ params }) => {
+      const model = fx.catalog.local_models.find((m) => m.tag === params.tag);
+      if (!model) return notFound();
+      if (!db.ollama.running) {
+        return errorResponse(
+          503,
+          'OLLAMA_NOT_RUNNING',
+          'Ollama가 실행 중이 아닙니다.',
+          'Ollama를 시작하세요.',
+        );
+      }
+      return HttpResponse.json({ started: true, variant: model.variant }, { status: 202 });
+    }),
+    http.delete('*/llm/models/:tag', ({ params }) => {
+      const model = fx.catalog.local_models.find((m) => m.tag === params.tag);
+      if (!model) return notFound();
+      db.ollama.models = db.ollama.models.filter(
+        (m) => m.name !== model.variant && m.name !== model.tag,
+      );
+      if (db.settings['llm.local_model'] === model.tag) db.settings['llm.local_model'] = '';
+      return new HttpResponse(null, { status: 204 });
+    }),
 
     // ---- 종목·감시 종목 ----
     http.get('*/symbols/search', ({ request }) => {

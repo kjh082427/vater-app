@@ -29,6 +29,14 @@ export type AnalysisDetail = S['AnalysisDetail'];
 export type BriefingItem = S['BriefingItem'];
 export type BriefingDetail = S['BriefingDetail'];
 export type CheckOut = S['CheckOut'];
+export type CatalogOut = S['CatalogOut'];
+export type CloudProvider = S['CloudProviderOut'];
+export type LocalModel = S['LocalModelOut'];
+export type HardwareOut = S['HardwareOut'];
+export type OllamaStatus = S['OllamaStatusOut'];
+export type KisTestResult = S['KisTestResult'];
+export type CloudTestOut = S['CloudTestOut'];
+export type PullStarted = S['PullStartedOut'];
 
 export type MarketCode = 'KR' | 'US';
 
@@ -66,14 +74,25 @@ export interface EventMap {
     id?: number;
     error?: ErrorBody | null;
   };
+  /** 모델 받기 진행. status가 done이면 variant, error면 code·message·hint. */
   'llm.pull': {
     tag: string;
     status: string;
     completed?: number | null;
     total?: number | null;
     percent?: number | null;
+    variant?: string;
+    code?: string;
+    message?: string;
+    hint?: string | null;
   };
-  'llm.install': { stage: 'download' | 'verify' | 'launch' | 'waiting' | 'done' | 'error' };
+  /** Ollama 설치 진행. error면 code·message. */
+  'llm.install': {
+    stage: 'download' | 'verify' | 'launch' | 'waiting' | 'done' | 'error';
+    code?: string;
+    message?: string;
+    hint?: string | null;
+  };
 }
 
 export type EventType = keyof EventMap;

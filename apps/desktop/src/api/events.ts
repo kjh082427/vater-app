@@ -116,7 +116,8 @@ export class EventHub {
 
   private async open(): Promise<void> {
     const attempt = ++this.attempt;
-    this.setStatus('connecting');
+    // 끊긴 뒤 다시 여는 중이면 disconnected를 유지한다(열릴 때까지 배너가 떠 있게)
+    if (this.failures === 0) this.setStatus('connecting');
     let url: string;
     this.resolving = true;
     try {
