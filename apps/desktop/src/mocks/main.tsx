@@ -7,6 +7,7 @@
  *   ?offline=1     감시 상태 offline(배너)
  *   ?empty=1       감시 종목·알림·분석·브리핑이 없는 빈 상태
  *   ?nokey=1       한투 앱키 없음(마법사로 보냄)
+ *   ?running=1     실행 중인 분석(#/analyses/40)과 진행 이벤트
  */
 import { getResponse, type RequestHandler } from 'msw';
 import { StrictMode } from 'react';
@@ -42,6 +43,26 @@ if (params.get('offline') === '1') {
   db.watchQuotes = db.watchQuotes.map((q) => ({ ...q, feed: 'offline' }));
 }
 if (params.get('nokey') === '1') db.secrets.KIS_APP_KEY = false;
+const running = params.get('running') === '1';
+if (running) {
+  const base = db.analyses[0];
+  if (base) {
+    db.analyses.push({
+      ...base,
+      id: 40,
+      code: '000660',
+      name: 'SK하이닉스',
+      status: 'running',
+      decision: null,
+      decision_ko: null,
+      decision_changed: false,
+      summary: null,
+      reports: null,
+      timings: null,
+      tokens: null,
+    });
+  }
+}
 
 const handlers = createHandlers(db) as RequestHandler[];
 
@@ -70,6 +91,20 @@ class MockEventSource implements EventSourceLike {
       }
       this.fire('open', new MessageEvent('open'));
       this.send('alerts.state', db.monitor);
+      if (running) {
+        this.send('analysis.progress', {
+          id: 40,
+          stage: 'analysts',
+          node: 'Market Analyst',
+          elapsed_sec: 412,
+        });
+        this.send('analysis.progress', {
+          id: 40,
+          stage: 'research',
+          node: 'Bull Researcher',
+          elapsed_sec: 530,
+        });
+      }
     }, 50);
   }
 

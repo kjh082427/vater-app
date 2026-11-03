@@ -5,6 +5,8 @@ import type { CheckOut } from '../api/types';
 import { AppShell, Banner, Button, Icon, SidebarNav, type NavItem } from '../design-system';
 import { ScreenHeader } from '../screens/common/ScreenHeader';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
+import { AnalysesScreen } from '../screens/analysis/AnalysesScreen';
+import { AnalysisDetailScreen } from '../screens/analysis/AnalysisDetailScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { formatClock } from '../screens/common/time';
 import styles from './app.module.css';
@@ -120,8 +122,9 @@ function screenFor(route: Route): ReactNode {
     case 'home':
       return <HomeScreen />;
     case 'analyses':
+      return <AnalysesScreen />;
     case 'analysis':
-      return <Placeholder title="분석" />;
+      return <AnalysisDetailScreen key={route.id} id={route.id} />;
     case 'alerts':
       return <AlertsScreen focus={null} />;
     case 'symbol':

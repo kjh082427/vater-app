@@ -14,7 +14,7 @@ import {
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
 import common from '../common/screen.module.css';
-import { formatDuration } from '../common/time';
+import { formatDay, formatDuration } from '../common/time';
 import styles from './home.module.css';
 
 interface Progress {
@@ -84,7 +84,7 @@ export function ActiveAnalyses() {
                   <b>{a.name ?? a.code}</b>
                 </a>
                 <span className={`${styles.itemMeta} vt-num`}>
-                  {`${marketLabel(a.market)} ${a.code} · 기준일 ${a.as_of}`}
+                  {`${marketLabel(a.market)} ${a.code} · 기준일 ${formatDay(a.as_of)}`}
                 </span>
               </span>
               <span className={`${styles.progress} vt-num`}>{progressText(a, progress[a.id])}</span>
