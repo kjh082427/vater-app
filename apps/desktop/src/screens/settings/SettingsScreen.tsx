@@ -189,87 +189,82 @@ export function SettingsScreen() {
           onRetry={settings.reload}
         />
       ) : null}
-      <div className={common.twoUp}>
-        <div className={common.twoUpGrid}>
-          <div className={common.column}>
-            <Section title="한국투자증권">
-              <KisSettings
+      {/* 한 열: 설정은 위에서 아래로 훑어 읽는다(두 열이면 AI 엔진 열만 길게 늘어진다) */}
+      <div className={`${common.stack} ${styles.page}`}>
+        <Section title="한국투자증권">
+          <KisSettings
+            secrets={secrets.data}
+            onSecretsSaved={secrets.reload}
+            settings={s}
+            save={settings.save}
+          />
+        </Section>
+        <Section title="AI 엔진">
+          <div className={styles.body}>
+            <Field label="프리셋" hint={PRESET_HINT[preset]}>
+              {(control) => (
+                <select
+                  {...control}
+                  className={form.control}
+                  value={preset}
+                  disabled={!s}
+                  onChange={(e) => void settings.save({ 'llm.preset': e.target.value })}
+                >
+                  {Object.entries(PRESET_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            {catalog.error ? (
+              <ApiErrorNotice error={catalog.error} title="모델 목록을 불러오지 못했습니다" />
+            ) : null}
+            <Section title="클라우드 AI" headingLevel={3}>
+              <CloudSettings
+                catalog={catalog.data}
                 secrets={secrets.data}
                 onSecretsSaved={secrets.reload}
                 settings={s}
                 save={settings.save}
               />
             </Section>
-            <Section title="AI 엔진">
-              <div className={styles.body}>
-                <Field label="프리셋" hint={PRESET_HINT[preset]}>
-                  {(control) => (
-                    <select
-                      {...control}
-                      className={form.control}
-                      value={preset}
-                      disabled={!s}
-                      onChange={(e) => void settings.save({ 'llm.preset': e.target.value })}
-                    >
-                      {Object.entries(PRESET_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </Field>
-                {catalog.error ? (
-                  <ApiErrorNotice error={catalog.error} title="모델 목록을 불러오지 못했습니다" />
-                ) : null}
-                <Section title="클라우드 AI" headingLevel={3}>
-                  <CloudSettings
-                    catalog={catalog.data}
-                    secrets={secrets.data}
-                    onSecretsSaved={secrets.reload}
-                    settings={s}
-                    save={settings.save}
-                  />
-                </Section>
-                <Section title="로컬 AI" headingLevel={3}>
-                  <LocalSettings catalog={catalog.data} settings={s} save={settings.save} />
-                </Section>
-              </div>
+            <Section title="로컬 AI" headingLevel={3}>
+              <LocalSettings catalog={catalog.data} settings={s} save={settings.save} />
             </Section>
           </div>
-          <div className={common.column}>
-            <Section title="분석 기본값">
-              <div className={styles.body}>
-                <Field
-                  label="토론 라운드"
-                  hint="강세·약세 토론과 리스크 토론을 몇 번 주고받을지. 늘리면 오래 걸립니다."
+        </Section>
+        <Section title="분석 기본값">
+          <div className={styles.body}>
+            <Field
+              label="토론 라운드"
+              hint="강세·약세 토론과 리스크 토론을 몇 번 주고받을지. 늘리면 오래 걸립니다."
+            >
+              {(control) => (
+                <select
+                  {...control}
+                  className={form.control}
+                  value={String(s?.['analysis.debate_rounds'] ?? 1)}
+                  disabled={!s}
+                  onChange={(e) =>
+                    void settings.save({ 'analysis.debate_rounds': Number(e.target.value) })
+                  }
                 >
-                  {(control) => (
-                    <select
-                      {...control}
-                      className={form.control}
-                      value={String(s?.['analysis.debate_rounds'] ?? 1)}
-                      disabled={!s}
-                      onChange={(e) =>
-                        void settings.save({ 'analysis.debate_rounds': Number(e.target.value) })
-                      }
-                    >
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <option key={n} value={n}>{`${n}회`}</option>
-                      ))}
-                    </select>
-                  )}
-                </Field>
-              </div>
-            </Section>
-            <Section title="브리핑">
-              <BriefingSettings settings={s} saveOrError={settings.saveOrError} />
-            </Section>
-            <Section title="일반">
-              <GeneralSettings settings={s} save={settings.save} />
-            </Section>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>{`${n}회`}</option>
+                  ))}
+                </select>
+              )}
+            </Field>
           </div>
-        </div>
+        </Section>
+        <Section title="브리핑">
+          <BriefingSettings settings={s} saveOrError={settings.saveOrError} />
+        </Section>
+        <Section title="일반">
+          <GeneralSettings settings={s} save={settings.save} />
+        </Section>
       </div>
     </>
   );

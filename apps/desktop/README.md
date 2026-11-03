@@ -1,0 +1,80 @@
+# Vater 데스크톱 UI (`apps/desktop`)
+
+React 18 + TypeScript 화면입니다. Tauri 셸(`src-tauri`, `shell/tauri` 브랜치)이 WebView2로 띄우고, 사이드카(`sidecar/`)와 HTTP·SSE로 이야기합니다. 설계 근거는 [스펙 9장](../../docs/superpowers/specs/2026-11-02-vater-mvp-design.md), 디자인 규칙은 저장소 루트 [`DESIGN.md`](../../DESIGN.md)입니다.
+
+## 폴더
+
+| 폴더                 | 하는 일                                                                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/design-system/` | 색·글꼴·부품·숫자 표기(`format/money.ts`). `ui/design-system` 브랜치가 맡는다                                                                                                                                                                                    |
+| `src/api/`           | 사이드카 계약: OpenAPI에서 만든 타입(`schema.d.ts`, `npm run gen:api`), 토큰을 붙이는 클라이언트(오류 `{code, message, hint}` → `ApiError`, 재시작 뒤 새 포트로 한 번 더), SSE 허브(`?token=`, 끊기면 다시 연결), `useResource`(SSE가 다시 열리면 다시 불러오기) |
+| `src/platform/`      | 셸 어댑터(스펙 9-3): Tauri(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`) / 브라우저(`VITE_SIDECAR_URL`, `VITE_SIDECAR_TOKEN`)                                                                                                            |
+| `src/app/`           | 해시 라우터(알림 클릭 경로와 같음), 앱 틀(사이드바, 상태 표시줄, 오프라인·연결 끊김 배너, 마법사로 보내기)                                                                                                                                                       |
+| `src/screens/`       | 화면: `home`, `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `common`(입력 칸, 종목 검색, 시각 표기)                                                                                                                        |
+| `src/mocks/`         | 사이드카 흉내(MSW 처리기와 예시 자료). 테스트와 견본 화면 `mock.html`이 함께 쓴다                                                                                                                                                                                |
+| `e2e/`               | 흐름 테스트(Playwright, 실제 개발 모드 사이드카)                                                                                                                                                                                                                 |
+
+## 실행
+
+```bash
+npm ci
+npm run dev                 # http://localhost:5173
+```
+
+- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`
+- **실제 사이드카와**: 사이드카를 `VATER_DEV=1`로 띄우고(`sidecar/README.md`), 출력된 포트와 토큰을 넘긴다. 개발 모드 사이드카는 `http://localhost:5173` 출처만 CORS로 허용한다.
+  ```bash
+  VITE_SIDECAR_URL=http://127.0.0.1:<포트> VITE_SIDECAR_TOKEN=<토큰> npm run dev
+  ```
+- 디자인 시스템 견본: `http://localhost:5173/gallery.html`
+
+## 검사
+
+```bash
+npm test            # Vitest + Testing Library + MSW (화면별 정상·빈 상태·오류, SSE, 사이드카 재시작)
+npm run lint        # ESLint(jsx-a11y strict) + Prettier
+npm run typecheck
+npm run build
+npm run e2e         # 흐름 테스트: 아래
+```
+
+### 흐름 테스트 (`npm run e2e`)
+
+`e2e/stack.ts`가 실제 사이드카와 Vite 개발 서버를 띄운다. 사이드카는 임시 데이터 폴더, `VATER_DEV=1`, `VATER_BACKGROUND_JOBS=0`, `VATER_SECRET_BACKEND=envfile`(임시 env 파일)로 돌고, 종목은 `e2e/seed.py`가 미리 심는다. 실제 한투·LLM 키는 쓰지 않는다(가짜 키만).
+
+- 필요한 것: `uv`(사이드카 실행), Chromium(`npx playwright install chromium`, 사용자 캐시 `~/.cache/ms-playwright`)
+- 확인하는 것: CORS(`http://localhost:5173`), 진짜 `EventSource`와 `?token=`, 이름 있는 SSE 이벤트(`alerts.state`), 실제 오류 본문(422 `ALERT_RULE_INVALID`·`SETTING_INVALID`, 한투 연결 테스트 실패), 쓰기 전용 키
+- 흐름: 마법사(키 없음 → 가짜 키 저장 → 연결 테스트 실패 메시지 → 다음으로 못 감), 감시 종목·규칙 만들기 → 다시 불러와도 남음·이력 빈 상태, SSE로 감시 일시 중지가 화면에 반영, 브리핑 목록 빈 상태, 설정 저장·검증 오류·클라우드 키
+- 마법사 연결 테스트는 가짜 키로 한국투자증권 토큰 API를 한 번 부른다(인터넷이 없으면 "연결할 수 없습니다" 문구로 같은 검사가 통과한다)
+- 화면 캡처(배율 1.5): `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`
+- CI에는 아직 넣지 않았다(Ubuntu 러너에 uv·사이드카 의존성과 Chromium이 필요)
+
+## 화면 캡처
+
+`docs/design/screens/shots/`: 화면별 1280×800·1024×600, 홈·마법사는 배율 1.5. 견본 자료(예시 데이터)로 찍었다.
+
+## 남은 일
+
+`ui/screens` 범위 밖이라 고치지 않고 적어 둔 것입니다. 해당 영역 브랜치에서 다룹니다.
+
+**사이드카 API (`core/*`)**
+
+- `GET /alerts/kinds`에 종류 이름과 방향 선택지가 없다. 화면이 `screens/alerts/kinds.ts`에 옮겨 적었다(종류가 늘면 같이 고쳐야 함).
+- `GET /alerts/events`에 종목·종류 필터가 없다(`limit`만). 화면은 최근 200건 안에서 거른다.
+- 분석 완료·실패 알림 이력(`AlertEventOut`, `rule_id = null`)에 분석 id·종목이 없어 이력에서 결과로 이동할 수 없다.
+- `GET /alerts/status`에 휴장일·다음 개장 시각이 없어, 상태 표시줄은 장중일 때 마감 시각만 보인다.
+- `GET /llm/catalog`에 가격표가 없어 분석 실행 정보의 "예상 비용"(스펙 5장)을 보일 수 없다.
+- 설정의 "분석 기본값: 애널리스트 고르기"(스펙 9-2)에 해당하는 설정 키가 없다.
+- 분석 보고서는 Markdown 원문이라 화면은 줄바꿈만 살려 그대로 보인다(해석기 없음).
+
+**셸 (`shell/tauri`)**
+
+- 로그 폴더 열기, 업데이트 확인 커맨드가 계약에 없다. 사이드카 실행 실패 배너와 설정 > 일반에 해당 버튼이 없다.
+- 화면은 계약(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`)대로 짰고 흉내로만 테스트했다. 실제 WebView2에서 확인해야 한다.
+
+**디자인 시스템 (`ui/design-system-*`)**
+
+- `FeedStatus`에 `idle`(장중이지만 실시간 규칙이 없어 감시하지 않음) 상태가 없다. 화면이 점과 글자로 따로 짰다(`screens/common/quotes.tsx`).
+- `DataTable`은 행이 0개일 때 숫자 열 머리가 어긋난다. 화면은 빈 표 대신 한 줄 안내를 보인다.
+- 입력 칸·선택·체크 상자·진행 막대 부품이 없다. DESIGN.md "Inputs / Fields" 규칙대로 `screens/common/Field.tsx`·`form.module.css`에 짰다. DESIGN.md의 그 절은 아직 비어 있다.
+- `format/money.ts`에 부호 없는 억 단위 금액(거래대금) 표기가 없다. 브리핑 상위 종목은 열 머리에 "(억 원)"을 달고 `formatNumber`로 보인다.

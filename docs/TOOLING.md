@@ -20,6 +20,8 @@
 | 2026-11-03 | `@tauri-apps/api` | 2.12.4 (2026-10-14 배포) | `apps/desktop` dependencies | 화면이 셸 커맨드·이벤트를 부르는 통로(`src/platform/`만 씀) | `ui/screens`. `npm install --save-exact --before=2026-10-20` |
 | 2026-11-03 | `openapi-typescript` | 7.13.0 (2026-02-11 배포) | `apps/desktop` devDependencies | 사이드카 OpenAPI 스냅샷 → `src/api/schema.d.ts` (`npm run gen:api`) | `ui/screens`. 피어 의존성이 TypeScript 5라서 `package.json`의 `overrides`로 앱의 TypeScript 6.0.3을 쓰게 함. 같은지 `schema.test.ts`가 검사 |
 | 2026-11-03 | `msw` (Mock Service Worker) | 3.0.3 (2026-10-10 배포) | `apps/desktop` devDependencies | 테스트와 견본 화면(`mock.html`)의 사이드카 흉내(스펙 10장) | `ui/screens`. 3.x는 `listen({ onUnhandledFrame })`. 서비스 워커는 쓰지 않고 `getResponse`로 처리기를 직접 부름 |
+| 2026-11-03 | `@playwright/test` | 1.64.1 (2026-10-14 배포) | `apps/desktop` devDependencies | 화면 흐름 테스트(`npm run e2e`, 실제 개발 모드 사이드카) | `ui/screens`. `npm install --save-exact --before=2026-10-20` |
+| 2026-11-03 | Playwright Chromium (Chrome Headless Shell 156.0.8078.4, chromium-1248) | playwright 1.64.1가 고른 빌드 | `~/.cache/ms-playwright` (사용자 캐시, 저장소 밖) | 흐름 테스트와 impeccable 검출기(`IMPECCABLE_BROWSER`)의 브라우저 | `npx playwright install chromium`. WSL에서 바로 실행됨(시스템 라이브러리 추가 설치 없음) |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |
