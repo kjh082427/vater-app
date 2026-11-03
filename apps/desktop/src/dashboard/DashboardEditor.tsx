@@ -165,6 +165,7 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
           ) : null}
           <SplitLayout
             className={styles.canvas}
+            fitToArea
             root={draft.layout.root}
             mins={mins}
             gap={GAP}

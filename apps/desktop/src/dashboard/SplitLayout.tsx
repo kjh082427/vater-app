@@ -40,8 +40,13 @@ export interface SplitLayoutProps {
   /** 경계선이 최소 크기를 재는 영역. 없으면 그린 영역. */
   limitArea?: Size;
   className?: string;
-  /** 영역 크기를 바깥에서 줄 때(편집 화면의 캔버스). */
+  /** 영역 크기를 바깥에서 줄 때. */
   area?: Size;
+  /**
+   * 편집 화면의 캔버스: 실제 영역보다 좁은 미리보기라 최소 크기로 늘리지 않고 영역에 맞춰 그린다.
+   * 최소 크기는 경계선이 limitArea(실제 영역)로 지킨다.
+   */
+  fitToArea?: boolean;
 }
 
 export function SplitLayout({
@@ -53,10 +58,11 @@ export function SplitLayout({
   limitArea,
   className,
   area,
+  fitToArea = false,
 }: SplitLayoutProps) {
   const [ref, measured] = useAreaSize();
   const outer = area ?? measured;
-  const need = requiredArea(root, mins, gap);
+  const need = fitToArea ? { w: 0, h: 0 } : requiredArea(root, mins, gap);
   const inner = { w: Math.max(outer.w, need.w), h: Math.max(outer.h, need.h) };
   const rects = computeRects(root, inner, gap);
   const scrolls = inner.w > outer.w + 0.5 || inner.h > outer.h + 0.5;

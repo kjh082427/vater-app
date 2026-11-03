@@ -88,6 +88,24 @@ describe('SplitLayout', () => {
   });
 });
 
+describe('편집 캔버스(fitToArea)', () => {
+  it('최소 합보다 작아도 영역에 맞춰 그린다(스크롤 없음)', () => {
+    const small = { w: 500, h: 150 };
+    render(
+      <SplitLayout
+        fitToArea
+        root={templateRoot('cols-2')}
+        mins={MINS}
+        gap={GAP}
+        area={small}
+        renderPanel={() => null}
+      />,
+    );
+    expect(screen.queryByRole('group', { name: /스크롤/ })).not.toBeInTheDocument();
+    expect(cell(1)?.style.width).toBe(px(244));
+  });
+});
+
 describe('경계선', () => {
   it('role="separator", 방향, aria-valuenow(왼쪽 칸 %)', () => {
     render(<Harness initial={templateRoot('cols-2')} />);
