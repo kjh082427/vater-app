@@ -67,3 +67,27 @@ describe('PriceChange: 변화량과 등락률을 한 덩어리로', () => {
     expect(container.firstElementChild).toHaveAttribute('data-direction', 'down');
   });
 });
+
+describe('tone: 시세 방향이 아닌 부호 숫자는 먹(neutral)', () => {
+  it('기본은 direction(방향 색)', () => {
+    render(<SignedNumber value={1.71} format="percent" />);
+    expect(screen.getByText('+1.71%')).toHaveAttribute('data-tone', 'direction');
+  });
+
+  it('neutral: 부호와 고정폭 숫자는 그대로, 색만 먹(예: 목표가 괴리율)', () => {
+    render(<SignedNumber value={-3.2} format="percent" tone="neutral" />);
+    const el = screen.getByText('−3.20%');
+    expect(el).toHaveAttribute('data-tone', 'neutral');
+    expect(el).toHaveClass('vt-num');
+  });
+
+  it('PriceChange도 같다: 기본 direction, neutral이면 먹', () => {
+    const { container, rerender } = render(
+      <PriceChange change={1200} percent={1.71} currency="KRW" />,
+    );
+    expect(container.firstElementChild).toHaveAttribute('data-tone', 'direction');
+    rerender(<PriceChange change={1200} percent={1.71} currency="KRW" tone="neutral" />);
+    expect(container.firstElementChild).toHaveAttribute('data-tone', 'neutral');
+    expect(container.firstElementChild).toHaveTextContent('+1,200 (+1.71%)');
+  });
+});

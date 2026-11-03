@@ -288,6 +288,13 @@ function Numbers() {
             <SignedNumber value={null} format="percent" />
           </div>
         </Row>
+        <Row label='tone="neutral": 시세 방향이 아닌 부호 숫자(목표가 괴리율)'>
+          <div className={styles.inline}>
+            <SignedNumber value={-3.2} format="percent" tone="neutral" />
+            <SignedNumber value={12.4} format="percent" tone="neutral" />
+            <SignedNumber value={0} format="percent" tone="neutral" />
+          </div>
+        </Row>
         <Row label="PriceChange: 한 덩어리">
           <div className={styles.inline}>
             {watchlist.map((r) => (
