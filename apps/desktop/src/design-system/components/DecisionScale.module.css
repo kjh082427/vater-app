@@ -1,0 +1,85 @@
+/* 의견 눈금: 5칸 중 한 칸만 채운다. 진하게 채운 버튼 모양을 피해서 주문 버튼처럼 보이지 않게 한다 */
+.scale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.track {
+  display: inline-grid;
+  gap: var(--space-0-5);
+}
+
+.bar {
+  display: inline-grid;
+  grid-template-columns: repeat(5, var(--size-scale-cell));
+  gap: var(--space-0-5);
+}
+
+.cell {
+  height: var(--size-scale-height);
+  background: var(--color-line);
+}
+
+.scale[data-tone='up'] {
+  color: var(--color-up-ink);
+}
+
+.scale[data-tone='up'] .cell[data-active='true'] {
+  background: var(--color-up);
+}
+
+.scale[data-tone='neutral'] {
+  color: var(--color-ink);
+}
+
+.scale[data-tone='neutral'] .cell[data-active='true'] {
+  background: var(--color-ink);
+}
+
+.scale[data-tone='down'] {
+  color: var(--color-down-ink);
+}
+
+.scale[data-tone='down'] .cell[data-active='true'] {
+  background: var(--color-down);
+}
+
+/* 검토 필요: 눈금 밖. 칸을 비우고 황토 테두리만 */
+.scale[data-tone='caution'] {
+  color: var(--color-caution-ink);
+}
+
+.scale[data-tone='caution'] .cell {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-caution);
+}
+
+/* 큰 크기: 분석 결과 머리. 양 끝에 매도·매수를 적어 눈금의 방향을 알려 준다 */
+.scale[data-size='lg'] {
+  gap: var(--space-3);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+}
+
+.scale[data-size='lg'] .bar {
+  grid-template-columns: repeat(5, calc(var(--size-scale-cell) * 2.4));
+  gap: var(--space-1);
+}
+
+.scale[data-size='lg'] .cell {
+  height: calc(var(--size-scale-height) * 1.5);
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-3);
+}
