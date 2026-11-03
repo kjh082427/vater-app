@@ -48,7 +48,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNjA5QUM4NDhFMjk1QTQKUldTa2xlSkl5SnBnODNiTlZOTURRaElvZjk1UERtR2xEM0ZvYld0NDc3WFp0ODJDZnZJTXNoZUcK",
       "endpoints": [
         "https://github.com/kjh082427/vater-releases/releases/latest/download/latest.json"
       ],
