@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useServices } from '../../api/services';
 import { Button } from '../../design-system';
 import type { UpdateInfo } from '../../platform';
@@ -15,6 +15,20 @@ export function UpdateRow() {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [busy, setBusy] = useState<'check' | 'install' | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // 알림이나 배너로 들어왔을 때 [지금 설치]가 바로 보이게 조용히 확인한다. 새 버전일 때만 보이고 실패는 숨긴다.
+  useEffect(() => {
+    let alive = true;
+    platform.checkUpdate().then(
+      (found) => {
+        if (alive && found.state === 'available') setInfo((prev) => prev ?? found);
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [platform]);
 
   async function check() {
     setBusy('check');

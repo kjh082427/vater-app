@@ -56,7 +56,7 @@ jobs:
           if ($publish -and [string]::IsNullOrWhiteSpace($pubkey)) {
             throw 'tauri.conf.json의 plugins.updater.pubkey가 비어 있습니다. 공개 키 없이 낸 앱은 업데이트를 받지 못합니다.'
           }
-          if (-not $publish) { 'Signing key or RELEASES_TOKEN missing: building the installer only, nothing is uploaded.' }
+          if (-not $publish) { '::warning::Signing key or RELEASES_TOKEN missing: building the installer only, nothing is uploaded.' }
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$($env:TAG)" >> $env:GITHUB_OUTPUT
           "publish=$($publish.ToString().ToLower())" >> $env:GITHUB_OUTPUT

@@ -4,6 +4,11 @@ name: release-acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      https_tag:
+        description: "R8: 이 공개 릴리스로 실제 HTTPS 업데이트를 확인한다 (예: v0.1.0-rc.1). 비우면 건너뜀"
+        required: false
+        default: ""
   push:
     branches: ["infra/release*"]
     paths:
@@ -25,6 +30,72 @@ env:
   NEW_VERSION: "0.1.2"
 
 jobs:
+  # 비밀값이 있어야 도는 올리기 스크립트를 가짜 gh로 확인한다
+  publish-script:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - name: P1~P5
+        run: ./apps/desktop/src-tauri/packaging/acceptance-publish.ps1
+
+  # R8: 실제 공개 릴리스의 latest.json을 HTTPS로 받아 실제 공개 키로 검증하고 설치한다. 비밀값은 쓰지 않는다
+  real-https:
+    if: ${{ inputs.https_tag != '' }}
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          version: "0.13.6"
+      - run: uv python install 3.13.18
+      - name: Sidecar PyInstaller onedir
+        run: ./apps/desktop/src-tauri/packaging/build-sidecar.ps1
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: npm ci
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: 구버전 빌드 (주소만 이 릴리스로)
+        env:
+          HTTPS_TAG: ${{ inputs.https_tag }}
+        run: |
+          python apps/desktop/src-tauri/packaging/check-versions.py --set 0.0.9
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $conf = Join-Path $env:RUNNER_TEMP 'https.conf.json'
+          @{ plugins = @{ updater = @{ endpoints = @("https://github.com/kjh082427/vater-releases/releases/download/$($env:HTTPS_TAG)/latest.json") } } } |
+            ConvertTo-Json -Depth 6 | Set-Content $conf -Encoding utf8NoBOM
+          Push-Location apps/desktop
+          npx --yes $env:TAURI_CLI build --bundles nsis --features e2e-auto-update --config $conf -- --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Pop-Location
+      - name: R8
+        env:
+          HTTPS_TAG: ${{ inputs.https_tag }}
+        run: >
+          ./apps/desktop/src-tauri/packaging/acceptance-update.ps1
+          -RealRelease
+          -OldDir apps/desktop/src-tauri/target/release/bundle/nsis
+          -OldVersion 0.0.9
+          -NewVersion ($env:HTTPS_TAG.Substring(1))
+
   windows:
     runs-on: windows-latest
     timeout-minutes: 90

@@ -3,11 +3,13 @@
 #   R5 서버에 연결 못함 → 구버전 그대로, 앱·사이드카 정상
 #   R4 서명이 틀림      → 설치하지 않음, 구버전 그대로, 앱·사이드카 정상
 #   R3 올바른 업데이트  → 새 버전으로 바뀌고 앱과 사이드카가 다시 뜸
+# -RealRelease: R8. 실제 공개 릴리스에서 HTTPS로 받는다(R5·R4와 로컬 서버는 건너뜀).
 param(
     [Parameter(Mandatory)] [string] $OldDir,
-    [Parameter(Mandatory)] [string] $NewDir,
+    [string] $NewDir,
     [Parameter(Mandatory)] [string] $OldVersion,
-    [Parameter(Mandatory)] [string] $NewVersion
+    [Parameter(Mandatory)] [string] $NewVersion,
+    [switch] $RealRelease
 )
 $ErrorActionPreference = 'Stop'
 $port = 8765
@@ -59,10 +61,12 @@ function ExpectNoChange($label) {
 $serve = Join-Path ([IO.Path]::GetTempPath()) ("vater-update-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $serve | Out-Null
 $oldExe = Get-ChildItem $OldDir -Filter '*-setup.exe' | Select-Object -First 1
-$newExe = Get-ChildItem $NewDir -Filter '*-setup.exe' | Select-Object -First 1
-$newSig = (Get-Content "$($newExe.FullName).sig" -Raw).Trim()
-$oldSig = (Get-Content "$($oldExe.FullName).sig" -Raw).Trim()
-Copy-Item $newExe.FullName $serve
+if (-not $RealRelease) {
+    $newExe = Get-ChildItem $NewDir -Filter '*-setup.exe' | Select-Object -First 1
+    $newSig = (Get-Content "$($newExe.FullName).sig" -Raw).Trim()
+    $oldSig = (Get-Content "$($oldExe.FullName).sig" -Raw).Trim()
+    Copy-Item $newExe.FullName $serve
+}
 function WriteLatest($signature) {
     @{
         version   = $NewVersion
@@ -83,18 +87,23 @@ try {
     "installed $v at $($app.FullName)"
     if ($v -ne $OldVersion) { Fail "expected $OldVersion, got $v" }
 
-    Step 'R5 업데이트 서버에 연결 못함'
-    ExpectNoChange 'R5'
+    if (-not $RealRelease) {
+        Step 'R5 업데이트 서버에 연결 못함'
+        ExpectNoChange 'R5'
 
-    $server = Start-Process -FilePath 'python' -ArgumentList '-m', 'http.server', $port, '--bind', '127.0.0.1', '--directory', $serve -PassThru -WindowStyle Hidden
-    Start-Sleep -Seconds 2
+        $server = Start-Process -FilePath 'python' -ArgumentList '-m', 'http.server', $port, '--bind', '127.0.0.1', '--directory', $serve -PassThru -WindowStyle Hidden
+        Start-Sleep -Seconds 2
 
-    Step 'R4 서명이 틀린 latest.json (다른 파일의 서명)'
-    WriteLatest $oldSig
-    ExpectNoChange 'R4'
+        Step 'R4 서명이 틀린 latest.json (다른 파일의 서명)'
+        WriteLatest $oldSig
+        ExpectNoChange 'R4'
 
-    Step 'R3 올바른 업데이트'
-    WriteLatest $newSig
+        Step 'R3 올바른 업데이트'
+        WriteLatest $newSig
+    }
+    else {
+        Step 'R8 실제 공개 릴리스에서 HTTPS로 업데이트'
+    }
     Start-Process -FilePath (Installed).FullName | Out-Null
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $done = $false
@@ -110,7 +119,7 @@ try {
     if (-not $core) { Fail 'sidecar did not come back after the update' }
     if (-not (Get-Process -Name 'Vater' -ErrorAction SilentlyContinue)) { Fail 'Vater.exe did not come back' }
     "new version running: sidecar pid $core"
-    "`nR3 R4 R5 passed"
+    "`n$(if ($RealRelease) { 'R8' } else { 'R3 R4 R5' }) passed"
 }
 finally {
     if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }

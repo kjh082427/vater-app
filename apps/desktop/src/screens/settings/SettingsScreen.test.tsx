@@ -449,7 +449,26 @@ describe('분석·브리핑·일반', () => {
     expect(button).toBeEnabled();
   });
 
-  it('새 버전: [지금 설치]가 설치를 부르고, 설치 중에는 막으며 안내한다. 실패하면 그 문구', async () => {
+  it('설정을 열면 조용히 확인해서, 새 버전이면 누르지 않아도 [지금 설치]가 보인다', async () => {
+    window.location.hash = '#/settings';
+    renderWithServices(<App />, { update: { state: 'available', version: '0.3.0' } });
+    const part = await waitFor(() => region('일반'));
+    expect(await within(part).findByRole('button', { name: '지금 설치' })).toBeInTheDocument();
+  });
+
+  it('설정을 열 때의 조용한 확인은 실패해도, 최신이어도 아무것도 보이지 않는다', async () => {
+    window.location.hash = '#/settings';
+    renderWithServices(<App />, { update: new Error('연결할 수 없습니다') });
+    const part = await waitFor(() => region('일반'));
+    await within(part).findByRole('button', { name: '업데이트 확인' });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(within(part).queryByText(/연결할 수 없습니다/)).not.toBeInTheDocument();
+    expect(within(part).queryByText('최신 버전입니다.')).not.toBeInTheDocument();
+  });
+
+  it('새 버전: [지금 설치]가 설치를 부르고 안내한다. 실패하면 그 문구', async () => {
     const view = renderSettings();
     view.shell.setUpdate({ state: 'available', version: '0.3.0', notes: '알림 수정' });
     const part = await waitFor(() => region('일반'));
