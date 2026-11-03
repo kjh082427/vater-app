@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 임시 아이콘: DESIGN.md의 ink(#141414) 사각형에 on-ink(#ffffff) "V" -->
+  <rect width="1024" height="1024" fill="#141414"/>
+  <polygon points="232,232 372,232 512,648 652,232 792,232 584,800 440,800" fill="#ffffff"/>
+</svg>

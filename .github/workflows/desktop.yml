@@ -1,0 +1,92 @@
+# Windows에서 셸이 컴파일되고 설치 파일이 만들어지는지 확인한다 (shell/tauri 계획서 Task 6).
+# 사이드카 PyInstaller onedir → 실행 확인 → Tauri NSIS 빌드 → 설치 파일을 산출물로 올린다 → 설치해서 실행 확인.
+# 릴리스(서명·업데이트·배포)는 infra/release에서 한다.
+name: desktop
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "sidecar/**"
+      - ".github/workflows/desktop.yml"
+  push:
+    branches: [main, "shell/**", "infra/**"]
+    paths:
+      - "apps/desktop/**"
+      - "sidecar/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  TAURI_CLI: "@tauri-apps/cli@2.12.3"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------- 사이드카: PyInstaller onedir와 실행 확인 ----------
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.13
+      - name: Sidecar PyInstaller onedir
+        run: ./apps/desktop/src-tauri/packaging/build-sidecar.ps1
+      - name: Sidecar smoke (ready → /health 200 → /shutdown → exit 0)
+        run: ./apps/desktop/src-tauri/packaging/smoke-sidecar.ps1
+
+      # ---------- 셸: Rust 검사와 Tauri NSIS 빌드 ----------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: npm ci
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal --component clippy
+          rustup default $env:RUST_TOOLCHAIN
+          rustc --version
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: cargo clippy (Windows)
+        working-directory: apps/desktop/src-tauri
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: cargo test (Windows, 가짜 사이드카로 실제 프로세스 확인)
+        working-directory: apps/desktop/src-tauri
+        env:
+          VATER_TEST_PYTHON: python
+        run: cargo test --locked --workspace
+      - name: Tauri build (NSIS)
+        working-directory: apps/desktop
+        run: npx --yes $env:TAURI_CLI build --bundles nsis -- --locked
+      - name: Sizes
+        run: |
+          $bundle = 'apps/desktop/src-tauri/target/release/bundle/nsis'
+          Get-ChildItem $bundle -Filter '*.exe' | ForEach-Object { 'installer {0}: {1:N1} MB' -f $_.Name, ($_.Length / 1MB) }
+          'Vater.exe: {0:N1} MB' -f ((Get-Item 'apps/desktop/src-tauri/target/release/Vater.exe').Length / 1MB)
+          'vater-core onedir: {0:N1} MB' -f ((Get-ChildItem sidecar/dist/vater-core -Recurse | Measure-Object Length -Sum).Sum / 1MB)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vater-windows-installer
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      # ---------- 설치해서 실행 확인 ----------
+      - name: Installed app smoke (Vater.exe → bundled vater-core.exe listening)
+        run: ./apps/desktop/src-tauri/packaging/smoke-installed.ps1

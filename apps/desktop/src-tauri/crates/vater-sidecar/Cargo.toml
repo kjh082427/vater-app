@@ -1,0 +1,20 @@
+[package]
+name = "vater-sidecar"
+version = "0.1.0"
+edition = "2024"
+description = "Vater 셸의 사이드카 실행·감시·재시작·종료 (Tauri에 의존하지 않는 순수 로직)"
+publish = false
+
+# 버전은 배포된 지 2주가 지난 것으로 고정한다 (shell/tauri 계획서 Tech Stack).
+[dependencies]
+serde_json = "=1.0.154"
+rand = "=0.10.3"
+reqwest = { version = "=0.13.5", default-features = false }
+tokio = { version = "=1.53.3", features = ["io-util", "macros", "process", "rt", "sync", "time"] }
+
+# Windows 작업 개체(사이드카를 셸과 함께 끝나게 묶는다). 이미 Cargo.lock에 있는 버전(2025-10-06 배포).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[dev-dependencies]
+tokio = { version = "=1.53.3", features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "sync", "time"] }
