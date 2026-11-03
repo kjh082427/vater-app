@@ -3,8 +3,8 @@ import { cx } from '../internal/cx';
 import styles from './Icon.module.css';
 
 /*
- * 직접 그린 아이콘(24 격자, 선 1.5, 둥근 끝). 늘 글자 옆에 두는 장식이라 aria-hidden이다.
- * 아이콘만 있는 버튼은 만들지 않는다.
+ * 직접 그린 아이콘(24 격자, 선 1.5, 둥근 끝). 늘 장식이라 aria-hidden이다.
+ * 아이콘만 있는 버튼은 Button variant="icon" + aria-label로만 만든다(칸 머리의 ⋯, 닫기).
  */
 const PATHS = {
   home: <path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" />,
@@ -41,6 +41,16 @@ const PATHS = {
       <path d="M19.5 4.5v4h-4" />
     </>
   ),
+  more: (
+    <>
+      <circle cx="5.5" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="18.5" cy="12" r="1.25" fill="currentColor" />
+    </>
+  ),
+  'chevron-down': <path d="m7 10 5 5 5-5" />,
+  check: <path d="m5.5 12.5 4 4 9-9" />,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

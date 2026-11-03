@@ -1,0 +1,61 @@
+/* 칸 카드. 칸 배치(ui/dashboard)가 높이를 정하면 본문이 남은 높이를 채운다 */
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2-5) var(--space-2) var(--space-card);
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-0-5);
+}
+
+.title {
+  overflow: hidden;
+  font-size: var(--text-card-title);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--color-ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.body[data-padded='true'] {
+  padding: 0 var(--space-card) var(--space-card);
+}

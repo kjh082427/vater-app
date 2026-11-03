@@ -240,10 +240,8 @@ code {
 }
 
 /* 표 안의 조합 */
-.stock {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
+.stock > * + * {
+  margin-left: var(--space-2);
 }
 
 .stock b {
@@ -390,4 +388,21 @@ code {
   display: grid;
   gap: var(--space-2);
   padding-left: var(--space-5);
+}
+
+/* 입력 견본 */
+.toggles {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 16rem));
+  gap: var(--space-4);
+}
+
+.progressDemo {
+  width: 12rem;
 }

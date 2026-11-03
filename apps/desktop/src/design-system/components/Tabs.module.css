@@ -52,6 +52,7 @@
 .list[data-variant='segment'] {
   display: inline-flex;
   flex: none;
+  width: fit-content;
   gap: var(--space-0-5);
   padding: var(--space-0-5);
   border: var(--rule-hair) solid var(--color-line);

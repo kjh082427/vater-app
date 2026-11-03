@@ -1,0 +1,57 @@
+/* 뒤 바탕: 화면 전체를 덮고 대화 상자를 가운데 둔다 */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-scrim);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--size-dialog), 100%);
+  max-height: calc(100vh - var(--space-8));
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-pop);
+  background: var(--color-card);
+  box-shadow: var(--shadow-pop);
+}
+
+.dialog:focus-visible {
+  outline: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) var(--space-2) var(--space-5);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-card-title);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
+}
+
+.body {
+  min-height: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  overflow-y: auto;
+  font-size: var(--text-md);
+  line-height: var(--leading-lg);
+  color: var(--color-ink-2);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: var(--rule-hair) solid var(--color-rule);
+}

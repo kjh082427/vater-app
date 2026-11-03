@@ -123,6 +123,23 @@ describe('DataTable', () => {
     expect(cell).toHaveAttribute('colspan', String(columns.length));
   });
 
+  it('truncate 열은 남는 너비를 차지하고 넘치면 말줄임한다(머리와 칸 모두 표시)', () => {
+    const cols: Column<Row>[] = [
+      { key: 'name', header: '종목', truncate: true, cell: (r) => r.name },
+      { key: 'close', header: '종가', numeric: true, cell: (r) => r.code },
+    ];
+    render(<DataTable caption="지수" columns={cols} rows={rows} rowKey={(r) => r.code} />);
+    expect(screen.getByRole('columnheader', { name: '종목' })).toHaveAttribute(
+      'data-truncate',
+      'true',
+    );
+    expect(screen.getByRole('columnheader', { name: '종가' })).not.toHaveAttribute('data-truncate');
+    const cell = screen.getByRole('cell', { name: 'NAVER' });
+    expect(cell).toHaveAttribute('data-truncate', 'true');
+    // 잘린 글자도 마우스를 올리면 다 보이게
+    expect(cell).toHaveAttribute('title', 'NAVER');
+  });
+
   it('행이 있으면 data-empty가 없다', () => {
     const { container } = render(
       <DataTable caption="지수" columns={columns} rows={rows} rowKey={(r) => r.code} />,

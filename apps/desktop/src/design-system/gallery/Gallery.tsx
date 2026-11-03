@@ -3,16 +3,23 @@ import { AiText } from '../components/AiText';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/Button';
 import { DataTable, type Column } from '../components/DataTable';
+import { Dialog } from '../components/Dialog';
 import { DECISION_LABEL, DecisionScale, type Decision } from '../components/DecisionScale';
 import { Disclaimer } from '../components/Disclaimer';
 import { FeedStatus } from '../components/FeedStatus';
 import { Icon } from '../components/Icon';
 import { MarketState } from '../components/MarketState';
+import { Menu } from '../components/Menu';
+import { ProgressBar } from '../components/ProgressBar';
 import { Section } from '../components/Section';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { Select } from '../components/Select';
 import { SidebarNav } from '../components/SidebarNav';
 import { PriceChange, SignedNumber } from '../components/SignedNumber';
 import { Sparkline } from '../components/Sparkline';
 import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs';
+import { TextField } from '../components/TextField';
+import { Toggle } from '../components/Toggle';
 import {
   formatEokChange,
   formatNumber,
@@ -447,6 +454,112 @@ const AGENT_TABS: [string, string, string][] = [
   ['risk', '리스크', '환율이 크게 움직이면 결론을 다시 봐야 한다고 정리했습니다.'],
 ];
 
+function InputsDemo() {
+  const [market, setMarket] = useState<'all' | 'kr' | 'us' | 'jp'>('kr');
+  const [range, setRange] = useState<'1d' | '5d' | '1m' | '1y'>('1d');
+  const [kpiRow, setKpiRow] = useState(true);
+  const [name, setName] = useState('국내 장중');
+  const [dialog, setDialog] = useState(false);
+  return (
+    <Section
+      title="입력과 메뉴"
+      meta="키보드만으로 열기·이동·선택·Esc. 막힌 항목은 숨기지 않고 이유를 보인다"
+    >
+      <div className={styles.rows}>
+        <Row label="Select: 막힌 항목은 건너뛰고 이유를 보인다">
+          <Select
+            label="시장"
+            value={market}
+            onChange={setMarket}
+            options={[
+              { value: 'all', label: '전체' },
+              { value: 'kr', label: '국내 전체' },
+              { value: 'jp', label: '일본', disabled: true, reason: '이 버전에서 지원하지 않음' },
+              { value: 'us', label: '미국' },
+            ]}
+          />
+        </Row>
+        <Row label="Menu: 칸 머리의 ⋯">
+          <Menu
+            align="start"
+            trigger={<Button variant="icon" aria-label="칸 메뉴" icon={<Icon name="more" />} />}
+            items={[
+              { id: 'change', label: '내용 바꾸기', onSelect: () => undefined },
+              { id: 'refresh', label: '새로 고침', onSelect: () => undefined },
+              {
+                id: 'remove',
+                label: '칸 지우기',
+                onSelect: () => undefined,
+                disabled: true,
+                reason: '칸이 하나뿐이라 지울 수 없음',
+              },
+            ]}
+          />
+        </Row>
+        <Row label="SegmentedControl: ←→로 바로 선택">
+          <SegmentedControl
+            label="기간"
+            value={range}
+            onChange={setRange}
+            options={[
+              { value: '1d', label: '1일' },
+              { value: '5d', label: '5일' },
+              { value: '1m', label: '1개월', disabled: true },
+              { value: '1y', label: '1년' },
+            ]}
+          />
+        </Row>
+        <Row label="Toggle: Space·Enter">
+          <div className={styles.toggles}>
+            <Toggle label="맨 위 숫자 줄 보이기" checked={kpiRow} onChange={setKpiRow} />
+            <Toggle label="막힌 스위치" checked={false} onChange={() => undefined} disabled />
+          </div>
+        </Row>
+        <Row label="TextField: 도움말 · 글자 수 · 오류(황토)">
+          <div className={styles.fields}>
+            <TextField
+              label="탭 이름"
+              value={name}
+              onChange={setName}
+              hint="1~20자"
+              maxLength={20}
+            />
+            <TextField
+              label="탭 이름"
+              value=""
+              onChange={() => undefined}
+              error="이름을 1자 이상 쓰세요."
+            />
+          </div>
+        </Row>
+        <Row label="ProgressBar">
+          <div className={styles.progressDemo}>
+            <ProgressBar value={60} label="분석 진행 60%" />
+          </div>
+        </Row>
+        <Row label="Dialog: 초점 가둠, Esc, 닫히면 연 버튼으로">
+          <Button onClick={() => setDialog(true)}>탭 삭제…</Button>
+          <Dialog
+            open={dialog}
+            title="‘미국’ 탭을 삭제할까요?"
+            onClose={() => setDialog(false)}
+            footer={
+              <>
+                <Button onClick={() => setDialog(false)}>취소</Button>
+                <Button variant="primary" onClick={() => setDialog(false)}>
+                  삭제
+                </Button>
+              </>
+            }
+          >
+            탭 안의 칸 배치도 함께 사라집니다. 마지막 남은 탭은 삭제할 수 없습니다.
+          </Dialog>
+        </Row>
+      </div>
+    </Section>
+  );
+}
+
 function TabsDemo() {
   return (
     <Section title="탭" meta="←→ 이동과 동시에 선택, Home·End">
@@ -676,6 +789,7 @@ export function Gallery() {
           <p className={styles.lede}>대시보드 라이트. 시세, 문장, 알림은 모두 예시 데이터입니다.</p>
         </div>
         <nav className={styles.links} aria-label="견본 보기">
+          <a href="#dashboard">대시보드 견본</a>
           <a href="#shell">창 틀 견본</a>
           <a href="#shell-offline">오프라인 창 틀</a>
         </nav>
@@ -688,6 +802,7 @@ export function Gallery() {
       <States />
       <Buttons />
       <TabsDemo />
+      <InputsDemo />
       <SectionsAndTables />
       <Sparklines />
       <Notices />

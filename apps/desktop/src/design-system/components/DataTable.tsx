@@ -9,6 +9,11 @@ export interface Column<Row> {
   numeric?: boolean;
   /** 열 너비(CSS 길이, rem 권장). */
   width?: string;
+  /**
+   * 좁은 칸에서 이 열이 남는 너비를 차지하고, 넘치면 한 줄로 말줄임한다(긴 종목명).
+   * 칸 내용이 글자면 마우스를 올렸을 때 전체가 보인다(title).
+   */
+  truncate?: boolean;
   cell: (row: Row) => ReactNode;
 }
 
@@ -99,6 +104,7 @@ export function DataTable<Row>({
               scope="col"
               className={styles.th}
               data-align={column.numeric ? 'end' : 'start'}
+              data-truncate={column.truncate ? 'true' : undefined}
             >
               {column.header}
             </th>
@@ -126,15 +132,20 @@ export function DataTable<Row>({
               onKeyDown={focusable ? (event) => onKeyDown(event, index, row) : undefined}
               onClick={focusable ? (event) => onClick(event, row) : undefined}
             >
-              {columns.map((column) => (
-                <td
-                  key={column.key}
-                  className={cx(styles.td, column.numeric && 'vt-num')}
-                  data-align={column.numeric ? 'end' : 'start'}
-                >
-                  {column.cell(row)}
-                </td>
-              ))}
+              {columns.map((column) => {
+                const content = column.cell(row);
+                return (
+                  <td
+                    key={column.key}
+                    className={cx(styles.td, column.numeric && 'vt-num')}
+                    data-align={column.numeric ? 'end' : 'start'}
+                    data-truncate={column.truncate ? 'true' : undefined}
+                    title={column.truncate && typeof content === 'string' ? content : undefined}
+                  >
+                    {content}
+                  </td>
+                );
+              })}
             </tr>
           ))
         )}

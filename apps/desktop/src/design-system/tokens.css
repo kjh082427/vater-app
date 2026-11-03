@@ -17,6 +17,8 @@
   --color-canvas: #f0f2f5;
   --color-card: #ffffff;
   --color-card-shadow: rgba(22, 28, 42, 0.07);
+  --color-pop-shadow: rgba(22, 28, 42, 0.18);
+  --color-scrim: rgba(22, 28, 42, 0.42);
   --color-row-alt: #f6f7f9;
   --color-hover: #eef0f4;
   --color-selection: #e3dafa;
@@ -65,8 +67,9 @@
   --color-ink-hover: var(--color-ink-2);
   --color-on-ink: var(--color-on-accent);
 
-  /* 그림자: 칸 카드는 아주 옅게 */
+  /* 그림자: 칸 카드는 아주 옅게, 떠 있는 것(메뉴, 목록, 대화 상자)만 진하게 */
   --shadow-card: 0 1px 2px var(--color-card-shadow), 0 2px 8px var(--color-card-shadow);
+  --shadow-pop: 0 12px 32px var(--color-pop-shadow), 0 2px 6px var(--color-card-shadow);
 
   /* 글꼴: Pretendard 하나. --font-serif는 예전 이름이며 같은 고딕을 가리킨다 */
   --font-sans: 'Pretendard', 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif;
@@ -82,6 +85,7 @@
   --text-3xl: 1.375rem; /* 22 화면 제목 */
   --text-card-title: 1rem; /* 16 카드 제목 */
   --text-kpi: 1.75rem; /* 28 숫자 카드 큰 숫자 */
+  --text-kpi-sm: 1.5rem; /* 24 좁은 숫자 카드 */
   --leading-xs: 1rem;
   --leading-sm: 1.125rem;
   --leading-md: 1.25rem;

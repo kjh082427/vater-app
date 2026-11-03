@@ -111,3 +111,13 @@
   color: var(--color-ink-3);
   white-space: normal;
 }
+
+/* 남는 너비를 차지하고 넘치면 말줄임(max-width: 0 + width: 100%는 자동 표 배치에서 쓰는 방법) */
+.th[data-truncate='true'],
+.td[data-truncate='true'] {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

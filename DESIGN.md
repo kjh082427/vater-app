@@ -291,6 +291,7 @@ components:
 - **Primary:** 강조 바탕 + 흰 글자, 호버 `accent-strong`. 한 화면에 하나.
 - **Secondary(기본):** 흰 바탕 + 1px `control` 테두리 + `ink-2` 글자. 호버 때 테두리가 `ink-3`.
 - **Quiet:** 강조색 글자의 링크 모양 버튼("브리핑 읽기 ›", "종목 추가"). 호버 때 밑줄.
+- **Icon:** 아이콘만 있는 28px 버튼(칸 머리의 `⋯`, 대화 상자 닫기). 테두리 없이 `ink-3` 아이콘, 호버·열림 때 `hover` 바탕. 이름은 반드시 `aria-label`로 준다. 아이콘만 있는 버튼은 이것뿐이다.
 - **Disabled:** 교차 행 바탕 + `ink-3` 글자. **Busy:** 모양을 두고 글자만 흐리게, `aria-busy`·`aria-disabled`로 포커스는 둔다.
 
 ### Inputs / Fields
@@ -313,7 +314,8 @@ components:
 ### 표 (DataTable)
 - 머리줄 30px: `table-head` 바탕 + `on-table-head` 12px 반굵게, 위 양 끝 모서리 4px. 행 38px, 짝수 행 `row-alt`, 아래 1px `rule`. 숫자 열은 오른쪽 정렬 + 고정폭.
 - 행 동작이 있으면 행 하나만 Tab 순서에 들어가고 ↑↓·Home·End로 옮기며 Enter·Space·클릭으로 연다. 호버는 `hover` 바탕, 포커스는 2px 강조 테두리.
-- 빈 표: 머리줄은 열 수 그대로 두고, 그 아래 한 행(`colSpan` = 열 수)에 다음에 할 일을 알려 준다.
+- 빈 표: 머리줄은 열 수 그대로 두고, 그 아래 한 행(`colSpan` = 열 수)에 다음에 할 일을 알려 준다. 빈 표는 열을 고르게 나눈다(`table-layout: fixed`).
+- `truncate` 열(보통 종목명)은 남는 너비를 차지하고 넘치면 한 줄 말줄임표, 글자면 `title`로 전체를 보인다.
 
 ### 차트
 직접 그린 SVG다(라이브러리 없음). 축 눈금 12px `ink-3`, 격자 1px `rule`.
