@@ -8,7 +8,7 @@ on:
     branches: ["infra/release*"]
     paths:
       - ".github/workflows/release-acceptance.yml"
-      - "apps/desktop/src-tauri/packaging/acceptance-update.ps1"
+      - "apps/desktop/src-tauri/packaging/**"
       - "apps/desktop/src-tauri/src/updater.rs"
 
 permissions:

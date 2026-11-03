@@ -1,6 +1,7 @@
 """버전은 한 곳(Cargo.toml)이 기준이고 네 파일과 태그가 같아야 한다 (infra/release Task 1)."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -84,3 +85,20 @@ def test_set_updates_lock_files_so_locked_builds_keep_working(tree: Path) -> Non
     assert 'name = "vater"\nversion = "0.1.0-rc.1"' in cargo_lock
     uv_lock = (tree / "sidecar/uv.lock").read_text(encoding="utf-8")
     assert 'name = "vater-core"\nversion = "0.1.0-rc.1"' in uv_lock
+
+
+@pytest.mark.parametrize("script", ["check-versions.py", "make-latest-json.py"])
+def test_korean_output_survives_a_windows_console_encoding(tmp_path: Path, script: str) -> None:
+    """Windows CI의 stdout은 cp1252다. 한글을 찍다가 죽으면 릴리스가 멈춘다."""
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    path = SCRIPT.parent / script
+    args = (
+        ["--root", str(REPO)]
+        if script == "check-versions.py"
+        else ["--version", "bad", "--sig", "x", "--base-url", "y", "--out", str(tmp_path / "o")]
+    )
+    r = subprocess.run(
+        [sys.executable, str(path), *args], capture_output=True, env=env, check=False
+    )
+    assert b"UnicodeEncodeError" not in r.stderr, r.stderr
+    assert r.returncode in (0, 1)

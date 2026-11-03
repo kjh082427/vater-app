@@ -15,6 +15,8 @@ SEMVER = re.compile(r"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$")
 
 
 def main() -> int:
+    # Windows 콘솔은 cp1252라 한글을 찍다가 죽는다(CI에서 확인됨)
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--version", required=True)
     ap.add_argument("--sig", required=True, type=Path)

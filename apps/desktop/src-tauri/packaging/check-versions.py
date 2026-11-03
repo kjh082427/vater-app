@@ -75,6 +75,8 @@ def set_versions(root: Path, version: str) -> None:
 
 
 def main() -> int:
+    # Windows 콘솔은 cp1252라 한글을 찍다가 죽는다(CI에서 확인됨)
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     ap = argparse.ArgumentParser(description=__doc__, exit_on_error=False)
     ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[4])
     ap.add_argument("--tag")
