@@ -157,3 +157,16 @@ async def test_us_realtime_ticks(live: tuple[KisClient, TokenManager]) -> None:
     task.cancel()
     print(f"\nAAPL ticks in 60s: {len(ticks)} states {states} sample {ticks[:2]}")
     assert "connected" in states
+
+
+async def test_index_board_live(live: tuple[KisClient, TokenManager]) -> None:
+    """대시보드 지수 칸(`GET /market/indices`와 같은 조립): 4개 지수 모두 값과 20개 이상 종가."""
+    from vater_core.api.routes.market import _KisFetch
+    from vater_core.market.indices import IndexBoard
+
+    c, _ = live
+    rows = await IndexBoard().rows(_KisFetch(c), key="live")
+    for r in rows:
+        print(r.code, r.value, r.change_pct, len(r.closes), r.closes[-1:] if r.closes else None)
+        assert r.value is not None and r.change is not None
+        assert len(r.closes) >= 20

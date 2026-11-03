@@ -438,6 +438,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/market/indices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Indices */
+    get: operations['read_indices_market_indices_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/secrets': {
     parameters: {
       query?: never;
@@ -555,6 +572,24 @@ export interface paths {
     /** Symbols Search */
     get: operations['symbols_search_symbols_search_get'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/ui/dashboards': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Dashboards */
+    get: operations['read_dashboards_ui_dashboards_get'];
+    /** Write Dashboards */
+    put: operations['write_dashboards_ui_dashboards_put'];
     post?: never;
     delete?: never;
     options?: never;
@@ -851,6 +886,24 @@ export interface components {
       /** Provider */
       provider: string;
     };
+    /** Dashboard */
+    Dashboard: {
+      /** Id */
+      id: string;
+      kpi: components['schemas']['KpiStrip'];
+      layout: components['schemas']['Layout'];
+      /** Name */
+      name: string;
+      /** Panels */
+      panels: components['schemas']['Panel'][];
+    };
+    /** DashboardsDoc */
+    DashboardsDoc: {
+      /** Dashboards */
+      dashboards: components['schemas']['Dashboard'][];
+      /** Version */
+      version: number;
+    };
     /**
      * ErrorBody
      * @description 모든 오류 응답의 형식. UI는 `code`로 안내 문구를 정한다.
@@ -916,6 +969,28 @@ export interface components {
       /** Version */
       version: string;
     };
+    /** IndexOut */
+    IndexOut: {
+      /** At */
+      at: string | null;
+      /** Change */
+      change: number | null;
+      /** Change Pct */
+      change_pct: number | null;
+      /** Closes */
+      closes: number[];
+      /** Code */
+      code: string;
+      /**
+       * Market
+       * @enum {string}
+       */
+      market: 'KR' | 'US';
+      /** Name */
+      name: string;
+      /** Value */
+      value: number | null;
+    };
     /** InstalledOut */
     InstalledOut: {
       /** Name */
@@ -953,6 +1028,22 @@ export interface components {
       sample: components['schemas']['KisSample'];
       /** Server */
       server: string;
+    };
+    /** KpiStrip */
+    KpiStrip: {
+      /** Enabled */
+      enabled: boolean;
+      /** Items */
+      items: string[];
+    };
+    /** Layout */
+    Layout: {
+      /** Root */
+      root: {
+        [key: string]: unknown;
+      };
+      /** Template */
+      template: string;
     };
     /** LoadedOut */
     LoadedOut: {
@@ -1027,6 +1118,15 @@ export interface components {
       running: boolean;
       /** Version */
       version: string | null;
+    };
+    /** Panel */
+    Panel: {
+      /** Options */
+      options: {
+        [key: string]: unknown;
+      };
+      /** Type */
+      type: string;
     };
     /** PullStartedOut */
     PullStartedOut: {
@@ -2592,6 +2692,53 @@ export interface operations {
       };
     };
   };
+  read_indices_market_indices_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IndexOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
   secret_status_secrets_get: {
     parameters: {
       query?: never;
@@ -3021,6 +3168,104 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SymbolOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  read_dashboards_ui_dashboards_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DashboardsDoc'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  write_dashboards_ui_dashboards_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DashboardsDoc'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DashboardsDoc'];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */
