@@ -3,7 +3,8 @@
  * 영역이 지금 비율의 최소 합보다 작으면 배치는 그대로 두고 영역이 스크롤한다(칸은 최소 크기 유지).
  */
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AREA_1280x800, computeRects, requiredArea } from './layout/geometry';
+import { Divider } from './Divider';
+import { AREA_1280x800, computeRects, dividers, requiredArea } from './layout/geometry';
 import type { Node, Rect, Size } from './layout/types';
 import styles from './dashboard.module.css';
 
@@ -34,8 +35,10 @@ export interface SplitLayoutProps {
   gap: number;
   /** 칸 그리기. rect는 영역 안 위치(px). */
   renderPanel: (index: number, rect: Rect) => ReactNode;
-  /** 칸 위에 겹쳐 그릴 것(편집 화면의 경계선 손잡이). 배치 영역 크기를 받는다. */
-  overlay?: (area: Size) => ReactNode;
+  /** 있으면 경계선 손잡이를 그린다(편집 화면). 바뀐 나무를 받는다. */
+  onResize?: (root: Node) => void;
+  /** 경계선이 최소 크기를 재는 영역. 없으면 그린 영역. */
+  limitArea?: Size;
   className?: string;
   /** 영역 크기를 바깥에서 줄 때(편집 화면의 캔버스). */
   area?: Size;
@@ -46,7 +49,8 @@ export function SplitLayout({
   mins,
   gap,
   renderPanel,
-  overlay,
+  onResize,
+  limitArea,
   className,
   area,
 }: SplitLayoutProps) {
@@ -76,7 +80,19 @@ export function SplitLayout({
             {renderPanel(i, r)}
           </div>
         ))}
-        {overlay?.(inner)}
+        {onResize
+          ? dividers(root, inner, gap).map((spot) => (
+              <Divider
+                key={`${spot.path.join('.')}:${spot.index}`}
+                spot={spot}
+                root={root}
+                limitArea={limitArea ?? inner}
+                mins={mins}
+                gap={gap}
+                onResize={onResize}
+              />
+            ))
+          : null}
       </div>
     </div>
   );

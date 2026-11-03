@@ -92,3 +92,92 @@
   justify-content: center;
   margin-bottom: auto;
 }
+
+/* 경계선 손잡이: 칸 사이 틈 전체가 끌 수 있는 자리, 가운데에 손잡이 */
+.divider {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.divider[data-dir='row'] {
+  cursor: col-resize;
+}
+
+.divider[data-dir='col'] {
+  cursor: row-resize;
+}
+
+.divider:hover::before,
+.divider:focus-visible::before,
+.divider[data-dragging='true']::before {
+  position: absolute;
+  background: var(--color-accent);
+  content: '';
+}
+
+.divider[data-dir='row']::before {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+.divider[data-dir='col']::before {
+  top: calc(50% - 1px);
+  right: 0;
+  left: 0;
+  height: 2px;
+}
+
+.divider:focus-visible {
+  outline: none;
+}
+
+.grip {
+  position: relative;
+  z-index: 1;
+  border: var(--rule-hair) solid var(--color-accent-line);
+  border-radius: var(--radius-round);
+  background: var(--color-card);
+}
+
+.divider[data-dir='row'] .grip {
+  width: 0.5rem;
+  height: 2rem;
+}
+
+.divider[data-dir='col'] .grip {
+  width: 2rem;
+  height: 0.5rem;
+}
+
+.divider:focus-visible .grip,
+.divider[data-dragging='true'] .grip {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--rule-focus) var(--color-focus);
+}
+
+.ratio {
+  position: absolute;
+  z-index: 2;
+  padding: var(--space-0-5) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.divider[data-dir='row'] .ratio {
+  top: calc(50% + 1.5rem);
+}
+
+.divider[data-dir='col'] .ratio {
+  left: calc(50% + 1.5rem);
+}

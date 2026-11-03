@@ -159,3 +159,74 @@ export function withCount(doc: DashboardDoc, count: number, template: TemplateId
   );
   return { ...doc, layout: { template, root: templateRoot(template) }, panels };
 }
+
+export interface DividerSpot {
+  /** 분할까지의 아이 순번들(resizeAt의 path). */
+  path: number[];
+  /** 앞 아이 순번(뒤 아이는 index + 1). */
+  index: number;
+  dir: Split['dir'];
+  /** 경계선 자리(틈 전체). */
+  rect: Rect;
+  /** 그 분할에서 칸에 쓰는 길이(틈 제외): 끌기 px → 비율. */
+  free: number;
+  /** 앞·뒤 아이에 든 칸 번호. */
+  before: number[];
+  after: number[];
+}
+
+function panelsIn(node: Node): number[] {
+  return isLeaf(node) ? [node.panel] : node.children.flatMap(panelsIn);
+}
+
+/** 모든 경계선(인접한 두 아이 사이). */
+export function dividers(root: Node, area: Size, gap: number): DividerSpot[] {
+  const out: DividerSpot[] = [];
+  const walk = (node: Node, box: Rect, path: number[]) => {
+    if (isLeaf(node)) return;
+    const n = node.children.length;
+    const free = Math.max(0, along(node.dir, box) - gap * (n - 1));
+    let offset = 0;
+    node.children.forEach((child, i) => {
+      const len = free * (node.sizes[i] ?? 0);
+      const r: Rect =
+        node.dir === 'row'
+          ? { x: box.x + offset, y: box.y, w: len, h: box.h }
+          : { x: box.x, y: box.y + offset, w: box.w, h: len };
+      walk(child, r, [...path, i]);
+      offset += len;
+      const next = node.children[i + 1];
+      if (next) {
+        out.push({
+          path,
+          index: i,
+          dir: node.dir,
+          rect:
+            node.dir === 'row'
+              ? { x: box.x + offset, y: box.y, w: gap, h: box.h }
+              : { x: box.x, y: box.y + offset, w: box.w, h: gap },
+          free,
+          before: panelsIn(child),
+          after: panelsIn(next),
+        });
+      }
+      offset += gap;
+    });
+  };
+  walk(root, { x: 0, y: 0, ...area }, []);
+  return out;
+}
+
+/** 경계선 양쪽 비율(%, 합 100). 표시는 "58 : 42". */
+export function pairPercent(root: Node, path: number[], index: number): [number, number] {
+  let node = root;
+  for (const i of path) {
+    if (isLeaf(node)) break;
+    node = node.children[i] ?? node;
+  }
+  if (isLeaf(node)) return [50, 50];
+  const a = node.sizes[index] ?? 0;
+  const b = node.sizes[index + 1] ?? 0;
+  const left = a + b > 0 ? Math.round((a / (a + b)) * 100) : 50;
+  return [left, 100 - left];
+}
