@@ -73,3 +73,4 @@ Check ($code -ne 0) 'fails'
 Check ((State).draft) 'stays a draft'
 
 "`nP1~P5 passed"
+exit 0
