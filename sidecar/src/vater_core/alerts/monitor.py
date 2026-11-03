@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 TICK_SEC = 30.0
 CLOSE_RETRY = timedelta(minutes=5)  # 마감 평가용 일봉을 다시 받기까지 기다리는 시간
+QUOTE_FRESH = timedelta(seconds=30)  # 홈 화면 시세: 이보다 오래되면 한투 REST로 다시 받는다
 MARKETS: tuple[MarketId, ...] = ("KR", "US")
 OFFLINE_CODES = {"KIS_UNREACHABLE"}
 Key = tuple[str, str]
@@ -173,6 +174,49 @@ class AlertMonitor:
 
     def quotes(self) -> dict[Key, WatchQuote]:
         return dict(self._quotes)
+
+    async def watch_quotes(self) -> list[dict[str, Any]]:
+        """홈 화면용: 감시 종목마다 최신 시세와 수신 상태.
+
+        감시 루프의 시세가 30초 안이면 그대로 쓰고, 아니면 한투 REST로 받아 30초 동안 쓴다
+        (앱 시작 직후, 장 마감, 장중 감시 규칙이 없는 종목).
+        한투가 실패하면 그 종목만 예전 시세나 None.
+        """
+        now = self._now()
+        feeds = {(f["market"], f["code"]): f["feed"] for f in self._feeds}
+        out: list[dict[str, Any]] = []
+        for item in WatchlistRepo(self._db()).list():
+            key = _key(item)
+            quote = self._quotes.get(key)
+            if quote is None or now - datetime.fromisoformat(quote.at) >= QUOTE_FRESH:
+                quote = await self._rest_quote(item) or quote
+            out.append(
+                {
+                    "watchlist_id": item.id,
+                    "market": item.market,
+                    "code": item.code,
+                    "name": item.name,
+                    "price": quote.price if quote else None,
+                    "change": quote.change if quote else None,
+                    "change_pct": quote.change_pct if quote else None,
+                    "at": quote.at if quote else None,
+                    "source": quote.source if quote else None,
+                    "feed": feeds.get(key, "idle"),
+                }
+            )
+        return out
+
+    async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
+        try:
+            q = await self._price(item)
+        except Exception as e:  # 홈 화면 한 줄 때문에 전체가 실패하지 않게 한다
+            level = (
+                logging.DEBUG if getattr(e, "code", "") == "KIS_NOT_CONFIGURED" else logging.WARNING
+            )
+            logger.log(level, "watch quote %s %s failed: %s", item.market, item.code, e)
+            return None
+        self._record_quote(item, q.price, q.change_pct, q.change, "rest")
+        return self._quotes.get(_key(item))
 
     def _record_quote(
         self,

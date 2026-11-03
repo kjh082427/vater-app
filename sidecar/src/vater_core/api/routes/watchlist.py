@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
 
+from vater_core.alerts.monitor import get_alerts
 from vater_core.alerts.store import WatchItem, WatchlistRepo
 from vater_core.analysis.symbols import resolve_target
 from vater_core.api.deps import AppDeps, get_deps
@@ -26,6 +27,21 @@ class WatchItemOut(BaseModel):
     exchange: str
     name: str
     created_at: str
+
+
+class WatchQuoteOut(BaseModel):
+    """홈 화면 감시 종목 한 줄. 시세를 받지 못하면 가격 칸이 null."""
+
+    watchlist_id: int
+    market: str
+    code: str
+    name: str
+    price: float | None
+    change: float | None  # 전일 대비 금액. 전일 종가를 모르면 null
+    change_pct: float | None
+    at: str | None  # 시세 시각(KST)
+    source: Literal["realtime", "polling", "rest"] | None
+    feed: Literal["realtime", "polling", "idle", "closed", "offline"]
 
 
 def _db(deps: AppDeps) -> sqlite3.Connection:
@@ -52,6 +68,12 @@ def _out(w: WatchItem) -> WatchItemOut:
 @router.get("")
 async def list_watchlist(deps: AppDeps = Depends(get_deps)) -> list[WatchItemOut]:  # noqa: B008
     return [_out(w) for w in _repo(deps).list()]
+
+
+@router.get("/quotes")
+async def watch_quotes(deps: AppDeps = Depends(get_deps)) -> list[WatchQuoteOut]:  # noqa: B008
+    """감시 종목마다 최신 시세와 수신 상태. 실시간 갱신은 SSE `quote`로 받는다."""
+    return [WatchQuoteOut(**q) for q in await get_alerts(deps).watch_quotes()]
 
 
 @router.post("", status_code=201)

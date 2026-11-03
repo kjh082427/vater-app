@@ -719,3 +719,77 @@ async def test_removed_symbol_leaves_quotes_and_feeds(db: sqlite3.Connection) ->
     await rig.monitor.tick_once()
     assert rig.monitor.quotes() == {}
     assert rig.monitor.status()["feeds"] == []
+
+
+async def test_watch_quotes_use_fresh_monitor_quotes(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    await rig.monitor.tick_once()  # 가짜 실시간은 처음부터 연결됨: 폴링 없이 실시간
+    assert rig.realtime is not None
+    await rig.monitor.tick_once()
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 1.2, 1000, "100001"))
+    calls = len(rig.market.price_calls)
+
+    got = await rig.monitor.watch_quotes()
+
+    assert len(rig.market.price_calls) == calls  # 30초 안의 시세는 한투를 다시 부르지 않는다
+    assert got == [
+        {
+            "watchlist_id": item.id,
+            "market": "KR",
+            "code": "005930",
+            "name": "삼성전자",
+            "price": 71000.0,
+            "change": None,  # REST 시세를 받은 적이 없어 전일 종가를 모른다
+            "change_pct": 1.2,
+            "at": "2026-11-03T10:00:00+09:00",
+            "source": "realtime",
+            "feed": "realtime",
+        }
+    ]
+
+
+async def test_watch_quotes_fall_back_to_rest_and_cache_it(db: sqlite3.Connection) -> None:
+    # 장 마감 뒤 앱을 켜서 감시 루프에 시세가 없다
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.prices["005930"] = 70000.0
+    rig.market.changes["005930"] = -500.0
+    await rig.monitor.tick_once()
+    calls = len(rig.market.price_calls)
+
+    first = await rig.monitor.watch_quotes()
+    rig.clock.at = KR_AFTER + timedelta(seconds=20)
+    await rig.monitor.watch_quotes()
+    assert len(rig.market.price_calls) == calls + 1  # 30초 캐시
+    assert (first[0]["price"], first[0]["change"], first[0]["source"], first[0]["feed"]) == (
+        70000.0,
+        -500.0,
+        "rest",
+        "closed",
+    )
+
+    rig.clock.at = KR_AFTER + timedelta(seconds=31)
+    await rig.monitor.watch_quotes()
+    assert len(rig.market.price_calls) == calls + 2
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        KisApiError("EGW00500", "일시 오류"),
+        VaterError("KIS_UNREACHABLE", "끊김", status=503),
+        VaterError("KIS_NOT_CONFIGURED", "키 없음", status=409),
+    ],
+)
+async def test_watch_quotes_never_fail_as_a_whole(db: sqlite3.Connection, error: Exception) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.prices["000660"] = 198700.0
+    rig.market.fail_for["005930"] = error
+
+    got = {q["code"]: q for q in await rig.monitor.watch_quotes()}
+
+    assert got["005930"]["price"] is None and got["005930"]["source"] is None
+    assert got["000660"]["price"] == 198700.0

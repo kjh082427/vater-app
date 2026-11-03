@@ -841,6 +841,36 @@
         "title": "ErrorInfo",
         "type": "object"
       },
+      "FeedOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "feed": {
+            "enum": [
+              "realtime",
+              "polling",
+              "idle",
+              "closed",
+              "offline"
+            ],
+            "title": "Feed",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "code",
+          "feed"
+        ],
+        "title": "FeedOut",
+        "type": "object"
+      },
       "GpuOut": {
         "properties": {
           "name": {
@@ -1155,6 +1185,24 @@
       },
       "MonitorStatus": {
         "properties": {
+          "feeds": {
+            "items": {
+              "$ref": "#/components/schemas/FeedOut"
+            },
+            "title": "Feeds",
+            "type": "array"
+          },
+          "markets": {
+            "additionalProperties": {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "object"
+          },
           "polling": {
             "title": "Polling",
             "type": "integer"
@@ -1177,7 +1225,9 @@
         "required": [
           "state",
           "realtime",
-          "polling"
+          "polling",
+          "markets",
+          "feeds"
         ],
         "title": "MonitorStatus",
         "type": "object"
@@ -1640,6 +1690,112 @@
           "created_at"
         ],
         "title": "WatchItemOut",
+        "type": "object"
+      },
+      "WatchQuoteOut": {
+        "description": "홈 화면 감시 종목 한 줄. 시세를 받지 못하면 가격 칸이 null.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "feed": {
+            "enum": [
+              "realtime",
+              "polling",
+              "idle",
+              "closed",
+              "offline"
+            ],
+            "title": "Feed",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "realtime",
+                  "polling",
+                  "rest"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "watchlist_id": {
+            "title": "Watchlist Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "watchlist_id",
+          "market",
+          "code",
+          "name",
+          "price",
+          "change",
+          "change_pct",
+          "at",
+          "source",
+          "feed"
+        ],
+        "title": "WatchQuoteOut",
         "type": "object"
       }
     }
@@ -3972,6 +4128,62 @@
           }
         },
         "summary": "Add Watch",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/watchlist/quotes": {
+      "get": {
+        "description": "감시 종목마다 최신 시세와 수신 상태. 실시간 갱신은 SSE `quote`로 받는다.",
+        "operationId": "watch_quotes_watchlist_quotes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WatchQuoteOut"
+                  },
+                  "title": "Response Watch Quotes Watchlist Quotes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Watch Quotes",
         "tags": [
           "watchlist"
         ]

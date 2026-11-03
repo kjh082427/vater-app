@@ -156,11 +156,8 @@ async def test_events_newest_first_with_limit(client: httpx.AsyncClient, deps: A
 
 async def test_pause_resume_and_status(client: httpx.AsyncClient) -> None:
     assert (await client.post("/alerts/pause")).json() == {"state": "paused"}
-    assert (await client.get("/alerts/status")).json() == {
-        "state": "paused",
-        "realtime": 0,
-        "polling": 0,
-    }
+    status = (await client.get("/alerts/status")).json()
+    assert (status["state"], status["realtime"], status["polling"]) == ("paused", 0, 0)
     assert (await client.post("/alerts/resume")).json()["state"] != "paused"
 
 
@@ -197,6 +194,7 @@ async def test_kinds_describe_the_rule_form(client: httpx.AsyncClient) -> None:
         ("POST", "/alerts/resume"),
         ("GET", "/alerts/status"),
         ("GET", "/alerts/kinds"),
+        ("GET", "/watchlist/quotes"),
     ],
 )
 async def test_routes_need_the_token(
@@ -204,3 +202,29 @@ async def test_routes_need_the_token(
 ) -> None:
     r = await anon_client.request(method, path)
     assert r.status_code == 401
+
+
+async def test_watch_quotes_route_lists_every_watched_symbol(client: httpx.AsyncClient) -> None:
+    wid = await add(client)
+    # 한투 키가 없는 상태: 실패하지 않고 가격만 비어 있다
+    rows = (await client.get("/watchlist/quotes")).json()
+    assert rows == [
+        {
+            "watchlist_id": wid,
+            "market": "KR",
+            "code": "005930",
+            "name": "삼성전자",
+            "price": None,
+            "change": None,
+            "change_pct": None,
+            "at": None,
+            "source": None,
+            "feed": "idle",
+        }
+    ]
+
+
+async def test_status_includes_markets_and_feeds(client: httpx.AsyncClient) -> None:
+    body = (await client.get("/alerts/status")).json()
+    assert set(body) == {"state", "realtime", "polling", "markets", "feeds"}
+    assert body["feeds"] == [] and isinstance(body["markets"], dict)
