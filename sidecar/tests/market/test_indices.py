@@ -130,3 +130,17 @@ async def test_short_history_is_fine(n: int) -> None:
 
     rows = await board(Clock()).rows(Short(), key="k")
     assert len(rows[0].closes) == n
+
+
+async def test_cancelled_waiter_does_not_leave_stale_inflight() -> None:
+    clock, fetch = Clock(), FakeFetch(delay=0.05)
+    b = board(clock)
+    waiter = asyncio.create_task(b.rows(fetch, key="k"))
+    await asyncio.sleep(0.01)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    await asyncio.sleep(0.1)  # 조회 작업은 끝까지 돈다
+    clock.t += 10_000
+    await b.rows(fetch, key="k")
+    assert fetch.calls["quote:KOSPI"] == 2  # 오래된 작업을 다시 쓰지 않고 새로 조회

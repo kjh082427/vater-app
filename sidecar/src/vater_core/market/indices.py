@@ -8,6 +8,7 @@
 """
 
 import asyncio
+import functools
 import logging
 import time
 from collections.abc import Callable
@@ -90,15 +91,17 @@ class IndexBoard:
         ):
             return self._cached[2]
         if self._inflight is None or self._inflight[0] != key:
-            self._inflight = (key, asyncio.create_task(self._load(fetch)))
-        task = self._inflight[1]
-        try:
-            rows = await asyncio.shield(task)
-        finally:
-            if self._inflight and self._inflight[1] is task and task.done():
-                self._inflight = None
-        self._cached = (key, self._now(), rows)
-        return rows
+            task = asyncio.create_task(self._load(fetch))
+            self._inflight = (key, task)
+            task.add_done_callback(functools.partial(self._finish, key))
+        # 기다리는 쪽이 취소돼도 조회는 끝까지 돌고, 끝나면 _finish가 캐시를 채우고 비운다.
+        return await asyncio.shield(self._inflight[1])
+
+    def _finish(self, key: str, task: "asyncio.Task[list[IndexRow]]") -> None:
+        if self._inflight and self._inflight[1] is task:
+            self._inflight = None
+        if not task.cancelled() and task.exception() is None:
+            self._cached = (key, self._now(), task.result())
 
     async def _load(self, fetch: IndexFetcher) -> list[IndexRow]:
         at = self._clock()

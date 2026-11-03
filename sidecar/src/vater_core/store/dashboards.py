@@ -19,6 +19,7 @@ MAX_PANELS = 6
 MAX_KPI_ITEMS = 5
 MAX_NAME = 20
 MAX_ID = 40
+MAX_DEPTH = 32  # root·options 안의 중첩 깊이(직렬화가 깨지는 깊이보다 한참 아래)
 EMPTY: dict[str, Any] = {"version": 1, "dashboards": []}
 
 
@@ -33,6 +34,20 @@ def _bad(why: str) -> VaterError:
 
 def _short_str(v: Any, limit: int) -> bool:
     return isinstance(v, str) and 1 <= len(v) <= limit
+
+
+def _depth(v: Any, limit: int) -> bool:
+    """중첩 깊이가 limit 이하인지. 재귀 대신 스택으로 센다."""
+    stack: list[tuple[Any, int]] = [(v, 1)]
+    while stack:
+        cur, d = stack.pop()
+        if d > limit:
+            return False
+        if isinstance(cur, dict):
+            stack.extend((x, d + 1) for x in cur.values())
+        elif isinstance(cur, list):
+            stack.extend((x, d + 1) for x in cur)
+    return True
 
 
 def _check_board(i: int, b: Any) -> None:
@@ -60,6 +75,8 @@ def _check_board(i: int, b: Any) -> None:
         or not isinstance(layout.get("root"), dict)
     ):
         raise _bad(f"{where}의 배치(template, root)가 올바르지 않습니다")
+    if not _depth(layout["root"], MAX_DEPTH):
+        raise _bad(f"{where}의 배치가 너무 깊게 중첩되어 있습니다(최대 {MAX_DEPTH}단계)")
     panels = b.get("panels")
     if not isinstance(panels, list) or not 1 <= len(panels) <= MAX_PANELS:
         raise _bad(f"{where}의 칸은 1~{MAX_PANELS}개여야 합니다")
@@ -70,6 +87,8 @@ def _check_board(i: int, b: Any) -> None:
             or not isinstance(p.get("options"), dict)
         ):
             raise _bad(f"{where}의 칸 내용(type, options)이 올바르지 않습니다")
+        if not _depth(p["options"], MAX_DEPTH):
+            raise _bad(f"{where}의 칸 옵션이 너무 깊게 중첩되어 있습니다(최대 {MAX_DEPTH}단계)")
 
 
 def validate_dashboards(doc: Any) -> None:
@@ -91,7 +110,7 @@ def parse_body(raw: bytes) -> Any:
         raise _bad(f"문서가 너무 큽니다({len(raw) // 1024}KB, 최대 {MAX_BYTES // 1024}KB)")
     try:
         return json.loads(raw)
-    except (ValueError, UnicodeDecodeError) as e:
+    except (ValueError, UnicodeDecodeError, RecursionError) as e:
         raise _bad("JSON 형식이 아닙니다") from e
 
 

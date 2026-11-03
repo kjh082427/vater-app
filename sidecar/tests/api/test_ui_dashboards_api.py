@@ -61,3 +61,29 @@ async def test_requires_token(anon_client: httpx.AsyncClient) -> None:
 async def test_dashboards_not_in_settings(client: httpx.AsyncClient) -> None:
     await client.put("/ui/dashboards", json=doc())
     assert "ui.dashboards" not in (await client.get("/settings")).json()
+
+
+def _nested(depth: int) -> dict[str, Any]:
+    node: dict[str, Any] = {}
+    for _ in range(depth):
+        node = {"n": node}
+    return node
+
+
+async def test_deeply_nested_root_is_422_and_previous_kept(client: httpx.AsyncClient) -> None:
+    good = doc()
+    await client.put("/ui/dashboards", json=good)
+    bad = doc()
+    bad["dashboards"][0]["layout"]["root"] = _nested(300)
+    r = await client.put("/ui/dashboards", json=bad)
+    assert r.status_code == 422 and r.json()["code"] == "DASHBOARD_INVALID"
+    g = await client.get("/ui/dashboards")
+    assert g.status_code == 200 and g.json() == good
+
+
+async def test_recursion_bomb_body_is_422(client: httpx.AsyncClient) -> None:
+    body = ("[" * 10000 + "]" * 10000).encode()
+    r = await client.put(
+        "/ui/dashboards", content=body, headers={"Content-Type": "application/json"}
+    )
+    assert r.status_code == 422 and r.json()["code"] == "DASHBOARD_INVALID"
