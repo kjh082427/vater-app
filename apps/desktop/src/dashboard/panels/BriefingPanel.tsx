@@ -43,6 +43,16 @@ export function briefingMeta(detail: BriefingDetail, market: MarketCode): string
 
 function Body({ detail, market }: { detail: BriefingDetail; market: MarketCode }) {
   const flow = parseFlows(detail.data)[0];
+  // 값이 없는 투자자는 막대에서 뺀다(0억으로 지어내지 않는다)
+  const bars = flow
+    ? (
+        [
+          ['외국인', flow.foreign],
+          ['기관', flow.institution],
+          ['개인', flow.individual],
+        ] as const
+      ).flatMap(([label, value]) => (value === null ? [] : [{ label, value }]))
+    : [];
   const indices = parseIndices(detail.data);
   // AI 해석이 빠진 것은 "AI 해석 없음(데이터만)"이 이미 말한다
   const missing = detail.missing.filter((m) => m !== 'interpretation');
@@ -56,15 +66,11 @@ function Body({ detail, market }: { detail: BriefingDetail; market: MarketCode }
       ) : (
         <p className={styles.itemMeta}>AI 해석 없음(데이터만)</p>
       )}
-      {market === 'KR' && flow ? (
+      {market === 'KR' && flow && bars.length > 0 ? (
         <DivergingBar
           aria-label={`투자자별 순매수 · ${flow.label}`}
           format={formatEokChange}
-          rows={[
-            { label: '외국인', value: flow.foreign ?? 0 },
-            { label: '기관', value: flow.institution ?? 0 },
-            { label: '개인', value: flow.individual ?? 0 },
-          ]}
+          rows={bars}
         />
       ) : indices.length > 0 ? (
         <IndexTable rows={indices} />

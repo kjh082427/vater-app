@@ -230,6 +230,19 @@ describe('브리핑 칸', () => {
   });
 });
 
+describe('브리핑 칸: 값이 없는 투자자', () => {
+  it('0억으로 지어내지 않고 막대에서 뺀다', async () => {
+    const kr = mock.db.briefings.find((b) => b.market === 'KR');
+    const flows = (kr?.data as { flows: { KOSPI: Record<string, unknown> } }).flows;
+    flows.KOSPI.individual = null;
+    renderWithServices(<DashboardView board={boardOf([{ type: 'briefing' }])} />);
+    const region = await panel(1, '브리핑 요약');
+    const bars = await within(region).findByRole('img', { name: /투자자별 순매수/ });
+    expect(bars.querySelector('[data-row="개인"]')).toBeNull();
+    expect(bars.querySelector('[data-row="외국인"]')).not.toBeNull();
+  });
+});
+
 describe('감시 종목 칸', () => {
   it('SSE quote로 갱신되고, 행을 누르면 그 종목으로', async () => {
     const user = userEvent.setup();
