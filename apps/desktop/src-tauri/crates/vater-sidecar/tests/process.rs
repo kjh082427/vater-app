@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -15,7 +16,7 @@ use tokio::runtime::Handle;
 use vater_sidecar::events::SidecarEvent;
 use vater_sidecar::launch::{self, Mode};
 use vater_sidecar::process::{
-    ManagerConfig, SidecarInfo, SidecarManager, SidecarState, StopOutcome,
+    ManagerConfig, RequestError, SidecarInfo, SidecarManager, SidecarState, StopOutcome,
 };
 use vater_sidecar::restart::RestartPolicy;
 
@@ -35,12 +36,15 @@ struct Scratch(PathBuf);
 
 impl Scratch {
     fn new(name: &str) -> Self {
+        // Windows 파일 이름에 쓸 수 없는 문자(`:` 등)가 들어가지 않게 숫자만 쓴다
+        static NEXT: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "vater-sidecar-test-{}-{}-{:?}",
+            "vater-sidecar-test-{}-{}-{}",
             name,
             std::process::id(),
-            Instant::now()
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         Self(dir)
     }
@@ -76,10 +80,11 @@ fn pids(runs: &Path) -> Vec<u32> {
         .collect()
 }
 
-/// 짧은 시간 제한: ready 2초, 종료 유예 0.5초, 1분에 3회, 백오프 10·20·40ms.
+/// 짧은 시간 제한: ready 5초(Windows 러너에서 Python 첫 실행이 느릴 수 있다), 종료 유예 0.5초,
+/// 1분에 3회, 백오프 10·20·40ms. 시간 초과를 보는 테스트는 ready 제한을 따로 짧게 둔다.
 fn fast_config() -> ManagerConfig {
     ManagerConfig {
-        ready_timeout: Duration::from_secs(2),
+        ready_timeout: Duration::from_secs(5),
         shutdown_grace: Duration::from_millis(500),
         policy: RestartPolicy::new(Duration::from_secs(60), 3)
             .with_backoff(Duration::from_millis(10), Duration::from_millis(40)),
@@ -493,4 +498,61 @@ async fn real_sidecar_ready_health_and_clean_shutdown() {
     println!("shutdown -> {outcome:?} after {:?}", stopping.elapsed());
     assert_eq!(outcome, StopOutcome::Exited(Some(0)));
     assert_eq!(manager.info().state, SidecarState::Stopped);
+}
+
+// ---------- 사이드카 요청 (트레이의 감시 일시 중지·재개) ----------
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_json_calls_the_ready_sidecar_with_its_token() {
+    let manager = SidecarManager::start(
+        &Handle::current(),
+        fake("ready", None),
+        ignore_events,
+        fast_config(),
+    );
+    wait_state(&manager, SidecarState::Ready, Duration::from_secs(10)).await;
+    assert_eq!(
+        manager.post_json("/alerts/pause").await,
+        Ok(serde_json::json!({"state": "paused"}))
+    );
+    assert_eq!(
+        manager.post_json("/alerts/resume").await,
+        Ok(serde_json::json!({"state": "running"}))
+    );
+    manager.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_json_before_ready_is_not_ready() {
+    let config = ManagerConfig {
+        ready_timeout: Duration::from_secs(30),
+        ..fast_config()
+    };
+    let manager = SidecarManager::start(
+        &Handle::current(),
+        fake("silent", None),
+        ignore_events,
+        config,
+    );
+    assert_eq!(
+        manager.post_json("/alerts/pause").await,
+        Err(RequestError::NotReady)
+    );
+    manager.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn post_json_reports_a_non_success_status() {
+    let manager = SidecarManager::start(
+        &Handle::current(),
+        fake("ready", None),
+        ignore_events,
+        fast_config(),
+    );
+    wait_state(&manager, SidecarState::Ready, Duration::from_secs(10)).await;
+    assert_eq!(
+        manager.post_json("/no-such-route").await,
+        Err(RequestError::Status(404))
+    );
+    manager.shutdown().await;
 }

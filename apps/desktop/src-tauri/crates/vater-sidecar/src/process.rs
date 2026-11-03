@@ -89,6 +89,35 @@ pub enum StopOutcome {
     NotRunning,
 }
 
+/// `post_json`이 실패한 이유. 토큰이나 주소는 담지 않는다.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestError {
+    /// 사이드카가 아직 `Ready`가 아니다(시작 중·실패·종료).
+    NotReady,
+    /// 사이드카가 2xx가 아닌 상태 코드로 답했다.
+    Status(u16),
+    /// 연결·시간 초과 등으로 응답을 받지 못했다.
+    Transport,
+    /// 응답 본문이 JSON이 아니다.
+    InvalidJson,
+}
+
+impl fmt::Display for RequestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotReady => write!(f, "사이드카가 아직 준비되지 않았습니다"),
+            Self::Status(code) => write!(f, "사이드카가 상태 코드 {code}로 답했습니다"),
+            Self::Transport => write!(f, "사이드카에 연결하지 못했습니다"),
+            Self::InvalidJson => write!(f, "사이드카 응답이 JSON이 아닙니다"),
+        }
+    }
+}
+
+impl std::error::Error for RequestError {}
+
+/// 사이드카에 보내는 요청의 시간 제한.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
 type EventCallback = Arc<dyn Fn(SidecarEvent) + Send + Sync>;
 
 impl SidecarInfo {
@@ -107,6 +136,7 @@ pub struct SidecarManager {
     stop_tx: watch::Sender<bool>,
     done_rx: watch::Receiver<Option<StopOutcome>>,
     task: JoinHandle<()>,
+    http: reqwest::Client,
 }
 
 impl SidecarManager {
@@ -134,7 +164,7 @@ impl SidecarManager {
             config,
             info_tx,
             stop_rx,
-            http,
+            http: http.clone(),
         };
         let task = runtime.spawn(async move {
             let outcome = supervisor.supervise().await;
@@ -145,6 +175,7 @@ impl SidecarManager {
             stop_tx,
             done_rx,
             task,
+            http,
         }
     }
 
@@ -156,6 +187,36 @@ impl SidecarManager {
     /// 상태가 바뀔 때마다 알림을 받는다(UI에 상태를 밀어 줄 때).
     pub fn subscribe(&self) -> watch::Receiver<SidecarInfo> {
         self.info_rx.clone()
+    }
+
+    /// `Ready`인 사이드카에 `POST path`를 보내고(Bearer 토큰) JSON 응답을 돌려준다.
+    /// 트레이의 감시 일시 중지·재개(`/alerts/pause`, `/alerts/resume`)에 쓴다.
+    pub async fn post_json(&self, path: &str) -> Result<serde_json::Value, RequestError> {
+        let SidecarInfo {
+            state: SidecarState::Ready,
+            port: Some(port),
+            token: Some(token),
+        } = self.info()
+        else {
+            return Err(RequestError::NotReady);
+        };
+        let response = self
+            .http
+            .post(format!("http://127.0.0.1:{port}{path}"))
+            .bearer_auth(token)
+            .timeout(REQUEST_TIMEOUT)
+            .send()
+            .await
+            .map_err(|_| RequestError::Transport)?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(RequestError::Status(status.as_u16()));
+        }
+        let body = response
+            .bytes()
+            .await
+            .map_err(|_| RequestError::Transport)?;
+        serde_json::from_slice(&body).map_err(|_| RequestError::InvalidJson)
     }
 
     /// 정상 종료를 요청하고 끝날 때까지 기다린다. 여러 번 불러도 된다.

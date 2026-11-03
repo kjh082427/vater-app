@@ -1,7 +1,8 @@
 """SidecarManager 테스트용 가짜 사이드카 (표준 라이브러리만 사용).
 
 실제 사이드카와 같은 계약을 흉내 낸다: VATER_TOKEN 필수, 127.0.0.1의 빈 포트에 HTTP 서버,
-stdout에 UTF-8 JSON 한 줄 이벤트, `GET /health`와 `POST /shutdown`(202)은 Bearer 토큰 인증.
+stdout에 UTF-8 JSON 한 줄 이벤트, `GET /health`, `POST /shutdown`(202),
+`POST /alerts/pause|resume`(200, `{"state": ...}`)은 Bearer 토큰 인증.
 
 사용법: python fake_sidecar.py <mode>
   ready            ready 후 서버. /shutdown 이면 종료 코드 0으로 끝난다
@@ -74,10 +75,18 @@ def serve(honor_shutdown: bool, after_ready=None) -> None:
                 self._reply(200, {"status": "ok"})
 
         def do_POST(self) -> None:
-            if self.path == "/shutdown" and self._authorized():
+            if not self._authorized():
+                return
+            if self.path == "/shutdown":
                 self._reply(202, {"status": "shutting_down"})
                 if honor_shutdown:
                     threading.Thread(target=server.shutdown, daemon=True).start()
+            elif self.path == "/alerts/pause":
+                self._reply(200, {"state": "paused"})
+            elif self.path == "/alerts/resume":
+                self._reply(200, {"state": "running"})
+            else:
+                self._reply(404, {"error": "not found"})
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     emit("ready", port=server.server_address[1])
