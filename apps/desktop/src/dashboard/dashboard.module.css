@@ -75,6 +75,11 @@
   position: relative;
 }
 
+/* 스크롤할 때는 칸이 영역 끝에 붙어 모서리·그림자가 잘리지 않게 둘레에 칸 사이와 같은 틈(12px)을 둔다 */
+.area[data-scroll='true'] .canvas {
+  margin: var(--space-gap);
+}
+
 .cell {
   position: absolute;
   display: flex;

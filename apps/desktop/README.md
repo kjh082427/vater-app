@@ -10,7 +10,8 @@ React 18 + TypeScript 화면입니다. Tauri 셸(`src-tauri`, `shell/tauri` 브�
 | `src/api/`           | 사이드카 계약: OpenAPI에서 만든 타입(`schema.d.ts`, `npm run gen:api`), 토큰을 붙이는 클라이언트(오류 `{code, message, hint}` → `ApiError`, 재시작 뒤 새 포트로 한 번 더), SSE 허브(`?token=`, 끊기면 다시 연결), `useResource`(SSE가 다시 열리면 다시 불러오기) |
 | `src/platform/`      | 셸 어댑터(스펙 9-3): Tauri(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`) / 브라우저(`VITE_SIDECAR_URL`, `VITE_SIDECAR_TOKEN`)                                                                                                            |
 | `src/app/`           | 해시 라우터(알림 클릭 경로와 같음), 앱 틀(사이드바, 상태 표시줄, 오프라인·연결 끊김 배너, 마법사로 보내기)                                                                                                                                                       |
-| `src/screens/`       | 화면: `home`, `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `common`(입력 칸, 종목 검색, 시각 표기)                                                                                                                        |
+| `src/dashboard/`     | 홈 대시보드: 배치 엔진(`layout/`, 순수 함수), 문서 저장(`store.ts`, `/ui/dashboards`), 칸 내용(`panels/`), 같이 쓰는 자료(`shared.ts`), 보기·편집 화면(`DashboardView`, `DashboardEditor`, `editor/`)                                                            |
+| `src/screens/`       | 화면: `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `common`(입력 칸, 종목 검색, 시각 표기)                                                                                                                                |
 | `src/mocks/`         | 사이드카 흉내(MSW 처리기와 예시 자료). 테스트와 견본 화면 `mock.html`이 함께 쓴다                                                                                                                                                                                |
 | `e2e/`               | 흐름 테스트(Playwright, 실제 개발 모드 사이드카)                                                                                                                                                                                                                 |
 
@@ -21,7 +22,7 @@ npm ci
 npm run dev                 # http://localhost:5173
 ```
 
-- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`
+- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`, `?six=1`(6칸 탭), `?broken=1`(깨진 대시보드 문서)
 - **실제 사이드카와**: 사이드카를 `VATER_DEV=1`로 띄우고(`sidecar/README.md`), 출력된 포트와 토큰을 넘긴다. 개발 모드 사이드카는 `http://localhost:5173` 출처만 CORS로 허용한다.
   ```bash
   VITE_SIDECAR_URL=http://127.0.0.1:<포트> VITE_SIDECAR_TOKEN=<토큰> npm run dev
@@ -46,12 +47,15 @@ npm run e2e         # 흐름 테스트: 아래
 - 확인하는 것: CORS(`http://localhost:5173`), 진짜 `EventSource`와 `?token=`, 이름 있는 SSE 이벤트(`alerts.state`), 실제 오류 본문(422 `ALERT_RULE_INVALID`·`SETTING_INVALID`, 한투 연결 테스트 실패), 쓰기 전용 키
 - 흐름: 마법사(키 없음 → 가짜 키 저장 → 연결 테스트 실패 메시지 → 다음으로 못 감), 감시 종목·규칙 만들기 → 다시 불러와도 남음·이력 빈 상태, SSE로 감시 일시 중지가 화면에 반영, 브리핑 목록 빈 상태, 설정 저장·검증 오류·클라우드 키
 - 마법사 연결 테스트는 가짜 키로 한국투자증권 토큰 API를 한 번 부른다(인터넷이 없으면 "연결할 수 없습니다" 문구로 같은 검사가 통과한다)
-- 화면 캡처(배율 1.5): `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`
+- 대시보드(`e2e/dashboard.spec.ts`): 탭 추가 → 3칸 틀 → 내용 → 저장 → 새로 고침 뒤 그대로, 경계선 끌기 뒤 비율 유지, 1024×600에서 가로 4열 막힘. 키를 넣지 않고 기본 탭은 바꾸지 않는다(flows보다 먼저 돌아도 됨)
+- 화면 캡처: `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`(로컬 `design-preview/화면/`에도 복사)
 - CI에는 아직 넣지 않았다(Ubuntu 러너에 uv·사이드카 의존성과 Chromium이 필요)
 
 ## 화면 캡처
 
-`docs/design/screens/shots/`: 화면별 1280×800·1024×600, 홈·마법사는 배율 1.5. 견본 자료(예시 데이터)로 찍었다.
+`docs/design/screens/shots/`: 화면별 1280×800·1024×600, 홈·편집·마법사는 배율 1.5. 견본 자료(예시 데이터)로 찍었다. `home-6`은 6칸 탭(1024×600에서는 배치를 그대로 두고 스크롤), `home-edit`·`home-pick`은 배치 편집.
+
+impeccable 검출기(2026-11-03): 소스 0건, 화면 12개(1280×800)·8개(1024×600) 렌더링 0건. 고친 것: 숫자 카드 칸의 카드 속 카드, 스크롤할 때 칸이 영역 끝에 붙음. 의도된 예외 없음. 정식 critique는 돌리지 않고 캡처로 직접 점검했다.
 
 ## 남은 일
 
@@ -72,10 +76,17 @@ npm run e2e         # 흐름 테스트: 아래
 - 로그 폴더 열기, 업데이트 확인 커맨드가 계약에 없다. 사이드카 실행 실패 배너와 설정 > 일반에 해당 버튼이 없다.
 - 화면은 계약(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`)대로 짰고 흉내로만 테스트했다. 실제 WebView2에서 확인해야 한다.
 
+**대시보드 (`ui/dashboard`)**
+
+- 지수 차트 칸은 최소 높이(180px)에서 차트(최소 8rem)가 다 들어가지 않아 칸 안에서 스크롤한다.
+- 브리핑 요약 칸(미국)의 지수 표가 좁은 칸에서 이름이 줄바꿈된다.
+- 감시·알림 규칙 편집의 종류·조건 고르기, 규칙 켜기 체크 상자는 네이티브 그대로다(디자인 시스템 Select에 묶음·막기가 없고, Toggle은 보이는 이름표와 다른 이름을 줄 수 없음).
+- 이 브랜치에서 디자인 시스템 예외로 옛 토큰 별칭을 지우고 `FeedStatus`의 "폴링" 문구를 "N초마다 확인"으로 바꿨다.
+
 **디자인 시스템 (`ui/design-system-*`)**
 
 - `FeedStatus`에 `idle`(장중이지만 실시간 규칙이 없어 감시하지 않음) 상태가 없다. 화면이 점과 글자로 따로 짰다(`screens/common/quotes.tsx`).
 - `DataTable`은 행이 0개일 때 숫자 열 머리가 어긋난다. 화면은 빈 표 대신 한 줄 안내를 보인다.
-- 입력 칸·선택·체크 상자·진행 막대 부품이 없다. DESIGN.md "Inputs / Fields" 규칙대로 `screens/common/Field.tsx`·`form.module.css`에 짰다. DESIGN.md의 그 절은 아직 비어 있다.
+- `Select`에 `disabled`와 묶음(optgroup)이 없다. 불러오는 동안 막던 고르기는 자료가 온 뒤에 그린다.
 - `format/money.ts`에 부호 없는 억 단위 금액(거래대금) 표기가 없다. 브리핑 상위 종목은 열 머리에 "(억 원)"을 달고 `formatNumber`로 보인다.
 - `fonts.test.ts`의 "외부 글꼴을 불러오지 않는다" 검사가 `node_modules`까지 모두 훑은 뒤 거른다. 의존성이 늘어 전체 실행 중 한 번 5초 제한에 걸린 적이 있다(혼자 돌리면 약 1초).

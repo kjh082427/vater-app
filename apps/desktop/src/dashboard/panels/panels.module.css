@@ -112,6 +112,15 @@ a.itemText:hover {
   gap: var(--space-gap);
 }
 
+/* 칸(카드) 안의 숫자: 카드 속 카드를 만들지 않는다. 바탕·그림자를 빼고 위 선으로 나눈다 */
+.kpis > .flatTile {
+  padding: var(--space-2) 0 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .unit {
   margin-left: var(--space-0-5);
   font-size: var(--text-md);

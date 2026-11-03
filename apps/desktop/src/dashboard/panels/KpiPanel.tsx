@@ -11,12 +11,12 @@ export function metricsOf(options: Record<string, unknown>): MetricId[] {
   return list.length > 0 ? list : DEFAULT_PANEL_METRICS;
 }
 
-/** 숫자 카드: 고른 숫자 1~4개를 큰 숫자로. */
+/** 숫자 카드: 고른 숫자 1~4개를 큰 숫자로. 칸이 이미 카드라 숫자는 카드 없이 선으로 나눈다. */
 export function KpiPanel({ options }: PanelProps) {
   return (
     <div className={`${styles.body} ${styles.kpis}`}>
       {metricsOf(options).map((id) => (
-        <MetricTile key={id} id={id} />
+        <MetricTile key={id} id={id} className={styles.flatTile} />
       ))}
     </div>
   );

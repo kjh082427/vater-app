@@ -171,7 +171,8 @@ test('설정: 저장한 값이 남고, 잘못된 값은 사이드카 422 문구 
 }) => {
   await page.goto('/#/settings');
   const analysis = page.getByRole('region', { name: '분석 기본값' });
-  await analysis.getByRole('combobox', { name: '토론 라운드' }).selectOption('2');
+  await analysis.getByRole('button', { name: /^토론 라운드 / }).click();
+  await page.getByRole('option', { name: '2회' }).click();
   await expect
     .poll(async () => (await (await api('/settings')).json())['analysis.debate_rounds'])
     .toBe(2);
@@ -179,8 +180,8 @@ test('설정: 저장한 값이 남고, 잘못된 값은 사이드카 422 문구 
   await expect(
     page
       .getByRole('region', { name: '분석 기본값' })
-      .getByRole('combobox', { name: '토론 라운드' }),
-  ).toHaveValue('2');
+      .getByRole('button', { name: /^토론 라운드 / }),
+  ).toHaveAccessibleName('토론 라운드 2회');
 
   const briefing = page.getByRole('region', { name: '브리핑' });
   await briefing.getByLabel('국내 브리핑 시각').fill('25:00');

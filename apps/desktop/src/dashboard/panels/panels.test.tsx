@@ -9,6 +9,7 @@ import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
 import { DashboardView } from '../DashboardView';
 import { templateRoot } from '../layout/templates';
+import { AlertHistoryPanel } from './AlertHistoryPanel';
 
 /** 옛 홈의 영역 테스트를 칸 내용으로 옮겼다: 칸 하나짜리 대시보드(넓이 1048px)로 그린다. */
 const NAME: Record<string, string> = { '최근 브리핑': '브리핑 요약' };
@@ -386,5 +387,23 @@ describe('사이드카 재시작 뒤', () => {
     expect(FakeEventSource.latest.url).toBe('http://127.0.0.1:41001/events?token=t2');
     act(() => FakeEventSource.latest.open());
     expect(await within(table).findByText('69,900원')).toBeInTheDocument();
+  });
+});
+
+describe('알림 이력 칸: 좁으면 종목 열을 뺀다', () => {
+  it('넓이 400px이면 시각·내용만', async () => {
+    renderWithServices(<AlertHistoryPanel options={{}} size={{ w: 400, h: 300 }} />);
+    const table = await screen.findByRole('table', { name: '알림 이력' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['시각', '내용']);
+  });
+
+  it('넓이 600px이면 종목 열도', async () => {
+    renderWithServices(<AlertHistoryPanel options={{}} size={{ w: 600, h: 300 }} />);
+    const table = await screen.findByRole('table', { name: '알림 이력' });
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(3);
   });
 });

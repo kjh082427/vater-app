@@ -160,7 +160,7 @@ export const METRICS: Record<MetricId, { label: string; use: () => MetricValue }
 };
 
 /** 숫자 카드 1개. id가 바뀌면 훅 순서가 바뀌므로 부모는 key={id}로 그린다. */
-export function MetricTile({ id }: { id: MetricId }) {
+export function MetricTile({ id, className }: { id: MetricId; className?: string }) {
   const metric = METRICS[id];
   const v = metric.use();
   return (
@@ -170,6 +170,7 @@ export function MetricTile({ id }: { id: MetricId }) {
       value={v.value}
       change={v.error ? <Muted>{v.error.message}</Muted> : v.change}
       chart={v.chart ?? undefined}
+      className={className}
     />
   );
 }

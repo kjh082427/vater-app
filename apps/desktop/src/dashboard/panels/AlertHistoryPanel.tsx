@@ -26,19 +26,25 @@ export function useSymbolChoices(): Choice[] {
   ];
 }
 
-const COLUMNS: Column<AlertEvent>[] = [
-  {
-    key: 'at',
-    header: '시각',
-    width: '8.5rem',
-    cell: (e) => <span className="vt-num">{formatDayTime(e.fired_at)}</span>,
-  },
-  { key: 'name', header: '종목', width: '7rem', cell: (e) => e.name ?? e.code ?? '—' },
-  { key: 'message', header: '내용', cell: (e) => e.message },
-];
+const TIME: Column<AlertEvent> = {
+  key: 'at',
+  header: '시각',
+  width: '7.5rem',
+  cell: (e) => <span className="vt-num">{formatDayTime(e.fired_at)}</span>,
+};
+const NAME: Column<AlertEvent> = {
+  key: 'name',
+  header: '종목',
+  width: '6.5rem',
+  cell: (e) => e.name ?? e.code ?? '—',
+};
+const MESSAGE: Column<AlertEvent> = { key: 'message', header: '내용', cell: (e) => e.message };
+
+/** 좁은 칸은 종목 열을 뺀다(내용에 종목 이름이 들어 있다). */
+const columnsFor = (width: number) => (width >= 520 ? [TIME, NAME, MESSAGE] : [TIME, MESSAGE]);
 
 /** 알림 이력: 종목·종류로 거른 알림 표. 행을 누르면 그 종목의 감시·알림. */
-export function AlertHistoryPanel({ options }: PanelProps) {
+export function AlertHistoryPanel({ options, size }: PanelProps) {
   const events = useShared(alertEventsSource);
   const kind = typeof options.kind === 'string' ? options.kind : 'all';
   const symbol = typeof options.symbol === 'string' ? options.symbol : 'all';
@@ -70,7 +76,7 @@ export function AlertHistoryPanel({ options }: PanelProps) {
     <div className={styles.body}>
       <DataTable
         caption="알림 이력"
-        columns={COLUMNS}
+        columns={columnsFor(size.w)}
         rows={rows}
         rowKey={(e) => String(e.id)}
         onRowActivate={(e) => {
