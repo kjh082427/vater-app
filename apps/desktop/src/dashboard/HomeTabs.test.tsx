@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { errorResponse } from '../mocks/handlers';
 import { renderWithServices } from '../test/render';
 import { mock, server } from '../test/server';
@@ -59,6 +59,28 @@ describe('홈 탭: 문서 읽기', () => {
     expect(
       screen.getByText('저장된 화면 배치를 읽지 못해 기본 배치로 열었습니다.'),
     ).toBeInTheDocument();
+  });
+
+  it('일부 장만 깨졌으면 남은 장과 정보 배너, 콘솔에는 문제 목록만', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mock.db.dashboards = {
+      version: 1,
+      dashboards: [defaultDashboard('d0', '국내'), { id: 'x', name: 3 }],
+    };
+    renderWithServices(<Harness />);
+    expect(await screen.findByRole('tab', { name: '국내' })).toBeInTheDocument();
+    expect(screen.getByText('일부 화면을 읽지 못했습니다')).toBeInTheDocument();
+    expect(warn).toHaveBeenCalledWith('대시보드 문서 확인', ['2번째 화면: 이름이 올바르지 않음']);
+  });
+
+  it('모르는 내용 종류뿐이면 배너 없이 그 칸이 안내한다', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const board = defaultDashboard('d0', '국내');
+    board.panels[0] = { type: 'heatmap', options: {} };
+    mock.db.dashboards = { version: 1, dashboards: [board] };
+    renderWithServices(<Harness />);
+    expect(await screen.findByRole('tab', { name: '국내' })).toBeInTheDocument();
+    expect(screen.queryByText('일부 화면을 읽지 못했습니다')).not.toBeInTheDocument();
   });
 
   it('불러오기 실패면 사이드카 문구 그대로와 [다시 시도]', async () => {

@@ -23,7 +23,11 @@ export interface Validated {
   problems: string[];
   /** 깨진 문서라 기본 문서로 열었다(정보 배너를 보인다). */
   fallback: boolean;
+  /** 일부 장을 버렸거나 비율을 되돌렸다(정보 배너). 모르는 내용 종류는 그 칸이 안내하므로 넣지 않는다. */
+  partial: boolean;
 }
+
+export const UNKNOWN_PANEL = '모르는 내용 종류';
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -74,7 +78,7 @@ function readBoard(
   }
   const cells = list as PanelDoc[];
   for (const p of cells) {
-    if (!known.has(p.type)) problems.push(`${where}: 모르는 내용 종류 ${p.type}`);
+    if (!known.has(p.type)) problems.push(`${where}: ${UNKNOWN_PANEL} ${p.type}`);
   }
   let root: Node = layout.root as Node;
   if (!sameShape(layout.root, TEMPLATES[template].root)) {
@@ -108,9 +112,11 @@ function readBoard(
 export function validateDoc(raw: unknown, known: Set<string>): Validated {
   const problems: string[] = [];
   if (!isRecord(raw) || raw.version !== 1 || !Array.isArray(raw.dashboards)) {
-    return { doc: defaultDoc(), problems: ['문서 형식이 아님'], fallback: true };
+    return { doc: defaultDoc(), problems: ['문서 형식이 아님'], fallback: true, partial: false };
   }
-  if (raw.dashboards.length === 0) return { doc: defaultDoc(), problems, fallback: false };
+  if (raw.dashboards.length === 0) {
+    return { doc: defaultDoc(), problems, fallback: false, partial: false };
+  }
   const seen = new Set<string>();
   const boards: DashboardDoc[] = [];
   raw.dashboards.forEach((b, i) => {
@@ -121,10 +127,13 @@ export function validateDoc(raw: unknown, known: Set<string>): Validated {
     boards.push(board);
   });
   if (boards.length > MAX_DASHBOARDS) problems.push(`화면이 ${MAX_DASHBOARDS}장을 넘음`);
-  if (boards.length === 0) return { doc: structuredClone(DEFAULT_DOC), problems, fallback: true };
+  if (boards.length === 0) {
+    return { doc: structuredClone(DEFAULT_DOC), problems, fallback: true, partial: false };
+  }
   return {
     doc: { version: 1, dashboards: boards.slice(0, MAX_DASHBOARDS) },
     problems,
     fallback: false,
+    partial: problems.some((p) => !p.includes(UNKNOWN_PANEL)),
   };
 }

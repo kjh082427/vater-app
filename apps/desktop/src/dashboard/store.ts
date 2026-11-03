@@ -2,7 +2,7 @@
  * 대시보드 문서 저장(GET·PUT /ui/dashboards, 대시보드 설계 4장). 읽은 문서는 validateDoc으로
  * 확인하고, 깨졌으면 기본 문서로 연다. 저장은 바로 화면에 반영한 뒤 PUT 하고, 실패하면 되돌린다.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toApiError, type ApiError } from '../api/errors';
 import { useServices } from '../api/services';
 import { useResource } from '../api/useResource';
@@ -23,6 +23,8 @@ export interface DashboardStore {
   error: ApiError | null;
   /** 저장된 문서가 깨져 기본 배치로 열었다. 다음 저장 때 덮어쓴다. */
   fallback: boolean;
+  /** 일부 화면을 버렸거나 비율을 되돌렸다. 다음 저장 때 남은 것만 저장된다. */
+  partial: boolean;
   reload: () => void;
   /** 바로 반영하고 PUT. 실패하면 되돌리고 ApiError를 던진다. */
   save: (doc: DashboardsDoc) => Promise<void>;
@@ -37,6 +39,11 @@ export function useDashboards(): DashboardStore {
     () => (data === undefined ? null : validateDoc(data, KNOWN_PANELS)),
     [data],
   );
+  useEffect(() => {
+    // 무엇을 고쳤는지만 남긴다(문서 본문·토큰은 남기지 않는다)
+    if (validated && validated.problems.length > 0)
+      console.warn('대시보드 문서 확인', validated.problems);
+  }, [validated]);
 
   const save = useCallback(
     async (next: DashboardsDoc) => {
@@ -62,6 +69,7 @@ export function useDashboards(): DashboardStore {
     status,
     error: doc ? null : error,
     fallback: !pending && (validated?.fallback ?? false),
+    partial: !pending && (validated?.partial ?? false),
     reload,
     save,
   };

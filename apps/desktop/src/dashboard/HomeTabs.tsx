@@ -107,7 +107,7 @@ function RenameDialog({
 }
 
 export function HomeTabs({ store, tab, renderBoard, actions }: HomeTabsProps) {
-  const { doc, status, error, fallback, reload, save } = store;
+  const { doc, status, error, fallback, partial, reload, save } = store;
   const [saveError, setSaveError] = useState<ApiError | null>(null);
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const reasonId = useId();
@@ -174,6 +174,11 @@ export function HomeTabs({ store, tab, renderBoard, actions }: HomeTabsProps) {
       {fallback ? (
         <Banner tone="info" title="저장된 화면 배치를 읽지 못해 기본 배치로 열었습니다.">
           화면을 바꿔 저장하면 새 배치로 덮어씁니다.
+        </Banner>
+      ) : null}
+      {partial ? (
+        <Banner tone="info" title="일부 화면을 읽지 못했습니다">
+          읽은 화면만 열었습니다. 화면을 바꿔 저장하면 읽은 것만 남습니다.
         </Banner>
       ) : null}
       {saveError ? (
