@@ -2,7 +2,7 @@
  * 대시보드 문서 저장(GET·PUT /ui/dashboards, 대시보드 설계 4장). 읽은 문서는 validateDoc으로
  * 확인하고, 깨졌으면 기본 문서로 연다. 저장은 바로 화면에 반영한 뒤 PUT 하고, 실패하면 되돌린다.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toApiError, type ApiError } from '../api/errors';
 import { useServices } from '../api/services';
 import { useResource } from '../api/useResource';
@@ -45,16 +45,19 @@ export function useDashboards(): DashboardStore {
       console.warn('대시보드 문서 확인', validated.problems);
   }, [validated]);
 
+  // 저장이 겹치면(빠른 두 번 옮기기) 마지막 저장만 화면을 정한다: 늦게 온 앞 응답은 무시한다
+  const seq = useRef(0);
   const save = useCallback(
     async (next: DashboardsDoc) => {
+      const my = ++seq.current;
       setPending(next);
       try {
         const saved = await api.request<unknown>('/ui/dashboards', { method: 'PUT', body: next });
-        mutate(() => saved);
+        if (my === seq.current) mutate(() => saved);
       } catch (e) {
         throw toApiError(e);
       } finally {
-        setPending(null);
+        if (my === seq.current) setPending(null);
       }
     },
     [api, mutate],

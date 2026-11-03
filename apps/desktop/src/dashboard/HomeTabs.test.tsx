@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { errorResponse } from '../mocks/handlers';
 import { renderWithServices } from '../test/render';
@@ -212,6 +212,33 @@ describe('홈 탭: 조작마다 PUT 1번', () => {
     await user.click(within(menu).getByRole('menuitem', { name: /오른쪽으로 옮기기/ }));
     await waitFor(() => expect(tabNames()).toEqual(['국내', '미국']));
     await waitFor(() => expect(puts).toHaveLength(2));
+  });
+
+  it('빠르게 두 번 옮기면 늦게 온 첫 응답이 화면을 되돌리지 않는다', async () => {
+    const user = userEvent.setup();
+    let n = 0;
+    server.use(
+      http.put('*/ui/dashboards', async ({ request }) => {
+        const body = (await request.json()) as object;
+        n += 1;
+        // 첫 저장의 응답이 두 번째보다 늦게 온다
+        if (n === 1) await new Promise((r) => setTimeout(r, 300));
+        return HttpResponse.json(body);
+      }),
+    );
+    mock.db.dashboards = docOf('가', '나', '다');
+    renderWithServices(<Harness tab="d0" />);
+    await user.click(
+      within(await openTabMenu(user)).getByRole('menuitem', { name: /오른쪽으로 옮기기/ }),
+    );
+    await waitFor(() => expect(tabNames()).toEqual(['나', '가', '다']));
+    await user.click(
+      within(await openTabMenu(user)).getByRole('menuitem', { name: /오른쪽으로 옮기기/ }),
+    );
+    await waitFor(() => expect(tabNames()).toEqual(['나', '다', '가']));
+    await waitFor(() => expect(n).toBe(2));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(tabNames()).toEqual(['나', '다', '가']);
   });
 
   it('저장 실패면 이전 상태로 돌리고 사이드카 문구를 보인다', async () => {
