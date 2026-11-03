@@ -134,3 +134,23 @@
 .textLink:hover {
   text-decoration-color: var(--color-ink);
 }
+
+/* 종목 검색 결과 */
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--rule-hair) solid var(--color-line);
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--size-row);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.resultAction {
+  margin-left: auto;
+}

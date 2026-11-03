@@ -4,6 +4,7 @@ import { useResource } from '../api/useResource';
 import type { CheckOut } from '../api/types';
 import { AppShell, Banner, Button, Icon, SidebarNav, type NavItem } from '../design-system';
 import { ScreenHeader } from '../screens/common/ScreenHeader';
+import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { formatClock } from '../screens/common/time';
 import styles from './app.module.css';
@@ -122,8 +123,9 @@ function screenFor(route: Route): ReactNode {
     case 'analysis':
       return <Placeholder title="분석" />;
     case 'alerts':
+      return <AlertsScreen focus={null} />;
     case 'symbol':
-      return <Placeholder title="감시·알림" />;
+      return <AlertsScreen focus={{ market: route.market, code: route.code }} />;
     case 'briefings':
     case 'briefing':
       return <Placeholder title="브리핑" />;
