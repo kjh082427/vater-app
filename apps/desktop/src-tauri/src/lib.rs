@@ -49,6 +49,7 @@ pub fn run() {
             commands::get_sidecar_info,
             commands::get_autostart,
             commands::set_autostart,
+            commands::open_log_folder,
         ])
         .on_window_event(|window, event| {
             // 창을 닫으면 트레이로 숨긴다. 처음 한 번은 안내 알림 (스펙 2-1)
