@@ -21,6 +21,7 @@ use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 
 use crate::events::{self, SidecarEvent};
+use crate::job;
 use crate::launch;
 use crate::restart::{Decision, RestartPolicy};
 
@@ -296,6 +297,9 @@ where
         let Ok(mut child) = cmd.spawn() else {
             return RunEnd::Exited;
         };
+        // Windows: 셸이 비정상 종료돼도 사이드카가 남지 않게 셸의 작업 개체에 넣는다.
+        // 넣지 못해도 사이드카는 그대로 쓴다(정상 종료 경로는 따로 정리한다).
+        let _ = job::bind_to_shell(&child);
         let (ready_tx, mut ready_rx) = mpsc::unbounded_channel();
         if let Some(stdout) = child.stdout.take() {
             tokio::spawn(read_events(
