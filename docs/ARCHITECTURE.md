@@ -23,7 +23,7 @@ Vater.exe (Tauri 셸) ── React UI ──HTTP/SSE──► vater-core (Python
 | 일일 브리핑 | `sidecar/src/vater_core/briefing` (+ `api/routes/briefings.py`) | `core/briefing` (+ `-session-bounds`, `-kr-index-closes`) | [#8](https://github.com/kjh082427/vater-app/pull/8), [#10](https://github.com/kjh082427/vater-app/pull/10), [#14](https://github.com/kjh082427/vater-app/pull/14) | 브리핑 시각·놓친 브리핑 규칙, 수집 항목, AI 프롬프트(숫자 금지)·해석 형식, 부분 실패 처리 |
 | 데스크톱 셸 | `apps/desktop/src-tauri` | `shell/tauri` | — | 트레이, 알림 표시, 자동 실행, 사이드카 관리 |
 | 디자인 시스템 | `apps/desktop/src/design-system` (+ `apps/desktop` 뼈대: `package.json`, `vite.config.ts`, `gallery.html`) | `ui/design-system` | [#15](https://github.com/kjh082427/vater-app/pull/15) | **색, 글꼴, 버튼 같은 겉모양**, 숫자 표기(`format/money.ts`). 규칙은 저장소 루트 `DESIGN.md`, 견본은 `gallery.html` |
-| 화면 | `apps/desktop/src/screens` | `ui/screens` | — | **화면 배치와 흐름** |
+| 화면 | `apps/desktop/src/{api,platform,app,screens,mocks}`, `apps/desktop/e2e` (+ `mock.html`, `playwright.config.ts`) | `ui/screens` | — | **화면 배치와 흐름**: 사이드카 API 타입(OpenAPI → `schema.d.ts`)·클라이언트·SSE 허브, 셸 어댑터(`platform/`), 해시 라우터와 앱 틀, 홈·분석·감시·알림·브리핑·설정·첫 실행 마법사, MSW 사이드카 흉내, 실제 개발 모드 사이드카와의 흐름 테스트(Playwright). 남은 일은 `apps/desktop/README.md` |
 | 배포 | `.github/workflows`, `packaging/` | `infra/release` | — | 설치 파일, 자동 업데이트 |
 | 3단계 확인 테스트 | `sidecar/tests/acceptance` (계획 `docs/superpowers/plans/2026-11-03-stage-3-acceptance.md`) | `core/acceptance` | [#12](https://github.com/kjh082427/vater-app/pull/12) | 사이드카 전체를 실제 흐름대로 확인(프로세스 수명, 알림 지연 5초/60초, 끊김·오프라인 복구, 분석·브리핑 → 이력). 기능을 바꾸면 여기도 통과해야 한다 |
 | 검증 실험 | `spikes/` | `spike/tradingagents-local-llm` | [#3](https://github.com/kjh082427/vater-app/pull/3) | (앱 코드 아님) 결과는 `spikes/tradingagents-local-llm/REPORT.md` |

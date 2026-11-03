@@ -1,0 +1,67 @@
+/* 홈. 색은 토큰만 쓴다. */
+
+.brief {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.briefFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* 알림·분석 목록: 행 사이 가는 선, 카드 상자 없음 */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--space-0-5);
+  padding: var(--space-2-5) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.itemLink {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.itemLink:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.itemLink b {
+  font-weight: var(--weight-semibold);
+}
+
+.itemMeta {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+.progress {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  color: var(--color-ink-2);
+}
