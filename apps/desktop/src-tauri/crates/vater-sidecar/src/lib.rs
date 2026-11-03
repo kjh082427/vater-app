@@ -4,4 +4,5 @@
 //! Tauri 앱 크레이트(`apps/desktop/src-tauri`)가 이 크레이트를 경로 의존성으로 쓴다.
 
 pub mod events;
+pub mod launch;
 pub mod restart;

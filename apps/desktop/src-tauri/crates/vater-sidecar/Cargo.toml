@@ -8,3 +8,4 @@ publish = false
 # 버전은 배포된 지 2주가 지난 것으로 고정한다 (shell/tauri 계획서 Tech Stack).
 [dependencies]
 serde_json = "=1.0.154"
+rand = "=0.10.3"
