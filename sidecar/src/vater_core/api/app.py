@@ -14,6 +14,7 @@ from vater_core.api.routes import (
     events,
     kis,
     llm,
+    market,
     secrets,
     settings,
     system,
@@ -59,6 +60,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     authed.include_router(alerts.router)
     authed.include_router(briefings.router)
     authed.include_router(ui.router)
+    authed.include_router(market.router)
     app.include_router(authed)
     # SSE는 브라우저 EventSource가 헤더를 못 붙이므로 쿼리 토큰도 받는 별도 인증을 쓴다.
     app.include_router(events.router)

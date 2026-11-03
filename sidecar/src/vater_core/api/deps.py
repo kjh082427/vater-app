@@ -22,6 +22,7 @@ if (
     from vater_core.briefing.service import BriefingService
     from vater_core.kis.services import KisServices
     from vater_core.llm.state import LlmState
+    from vater_core.market.indices import IndexBoard
 
 
 def _noop() -> None:
@@ -43,6 +44,7 @@ class AppDeps:
     analysis: AnalysisQueue | None = None  # analysis.queue.get_analysis()가 만든다
     alerts: AlertMonitor | None = None  # alerts.monitor.get_alerts()가 만든다
     briefing: BriefingService | None = None  # briefing.service.get_briefing()이 만든다
+    indices: IndexBoard | None = None  # api.routes.market이 처음 부를 때 만든다
 
 
 def get_deps(request: Request) -> AppDeps:
