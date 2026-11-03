@@ -14,6 +14,7 @@ import type { Platform } from '../platform';
 import { createClient, type ApiClient } from './client';
 import { SidecarConnection } from './connection';
 import { EventHub, type EventHubOptions, type StreamStatus } from './events';
+import { ProgressTracker, type ProgressState } from './progress';
 import type { EventMap, EventType } from './types';
 
 export interface Services {
@@ -21,6 +22,8 @@ export interface Services {
   connection: SidecarConnection;
   api: ApiClient;
   events: EventHub;
+  /** 분석 진행 상황(SSE analysis.progress)을 화면과 상관없이 모은다. */
+  progress: ProgressTracker;
 }
 
 export interface ServicesOptions extends EventHubOptions {
@@ -31,7 +34,7 @@ export function createServices(platform: Platform, options: ServicesOptions = {}
   const connection = new SidecarConnection(platform);
   const api = createClient(connection, options.fetchImpl);
   const events = new EventHub(connection, options);
-  return { platform, connection, api, events };
+  return { platform, connection, api, events, progress: new ProgressTracker(events) };
 }
 
 /** 접속 정보 감시와 SSE 연결을 시작한다. 멈추는 함수를 돌려준다. */
@@ -82,5 +85,14 @@ export function useStreamStatus(): StreamStatus {
   return useSyncExternalStore(
     (notify) => events.onStatus(notify),
     () => events.status,
+  );
+}
+
+/** 분석 하나의 진행 상황(아직 받은 소식이 없으면 undefined). */
+export function useAnalysisProgress(id: number): ProgressState | undefined {
+  const { progress } = useServices();
+  return useSyncExternalStore(
+    (notify) => progress.subscribe(notify),
+    () => progress.get(id),
   );
 }

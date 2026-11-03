@@ -126,3 +126,22 @@
   font-size: var(--text-sm);
   color: var(--color-ink-3);
 }
+
+/* 키 받는 방법: 펼쳐 보는 안내 */
+.help {
+  max-width: var(--size-prose);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.help summary {
+  cursor: pointer;
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.help p {
+  margin-top: var(--space-2);
+}

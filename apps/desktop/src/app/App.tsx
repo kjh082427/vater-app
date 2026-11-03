@@ -213,6 +213,7 @@ function Shell({ route }: { route: Route }) {
             <SidebarFooter
               state={monitor.data?.state}
               server={settings.data?.['kis.server']}
+              stale={stream === 'disconnected'}
               onState={(state) => monitor.mutate((prev) => (prev ? { ...prev, state } : prev))}
             />
           }
@@ -226,6 +227,7 @@ function Shell({ route }: { route: Route }) {
           llmError={llm.error}
           analyses={analyses}
           lastEventAt={lastEventAt}
+          stale={stream === 'disconnected'}
         />
       }
     >

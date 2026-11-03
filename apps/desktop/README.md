@@ -78,3 +78,4 @@ npm run e2e         # 흐름 테스트: 아래
 - `DataTable`은 행이 0개일 때 숫자 열 머리가 어긋난다. 화면은 빈 표 대신 한 줄 안내를 보인다.
 - 입력 칸·선택·체크 상자·진행 막대 부품이 없다. DESIGN.md "Inputs / Fields" 규칙대로 `screens/common/Field.tsx`·`form.module.css`에 짰다. DESIGN.md의 그 절은 아직 비어 있다.
 - `format/money.ts`에 부호 없는 억 단위 금액(거래대금) 표기가 없다. 브리핑 상위 종목은 열 머리에 "(억 원)"을 달고 `formatNumber`로 보인다.
+- `fonts.test.ts`의 "외부 글꼴을 불러오지 않는다" 검사가 `node_modules`까지 모두 훑은 뒤 거른다. 의존성이 늘어 전체 실행 중 한 번 5초 제한에 걸린 적이 있다(혼자 돌리면 약 1초).

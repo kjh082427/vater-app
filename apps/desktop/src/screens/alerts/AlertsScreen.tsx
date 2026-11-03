@@ -63,7 +63,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     <>
       <ScreenHeader
         title="감시·알림"
-        lede="종목을 펼쳐 알림 규칙을 만듭니다. 조건이 거짓에서 참으로 바뀔 때만, 같은 규칙은 하루 한 번 알립니다."
+        lede="종목을 펼쳐 알림 규칙을 만듭니다. 조건을 새로 만족할 때만 알리고, 같은 규칙은 하루에 한 번만 알립니다."
         end={
           <Button variant="primary" onClick={() => setAdding(true)}>
             종목 추가

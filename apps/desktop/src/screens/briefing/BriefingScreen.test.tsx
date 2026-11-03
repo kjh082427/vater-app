@@ -286,6 +286,9 @@ describe('브리핑 상세: 미국', () => {
       await screen.findByRole('heading', { level: 1, name: '11월 2일(월) 미국 시장 브리핑' }),
     ).toBeInTheDocument();
     expect(screen.getByText('AI 해석 없음(데이터만)')).toBeInTheDocument();
+    // AI 해석만 빠졌으면 머리에 "일부 항목 빠짐"이라고 하지 않는다(무엇이 빠졌는지 그대로)
+    expect(screen.getByText('11월 3일 07:00 만듦 · AI 해석 없음')).toBeInTheDocument();
+    expect(screen.queryByText(/일부 항목 빠짐/)).not.toBeInTheDocument();
     expect(document.querySelectorAll('[data-voice="ai"]')).toHaveLength(0);
     const table = within(region('지수')).getByRole('table', { name: '지수' });
     expect(within(table).getAllByRole('row')).toHaveLength(4);

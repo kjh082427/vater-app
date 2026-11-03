@@ -48,43 +48,64 @@ export function KisServerChoice({
 
 /**
  * 연결 테스트(POST /settings/kis/test): 토큰을 받고 삼성전자 현재가를 조회해 본다.
- * 성공하면 onResult(true). 실패는 사이드카의 message와 hint를 그대로.
+ * 저장된 키와 서버로 시험하므로, 키나 서버가 바뀌면 reset으로 이전 결과를 지운다.
  */
-export function KisConnectionTest({ onResult }: { onResult?: (ok: boolean) => void }) {
+export function useKisTest() {
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<KisTestResult | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
-  async function run() {
+  async function run(): Promise<boolean> {
     setBusy(true);
     setError(null);
     setResult(null);
     try {
       const out = await api.request<KisTestResult>('/settings/kis/test', { method: 'POST' });
       setResult(out);
-      onResult?.(out.ok);
+      return out.ok;
     } catch (e) {
       setError(toApiError(e));
-      onResult?.(false);
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
+  function reset() {
+    setResult(null);
+    setError(null);
+  }
+
+  return { busy, result, error, run, reset };
+}
+
+export type KisTest = ReturnType<typeof useKisTest>;
+
+/** 연결 테스트 결과: 성공은 서버와 삼성전자 현재가, 실패는 사이드카의 message와 hint 그대로. */
+export function KisTestOutcome({ test }: { test: KisTest }) {
+  return (
+    <>
+      {test.result ? (
+        <span role="status" className={styles.ok}>
+          {`연결됨: ${SERVER_LABEL[test.result.server] ?? test.result.server} 서버 · 삼성전자 현재가 ${formatWon(test.result.sample.price)}`}
+        </span>
+      ) : null}
+      {test.error ? <ApiErrorNotice error={test.error} /> : null}
+    </>
+  );
+}
+
+/** [연결 테스트] 버튼과 결과(설정 화면). */
+export function KisConnectionTest({ test }: { test: KisTest }) {
   return (
     <div className={styles.fields}>
       <div className={form.actions}>
-        <Button busy={busy} onClick={run}>
-          {busy ? '확인 중…' : '연결 테스트'}
+        <Button busy={test.busy} onClick={() => void test.run()}>
+          {test.busy ? '확인 중…' : '연결 테스트'}
         </Button>
-        {result ? (
-          <span role="status" className={styles.ok}>
-            {`연결됨: ${SERVER_LABEL[result.server] ?? result.server} 서버 · 삼성전자 현재가 ${formatWon(result.sample.price)}`}
-          </span>
-        ) : null}
       </div>
-      {error ? <ApiErrorNotice error={error} /> : null}
+      <KisTestOutcome test={test} />
     </div>
   );
 }
@@ -101,11 +122,25 @@ export function KisSettings({
   settings: Settings | undefined;
   save: (changes: Settings) => Promise<boolean>;
 }) {
+  const test = useKisTest();
   return (
     <div className={styles.body}>
-      <SecretForm fields={KIS_FIELDS} status={secrets} onSaved={onSecretsSaved} />
-      <KisServerChoice settings={settings} save={save} />
-      <KisConnectionTest />
+      <SecretForm
+        fields={KIS_FIELDS}
+        status={secrets}
+        onSaved={() => {
+          test.reset();
+          onSecretsSaved();
+        }}
+      />
+      <KisServerChoice
+        settings={settings}
+        save={(changes) => {
+          test.reset();
+          return save(changes);
+        }}
+      />
+      <KisConnectionTest test={test} />
     </div>
   );
 }

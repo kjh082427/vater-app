@@ -105,6 +105,15 @@ describe('한국투자증권', () => {
     ).toBeInTheDocument();
   });
 
+  it('서버를 바꾸면 이전 연결 테스트 결과를 지운다(저장된 키·서버와 맞지 않으므로)', async () => {
+    renderSettings();
+    const part = await waitFor(() => region('한국투자증권'));
+    await userEvent.click(within(part).getByRole('button', { name: '연결 테스트' }));
+    await within(part).findByText(/연결됨: 실전 서버/);
+    await userEvent.click(within(part).getByRole('radio', { name: '모의' }));
+    await waitFor(() => expect(within(part).queryByText(/연결됨:/)).not.toBeInTheDocument());
+  });
+
   it('연결 테스트 실패: message와 hint', async () => {
     server.use(
       http.post('*/settings/kis/test', () =>

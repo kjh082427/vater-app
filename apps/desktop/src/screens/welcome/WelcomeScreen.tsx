@@ -13,7 +13,7 @@ import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { withObjectParticle } from '../common/text';
 import { CloudSettings } from '../settings/CloudSection';
-import { KIS_FIELDS, KisConnectionTest, KisServerChoice } from '../settings/KisSection';
+import { KIS_FIELDS, KisServerChoice, KisTestOutcome, useKisTest } from '../settings/KisSection';
 import { LocalSettings } from '../settings/LocalSection';
 import { SecretForm } from '../settings/SecretForm';
 import { useSettings, type Settings } from '../settings/useSettings';
@@ -57,29 +57,44 @@ function KisStep({
   save: (changes: Settings) => Promise<boolean>;
   onTested: (ok: boolean) => void;
 }) {
+  const test = useKisTest();
+  const saved = Boolean(secrets?.KIS_APP_KEY && secrets?.KIS_APP_SECRET);
   return (
     <div className={styles.body}>
       <h2 className={styles.heading}>한국투자증권 연결</h2>
       <p className={styles.text}>
-        한국투자증권 KIS Developers에서 발급한 앱키와 앱시크릿을 넣고, 실전·모의 중 키를 받은 서버를
-        고른 뒤 연결 테스트를 누르세요. 시세 조회만 하며 주문은 하지 않습니다.
+        앱키와 앱시크릿을 넣고, 키를 받은 서버(실전·모의)를 고른 뒤 저장하고 연결 테스트를 누르세요.
+        입력한 키를 저장한 다음 바로 그 키로 시험합니다. 시세 조회만 하며 주문은 하지 않습니다.
       </p>
-      <SecretForm
-        fields={KIS_FIELDS}
-        status={secrets}
-        onSaved={() => {
-          onTested(false); // 키가 바뀌었으니 다시 확인해야 한다
-          onSecretsSaved();
-        }}
-      />
+      <details className={styles.help}>
+        <summary>앱키는 어디서 받나요?</summary>
+        <p>
+          한국투자증권 홈페이지나 앱의 KIS Developers에서 Open API를 신청하면 앱키와 앱시크릿이
+          나옵니다. 모의투자로 신청한 키라면 아래에서 모의 서버를 고르세요. 키는 이 PC에만
+          저장됩니다.
+        </p>
+      </details>
       <KisServerChoice
         settings={settings}
         save={async (changes) => {
+          test.reset(); // 이전 결과는 다른 서버의 것이다
           onTested(false);
           return save(changes);
         }}
       />
-      <KisConnectionTest onResult={onTested} />
+      <SecretForm
+        fields={KIS_FIELDS}
+        status={secrets}
+        label="저장하고 연결 테스트"
+        allowEmpty={saved}
+        emptyMessage="앱키와 앱시크릿을 입력하세요."
+        onSaved={async () => {
+          onTested(false);
+          onSecretsSaved();
+          onTested(await test.run());
+        }}
+      />
+      <KisTestOutcome test={test} />
     </div>
   );
 }

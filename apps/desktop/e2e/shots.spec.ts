@@ -22,7 +22,9 @@ test('첫 실행 마법사 배율 1.5', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 2, name: 'Vater를 소개합니다' })).toBeVisible();
   await page.screenshot({ path: `${OUT}/welcome-1280x800@1.5x.png` });
   await page.getByRole('button', { name: '다음' }).click();
-  await page.getByRole('button', { name: '연결 테스트' }).click();
+  await page.getByLabel('앱키').fill('예시-앱키');
+  await page.getByLabel('앱시크릿').fill('예시-앱시크릿');
+  await page.getByRole('button', { name: '저장하고 연결 테스트' }).click();
   await expect(page.getByText(/연결됨: 실전 서버/)).toBeVisible();
   await page.screenshot({ path: `${OUT}/welcome-kis-1280x800@1.5x.png` });
 });

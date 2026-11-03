@@ -54,7 +54,8 @@ test('첫 실행: 키가 없으면 마법사, 가짜 키는 저장되지만 연�
 
   await page.getByLabel('앱키').fill(FAKE_KIS_KEY);
   await page.getByLabel('앱시크릿').fill(FAKE_KIS_SECRET);
-  await page.getByRole('button', { name: '키 저장' }).click();
+  // 한 동작: 입력한 키를 저장한 다음 바로 그 키로 연결 테스트
+  await page.getByRole('button', { name: '저장하고 연결 테스트' }).click();
   await expect(page.getByText('저장됨', { exact: true })).toBeVisible();
   await expect(page.getByText('앱키 저장됨')).toBeVisible();
   await expect(page.getByLabel('앱키')).toHaveValue('');
@@ -67,7 +68,6 @@ test('첫 실행: 키가 없으면 마법사, 가짜 키는 저장되지만 연�
   expect(secrets).not.toContain(FAKE_KIS_KEY);
 
   // 가짜 키: 한투가 거절하거나(KIS_AUTH_INVALID) 인터넷이 없으면 연결 실패. 어느 쪽이든 원인이 보인다.
-  await page.getByRole('button', { name: '연결 테스트' }).click();
   const failure = page.getByRole('status').filter({ hasText: '한국투자증권' });
   await expect(failure.first()).toBeVisible({ timeout: 45_000 });
   // 어떤 실패였는지 보고서에 남긴다(인터넷이 되는 PC는 인증 실패, 아니면 연결 실패)

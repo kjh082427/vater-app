@@ -179,6 +179,18 @@ describe('감시 종목', () => {
     expect(await within(table).findAllByText('끊김 · 재연결 중')).toHaveLength(3);
   });
 
+  it('SSE가 끊긴 동안 수신 열은 실시간이라고 말하지 않는다', async () => {
+    const { stream } = renderWithServices(<HomeScreen />, { retryDelaysMs: [60_000] });
+    const table = await within(section('감시 종목')).findByRole('table', { name: '감시 종목' });
+    await within(table).findByText('실시간');
+    const source = await stream();
+    act(() => source.fail());
+    // 장 마감 종목은 그대로(실시간이라고 주장하지 않으므로), 나머지는 끊김
+    expect(await within(table).findAllByText('끊김 · 재연결 중')).toHaveLength(2);
+    expect(within(table).queryByText('실시간')).not.toBeInTheDocument();
+    expect(within(table).getByText('장 마감')).toBeInTheDocument();
+  });
+
   it('가격이 없으면 "—"와 "데이터 없음"', async () => {
     mock.db.watchQuotes = mock.db.watchQuotes.map((q) =>
       q.code === '005930' ? { ...q, price: null, change: null, change_pct: null } : q,

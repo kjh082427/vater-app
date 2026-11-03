@@ -22,8 +22,12 @@ async function toKisStep() {
   await waitFor(() => expect(step()).toHaveTextContent('한국투자증권 연결'));
 }
 
+const SAVE_AND_TEST = '저장하고 연결 테스트';
+
 async function passKisTest() {
-  await userEvent.click(screen.getByRole('button', { name: '연결 테스트' }));
+  await userEvent.type(screen.getByLabelText('앱키'), 'fake-app-key');
+  await userEvent.type(screen.getByLabelText('앱시크릿'), 'fake-app-secret');
+  await userEvent.click(screen.getByRole('button', { name: SAVE_AND_TEST }));
   await screen.findByText(/연결됨: 실전 서버/);
 }
 
@@ -44,8 +48,13 @@ describe('첫 실행 마법사', () => {
     expect(screen.queryByRole('button', { name: '뒤로' })).not.toBeInTheDocument();
   });
 
-  it('② 한투: 연결 테스트를 통과해야 다음으로 간다(건너뛰기 없음), 실패하면 원인', async () => {
+  it('② 한투: 입력한 키를 저장하고 바로 그 키로 시험한다(한 동작), 통과해야 다음(건너뛰기 없음)', async () => {
     let fail = true;
+    const order: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method !== 'GET') order.push(`${request.method} ${path}`);
+    });
     server.use(
       http.post('*/settings/kis/test', () =>
         fail
@@ -62,18 +71,26 @@ describe('첫 실행 마법사', () => {
     await toKisStep();
     expect(next()).toBeDisabled();
     expect(screen.queryByRole('button', { name: /건너뛰기|나중에/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '연결 테스트' })).not.toBeInTheDocument();
     expect(screen.getByText('연결 테스트에 성공하면 다음으로 갈 수 있습니다.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('앱키'), 'fake-app-key');
     await userEvent.type(screen.getByLabelText('앱시크릿'), 'fake-app-secret');
-    await userEvent.click(screen.getByRole('button', { name: '키 저장' }));
-    await screen.findByText('저장됨');
-    await userEvent.click(screen.getByRole('button', { name: '연결 테스트' }));
+    await userEvent.click(screen.getByRole('button', { name: SAVE_AND_TEST }));
     expect(await screen.findByText('한국투자증권 인증에 실패했습니다.')).toBeInTheDocument();
+    expect(order).toEqual([
+      'PUT /secrets/KIS_APP_KEY',
+      'PUT /secrets/KIS_APP_SECRET',
+      'POST /settings/kis/test',
+    ]);
     expect(next()).toBeDisabled();
 
+    // 서버를 바꾸면 이전 결과를 지운다. 키는 이미 저장되어 있으니 칸이 비어도 시험만 한다
     fail = false;
     await userEvent.click(screen.getByRole('radio', { name: '모의' }));
-    await userEvent.click(screen.getByRole('button', { name: '연결 테스트' }));
+    await waitFor(() =>
+      expect(screen.queryByText('한국투자증권 인증에 실패했습니다.')).not.toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: SAVE_AND_TEST }));
     expect(
       await screen.findByText('연결됨: 모의 서버 · 삼성전자 현재가 71,400원'),
     ).toBeInTheDocument();
@@ -82,15 +99,29 @@ describe('첫 실행 마법사', () => {
     await waitFor(() => expect(step()).toHaveTextContent('AI 엔진'));
   });
 
-  it('키를 새로 저장하면 연결 테스트를 다시 해야 한다', async () => {
+  it('통과한 뒤 키를 바꾸거나 서버를 바꾸면 "연결됨"을 지우고 다시 시험해야 한다', async () => {
     renderWizard();
     await toKisStep();
     await passKisTest();
     expect(next()).toBeEnabled();
-    await userEvent.type(screen.getByLabelText('앱키'), 'another-fake-key');
-    await userEvent.click(screen.getByRole('button', { name: '키 저장' }));
-    await screen.findByText('저장됨');
+    await userEvent.click(screen.getByRole('radio', { name: '모의' }));
+    await waitFor(() => expect(screen.queryByText(/연결됨:/)).not.toBeInTheDocument());
     expect(next()).toBeDisabled();
+  });
+
+  it('키가 없는데 비운 채로 누르면 이유를 알려 준다', async () => {
+    renderWizard();
+    await toKisStep();
+    await userEvent.click(screen.getByRole('button', { name: SAVE_AND_TEST }));
+    expect(await screen.findByText('앱키와 앱시크릿을 입력하세요.')).toBeInTheDocument();
+    expect(next()).toBeDisabled();
+  });
+
+  it('키를 받는 방법을 펼쳐 볼 수 있다', async () => {
+    renderWizard();
+    await toKisStep();
+    await userEvent.click(screen.getByText('앱키는 어디서 받나요?'));
+    expect(screen.getByText(/KIS Developers/)).toBeVisible();
   });
 
   it('뒤로', async () => {

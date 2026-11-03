@@ -1,34 +1,28 @@
-import { useState } from 'react';
-import { useEvent } from '../../api/services';
+import { useAnalysisProgress, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AnalysisItem } from '../../api/types';
 import { Section } from '../../design-system';
 import { hrefOf } from '../../app/router';
-import {
-  isActiveStatus,
-  stageLabel,
-  STATUS_LABEL,
-  visibleStage,
-  type StageId,
-} from '../analysis/stages';
+import type { ProgressState } from '../../api/progress';
+import { isActiveStatus, stageLabel, STATUS_LABEL } from '../analysis/stages';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
 import common from '../common/screen.module.css';
 import { formatDay, formatDuration } from '../common/time';
 import styles from './home.module.css';
 
-interface Progress {
-  stage: StageId | null;
-  elapsed: number;
-}
-
-function progressText(item: AnalysisItem, progress: Progress | undefined): string {
+function progressText(item: AnalysisItem, progress: ProgressState | undefined): string {
   const parts = [STATUS_LABEL[item.status] ?? item.status];
   if (item.status === 'running' && progress) {
-    if (progress.stage) parts.push(stageLabel(progress.stage));
+    if (progress.current) parts.push(stageLabel(progress.current));
     parts.push(formatDuration(progress.elapsed));
   }
   return parts.join(' · ');
+}
+
+function ProgressLine({ item }: { item: AnalysisItem }) {
+  const progress = useAnalysisProgress(item.id);
+  return <span className={`${styles.progress} vt-num`}>{progressText(item, progress)}</span>;
 }
 
 /** 진행 중인 분석: 대기·실행 중인 분석과 단계·경과 시간(SSE analysis.status / analysis.progress). */
@@ -37,7 +31,6 @@ export function ActiveAnalyses() {
     const items = await api.request<AnalysisItem[]>('/analyses', { query: { limit: 20 } });
     return items.filter((a) => isActiveStatus(a.status));
   });
-  const [progress, setProgress] = useState<Record<number, Progress>>({});
   const { data, mutate, reload } = list;
 
   useEvent('analysis.status', (event) => {
@@ -53,14 +46,6 @@ export function ActiveAnalyses() {
       reload(); // 새 분석: 종목 이름이 필요하다
     }
   });
-  useEvent('analysis.progress', (p) =>
-    setProgress((prev) => ({
-      ...prev,
-      // other 단계는 보이지 않는다: 직전에 보이던 단계를 그대로 둔다
-      [p.id]: { stage: visibleStage(p.stage) ?? prev[p.id]?.stage ?? null, elapsed: p.elapsed_sec },
-    })),
-  );
-
   return (
     <Section title="진행 중인 분석">
       {list.error ? (
@@ -87,7 +72,7 @@ export function ActiveAnalyses() {
                   {`${marketLabel(a.market)} ${a.code} · 기준일 ${formatDay(a.as_of)}`}
                 </span>
               </span>
-              <span className={`${styles.progress} vt-num`}>{progressText(a, progress[a.id])}</span>
+              <ProgressLine item={a} />
             </li>
           ))}
         </ul>

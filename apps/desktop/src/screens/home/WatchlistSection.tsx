@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useEvent } from '../../api/services';
+import { useEvent, useStreamStatus } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { WatchQuote } from '../../api/types';
 import { Button, DataTable, Section, SignedNumber, type Column } from '../../design-system';
@@ -88,7 +88,11 @@ export function WatchlistSection({ settings }: { settings?: Record<string, unkno
   }, [hasIdle, reload]);
 
   const poll = settings?.['alerts.poll_interval_sec'];
-  const rows = quotes.data;
+  // SSE가 끊긴 동안은 수신 상태를 모른다: 마지막 상태(실시간 등)를 그대로 두지 않는다
+  const stale = useStreamStatus() === 'disconnected';
+  const rows = stale
+    ? quotes.data?.map((r) => (r.feed === 'closed' ? r : { ...r, feed: 'offline' as const }))
+    : quotes.data;
   return (
     <Section
       title="감시 종목"

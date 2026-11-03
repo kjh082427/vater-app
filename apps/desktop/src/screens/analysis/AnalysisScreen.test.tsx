@@ -183,6 +183,43 @@ describe('진행 타임라인', () => {
     expect(within(steps).getByText('트레이더').closest('li')).toHaveTextContent('대기');
   });
 
+  it('다른 화면에 있는 동안 받은 진행도 분석 화면을 열면 보인다(홈과 같은 진행 상황)', async () => {
+    addRunning(40);
+    const { stream } = renderAt('#/home');
+    await screen.findByRole('heading', { level: 1, name: '홈' });
+    const source = await stream();
+    emit(source, 'analysis.progress', {
+      id: 40,
+      stage: 'analysts',
+      node: 'Market Analyst',
+      elapsed_sec: 412.4,
+    });
+    emit(source, 'analysis.progress', {
+      id: 40,
+      stage: 'research',
+      node: 'Bull Researcher',
+      elapsed_sec: 530,
+    });
+    act(() => {
+      window.location.hash = '#/analyses/40';
+    });
+    const progress = await screen.findByRole('region', { name: '진행' });
+    const steps = within(progress).getByRole('list', { name: '진행 단계' });
+    expect(within(steps).getByText('애널리스트').closest('li')).toHaveTextContent('6분 52초');
+    expect(within(steps).getByText('강세·약세 토론').closest('li')).toHaveTextContent('진행 중');
+    expect(within(progress).getByText('경과 8분 50초')).toBeInTheDocument();
+  });
+
+  it('진행 소식을 아직 못 받았으면 모두 대기로 보이지 않고 "단계 확인 중"과 요청 시각', async () => {
+    addRunning(40);
+    renderAt('#/analyses/40');
+    const progress = await screen.findByRole('region', { name: '진행' });
+    expect(within(progress).getByText(/단계 확인 중/)).toBeInTheDocument();
+    expect(within(progress).getByText('요청 11월 3일 12:41')).toBeInTheDocument();
+    const steps = within(progress).getByRole('list', { name: '진행 단계' });
+    expect(within(steps).queryByText('대기')).not.toBeInTheDocument();
+  });
+
   it('취소: 지금 단계가 끝나면 멈춘다고 알리고, cancelled가 오면 취소됨', async () => {
     addRunning(40);
     server.use(

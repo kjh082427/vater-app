@@ -2,7 +2,9 @@
  * 분석 진행 단계(스펙 5장): 애널리스트 → 강세·약세 토론 → 트레이더 → 리스크 토론 → 포트폴리오 매니저.
  * 사이드카는 이 다섯에 들지 않는 노드를 `other`로 보내는데, 화면에는 보이지 않는다.
  */
-export type StageId = 'analysts' | 'research' | 'trader' | 'risk' | 'portfolio';
+import type { StageId } from '../../api/progress';
+
+export { visibleStage, type StageId } from '../../api/progress';
 
 export const STAGES: readonly { id: StageId; label: string }[] = [
   { id: 'analysts', label: '애널리스트' },
@@ -11,11 +13,6 @@ export const STAGES: readonly { id: StageId; label: string }[] = [
   { id: 'risk', label: '리스크 토론' },
   { id: 'portfolio', label: '포트폴리오 매니저' },
 ];
-
-/** 보이는 단계면 그 id, 아니면(other 등) null. */
-export function visibleStage(stage: string): StageId | null {
-  return STAGES.some((s) => s.id === stage) ? (stage as StageId) : null;
-}
 
 export function stageLabel(stage: StageId): string {
   return STAGES.find((s) => s.id === stage)?.label ?? stage;

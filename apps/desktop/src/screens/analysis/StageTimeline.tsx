@@ -15,6 +15,8 @@ export interface StageTimelineProps {
 const PENDING_TEXT: Record<string, string> = {
   queued: '대기',
   running: '대기',
+  // 실행 중인데 아직 진행 소식을 못 받음: "대기"라고 하면 멈춘 것처럼 보인다
+  unknown: '확인 중',
 };
 
 /**
@@ -22,7 +24,7 @@ const PENDING_TEXT: Record<string, string> = {
  * 단계마다 상태 글자와 걸린 시간. 점은 장식이고 글자가 상태를 말한다.
  */
 export function StageTimeline({ timings, current, status }: StageTimelineProps) {
-  const active = status === 'queued' || status === 'running';
+  const active = status === 'queued' || status === 'running' || status === 'unknown';
   const currentIndex = current ? STAGES.findIndex((s) => s.id === current) : -1;
   return (
     <ol className={styles.steps} aria-label="진행 단계">

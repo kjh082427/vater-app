@@ -167,6 +167,13 @@ function Body({ b }: { b: BriefingDetail }) {
   );
 }
 
+/** 머리 보조 정보: AI 해석만 빠졌으면 그렇게, 데이터가 빠졌으면 "일부 항목 빠짐". */
+function ledeNote(missing: string[]): string {
+  const data = missing.filter((m) => m !== 'interpretation');
+  if (data.length > 0) return ' · 일부 항목 빠짐';
+  return missing.length > 0 ? ' · AI 해석 없음' : '';
+}
+
 /** 브리핑 상세(#/briefings/:id): AI 해석 문장과 데이터 표·미니 차트. 숫자는 표에서만. */
 export function BriefingDetailScreen({ id }: { id: number }) {
   const detail = useResource<BriefingDetail>(`/briefings/${id}`);
@@ -179,11 +186,7 @@ export function BriefingDetailScreen({ id }: { id: number }) {
     <>
       <ScreenHeader
         title={b ? `${formatDay(b.date)} ${marketLabel(b.market)} 시장 브리핑` : '브리핑'}
-        lede={
-          b
-            ? `${formatDayTime(b.created_at)} 만듦${b.status === 'partial' ? ' · 일부 항목 빠짐' : ''}`
-            : undefined
-        }
+        lede={b ? `${formatDayTime(b.created_at)} 만듦${ledeNote(b.missing)}` : undefined}
         end={
           <a className={common.textLink} href="#/briefings">
             브리핑 목록

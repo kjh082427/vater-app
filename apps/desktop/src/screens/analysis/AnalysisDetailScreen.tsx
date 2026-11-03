@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ApiError, toApiError } from '../../api/errors';
-import { useApi, useEvent } from '../../api/services';
+import { useAnalysisProgress, useApi, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AnalysisDetail, AnalysisQueued } from '../../api/types';
 import { Banner, Button, Section } from '../../design-system';
@@ -10,12 +10,11 @@ import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
 import { ScreenHeader } from '../common/ScreenHeader';
 import common from '../common/screen.module.css';
-import { formatDay, formatDuration } from '../common/time';
+import { formatDay, formatDayTime, formatDuration } from '../common/time';
 import styles from './analysis.module.css';
 import { AnalysisResult } from './AnalysisResult';
 import { StageTimeline } from './StageTimeline';
 import { STATUS_LABEL } from './stages';
-import { useProgress } from './useProgress';
 
 function useAction() {
   const [busy, setBusy] = useState(false);
@@ -37,7 +36,10 @@ function useAction() {
 
 function Progress({ detail, onChanged }: { detail: AnalysisDetail; onChanged: () => void }) {
   const api = useApi();
-  const progress = useProgress(detail.id);
+  const tracked = useAnalysisProgress(detail.id);
+  const progress = tracked ?? { timings: {}, current: null, elapsed: 0 };
+  // 창을 다시 열었거나 앱을 새로 켰으면 다음 진행 소식이 올 때까지 단계를 모른다
+  const unknownStage = detail.status === 'running' && !tracked;
   const cancel = useAction();
   const [cancelling, setCancelling] = useState(false);
 
@@ -53,14 +55,19 @@ function Progress({ detail, onChanged }: { detail: AnalysisDetail; onChanged: ()
   return (
     <Section title="진행" meta={STATUS_LABEL[detail.status]}>
       <div className={styles.opinion}>
+        {unknownStage ? (
+          <p className={styles.note}>단계 확인 중: 다음 진행 소식이 오면 바로 보입니다.</p>
+        ) : null}
         <StageTimeline
           timings={progress.timings}
           current={progress.current}
-          status={detail.status}
+          status={unknownStage ? 'unknown' : detail.status}
         />
         <div className={styles.progressFoot}>
           <span className={`${styles.note} vt-num`}>
-            {progress.elapsed > 0 ? `경과 ${formatDuration(progress.elapsed)}` : ''}
+            {progress.elapsed > 0
+              ? `경과 ${formatDuration(progress.elapsed)}`
+              : `요청 ${formatDayTime(detail.created_at)}`}
           </span>
           <Button busy={cancel.busy || cancelling} onClick={requestCancel}>
             분석 취소

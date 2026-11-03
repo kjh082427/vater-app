@@ -10,13 +10,24 @@ export interface AppStatusBarProps {
   llmError: ApiError | null;
   analyses: { running: number; queued: number };
   lastEventAt: Date | null;
+  /** SSE가 끊겨 한투 연결 상태를 모른다. */
+  stale?: boolean;
 }
 
 const MARKETS: MarketCode[] = ['KR', 'US'];
 
 /** 하단 상태 표시줄(스펙 9-1): 시장 상태, 한투 연결, AI 엔진, 마지막 수신 시각. */
-export function AppStatusBar({ monitor, llm, llmError, analyses, lastEventAt }: AppStatusBarProps) {
-  const feed = feedSummary(monitor);
+export function AppStatusBar({
+  monitor,
+  llm,
+  llmError,
+  analyses,
+  lastEventAt,
+  stale = false,
+}: AppStatusBarProps) {
+  const feed = stale
+    ? { tone: 'caution-strong' as const, detail: '확인 불가 · 다시 연결 중' }
+    : feedSummary(monitor);
   const engine = engineSummary(llm, llmError, analyses);
   return (
     <StatusBar>

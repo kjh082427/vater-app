@@ -123,6 +123,20 @@ describe('오프라인 배너', () => {
     await waitFor(() => expect(FakeEventSource.all).toHaveLength(2));
   });
 
+  it('SSE가 끊긴 동안 사이드바·상태 표시줄은 감시 상태를 주장하지 않는다', async () => {
+    const { stream } = renderApp('#/home', [60_000]);
+    const source = await stream();
+    const side = screen.getByRole('complementary');
+    await within(side).findByText('알림 감시 중');
+    await within(statusBar()).findByText('실시간 1 · 폴링 1');
+    act(() => source.fail());
+    expect(await within(side).findByText('감시 상태 확인 불가')).toBeInTheDocument();
+    expect(within(side).queryByText('알림 감시 중')).not.toBeInTheDocument();
+    expect(within(side).getByRole('button', { name: '감시 일시 중지' })).toBeDisabled();
+    expect(within(statusBar()).getByText('확인 불가 · 다시 연결 중')).toBeInTheDocument();
+    expect(within(statusBar()).queryByText('실시간 1 · 폴링 1')).not.toBeInTheDocument();
+  });
+
   it('감시 상태가 offline이면 "오프라인: 알림 감시 일시 중지"', async () => {
     const { stream } = renderApp();
     const source = await stream();
