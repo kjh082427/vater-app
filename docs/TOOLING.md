@@ -20,6 +20,11 @@
 | 2026-11-03 | rustup 대상 `x86_64-pc-windows-msvc` (표준 라이브러리만) | 1.99.1 | `~/.rustup` | WSL에서 Windows 전용 코드(`CREATE_NO_WINDOW`)를 `cargo check`/`clippy --target`으로 타입 검사 | `rustup target add x86_64-pc-windows-msvc`. 링크(MSVC 링커)는 하지 않으므로 실행 파일은 만들지 못함 |
 | 2026-11-03 | fonttools + brotli (`uvx`로 실행) | fonttools 4.68.0 | uv 캐시 (설치하지 않음) | Hahmlet 글꼴 서브셋, woff2 변환 (`pyftsubset`, `varLib.instancer`) | `ui/design-system`. 명령은 `apps/desktop/src/design-system/fonts/make-fonts.sh` |
 | 2026-11-03 | 프런트엔드 npm 의존성 | `apps/desktop/package.json`에 정확한 버전 고정 | `apps/desktop/node_modules` (git 제외) | Vite, React 18, TypeScript, Vitest, ESLint, Prettier | `npm install --before=2026-10-20`으로 2주 이상 지난 버전만 받음. `package-lock.json` 커밋 |
+| 2026-11-03 | Tauri CLI `@tauri-apps/cli` | 2.12.3 (2026-10-14 배포) | npm 캐시 (`npx`로 실행, `package.json`에 넣지 않음) | `shell/tauri`: `tauri dev`, `tauri build --bundles nsis`, `tauri icon` | 2.12.4는 2026-10-21 배포라 2주 기준에 못 미쳐 쓰지 않음. 명령은 `apps/desktop/src-tauri/README.md` |
+| 2026-11-03 | Tauri 2 Rust 크레이트 | tauri 2.12.4, tauri-build 2.7.3, single-instance 2.5.4, autostart 2.7.0, notification 2.7.0 | `apps/desktop/src-tauri/Cargo.toml`(`=` 고정), `Cargo.lock` 커밋 | Vater 셸 | 간접 의존성 471개도 2026-10-20 이전 배포 버전으로 맞춤 |
+| 2026-11-03 | PyInstaller | 6.22.3 (2026-09-12 배포) | CI에서만, `uv run --with`로 잠깐 얹음 (설치·잠금 파일 변경 없음) | 사이드카 onedir `vater-core.exe` | `apps/desktop/src-tauri/packaging/build-sidecar.ps1`. `sidecar/pyproject.toml`과 `uv.lock`은 그대로 |
+| 2026-11-03 | GitHub Action `Swatinem/rust-cache` | v2 | `.github/workflows/desktop.yml` | Windows 러너의 Cargo 빌드 캐시 | 서드파티 액션. 그 밖에 `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `astral-sh/setup-uv@v6` |
+| 2026-11-03 | Rust (CI) | 1.99.1 (+ clippy) | Windows 러너 (`rustup toolchain install`) | `desktop.yml`의 clippy·test·Tauri 빌드 | 로컬과 같은 버전으로 고정 |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |

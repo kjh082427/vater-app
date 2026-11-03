@@ -53,3 +53,65 @@
 
 - `tauri.conf.json`: 이름 `Vater`, 식별자 `com.kjh082427.vater`, 창 1280×800(최소 1024×600), 프런트엔드 `../dist`, 개발 서버 `http://localhost:5173`, NSIS `currentUser` 설치(관리자 권한 없음), WebView2는 부트스트래퍼로 설치합니다.
 - `tauri.windows.conf.json`: 설치 파일에 넣는 사이드카 폴더(`sidecar/dist/vater-core` → 설치 폴더의 `vater-core/`). Windows에서만 합쳐집니다. Linux의 `cargo test`가 PyInstaller 결과물 없이 돌아가게 하려고 따로 두었습니다. 그래서 **Windows에서 빌드하려면 먼저 PyInstaller로 `sidecar/dist/vater-core/`를 만들어야 합니다**(만드는 명령은 `.github/workflows/desktop.yml`).
+
+## 빌드와 확인
+
+### Linux(WSL)에서
+
+Rust는 `~/.cargo/bin`에 있고 PATH에 넣지 않았으므로 직접 부릅니다. WSL에는 Tauri가 쓰는 webkit2gtk-4.1, gtk3, libsoup3, ayatana-appindicator, xdo가 설치되어 있습니다.
+
+```bash
+cd apps/desktop/src-tauri
+~/.cargo/bin/cargo fmt --check
+~/.cargo/bin/cargo clippy --locked --workspace --all-targets -- -D warnings
+~/.cargo/bin/cargo test --locked --workspace
+# 실제 사이드카로 ready → /health 200 → 종료 코드 0
+~/.cargo/bin/cargo test --locked -p vater-sidecar --test process -- --ignored --nocapture
+# 창 띄워 보기(WSLg): Vite 개발 서버 + 디버그 빌드 + 저장소 사이드카(uv run)
+cd .. && PATH=$HOME/.cargo/bin:$PATH npx @tauri-apps/cli@2.12.3 dev
+```
+
+- `cargo clippy --target x86_64-pc-windows-msvc`는 `vater-sidecar`만 됩니다. 앱 크레이트는 빌드 스크립트가 Windows 아이콘 리소스를 만들 때 `llvm-rc`가 필요해서 WSL에서는 검사하지 못하고, Windows CI에서 검사합니다.
+- `tauri dev`의 사이드카는 개발 모드라서 데이터는 `~/.local/share/vater`, 비밀키는 `sidecar/.env`를 씁니다.
+
+### Windows CI (`.github/workflows/desktop.yml`)
+
+`apps/desktop/**`, `sidecar/**`, 워크플로가 바뀐 PR과 `main`·`shell/**`·`infra/**` push에서 `windows-latest`로 돕니다.
+
+1. `packaging/build-sidecar.ps1`: `uv sync --locked --no-dev` 뒤 PyInstaller 6.22.3(`uv run --with`, `sidecar/pyproject.toml`과 `uv.lock`은 그대로)으로 `sidecar/dist/vater-core/vater-core.exe`(onedir, 콘솔 앱)를 만듭니다.
+2. `packaging/smoke-sidecar.ps1`: 그 exe를 `VATER_TOKEN`, `VATER_BACKGROUND_JOBS=0`, 임시 데이터 폴더, `VATER_SECRET_BACKEND=envfile`로 띄워 `ready` → `GET /health` 200 → `POST /shutdown` 202 → 종료 코드 0을 확인합니다.
+3. `cargo clippy`, `cargo test`(가짜 사이드카로 Windows 프로세스 동작까지) → `npx @tauri-apps/cli@2.12.3 build --bundles nsis`.
+4. 설치 파일을 산출물 **`vater-windows-installer`**로 올립니다(14일 보관). Actions 실행 화면의 Artifacts에서 받습니다.
+5. `packaging/smoke-installed.ps1`: 설치 파일을 `/S`로 조용히 설치하고 `Vater.exe`를 띄워, 함께 설치된 `vater-core.exe`가 `Vater.exe`의 자식으로 127.0.0.1에서 요청을 받는지(토큰 없이 `/health` → 401) 확인합니다.
+
+첫 성공 실행([41576477065](https://github.com/kjh082427/vater-app/actions/runs/41576477065)): 사이드카 onedir 146.9MB, `Vater.exe` 12.2MB, 설치 파일 `Vater_0.1.0_x64-setup.exe` 55.8MB, 설치 후 `vater-core.exe`가 9.6초 만에 요청을 받음.
+
+### Windows에서 직접 빌드할 때
+
+```powershell
+./apps/desktop/src-tauri/packaging/build-sidecar.ps1     # sidecar/dist/vater-core/ (설치 파일과 Windows 빌드에 필요)
+cd apps/desktop; npm ci; npx @tauri-apps/cli@2.12.3 build --bundles nsis
+```
+
+## Windows 수동 확인 목록
+
+CI 산출물 `vater-windows-installer`의 설치 파일을 받아 확인합니다. 서명하지 않았으므로 SmartScreen("Windows PC 보호")이 뜨면 "추가 정보 → 실행"을 누릅니다(스펙 11). 결과는 PR에 적습니다.
+
+| #   | 할 일                                                                           | 기대 결과                                                                                                 |
+| --- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1   | 설치 파일 실행                                                                  | 관리자 권한 묻지 않고 `%LOCALAPPDATA%\Vater`에 설치. WebView2가 없으면 함께 설치                          |
+| 2   | 시작 메뉴에서 Vater 실행                                                        | 창(1280×800)이 뜨고, 작업 관리자에서 `Vater.exe` 아래에 `vater-core.exe`가 하나 보임. 콘솔 창은 뜨지 않음 |
+| 3   | 창을 최소 크기까지 줄이기                                                       | 1024×600보다 작아지지 않음                                                                                |
+| 4   | 창의 X 누르기                                                                   | 창이 사라지고 트레이 아이콘이 남음. 처음 한 번만 "Vater는 트레이에서 계속 실행됩니다" 알림                |
+| 5   | 다시 열고 X를 한 번 더                                                          | 이번에는 알림이 뜨지 않음(앱을 다시 시작해도)                                                             |
+| 6   | 트레이 아이콘 왼쪽 클릭, 또는 메뉴 "열기"                                       | 창이 다시 앞으로                                                                                          |
+| 7   | 트레이 메뉴 "감시 일시 중지"                                                    | 글자가 "감시 재개"로 바뀜. 다시 누르면 "감시 일시 중지"                                                   |
+| 8   | Vater를 한 번 더 실행(시작 메뉴)                                                | 새 창이 뜨지 않고 기존 창이 앞으로. `vater-core.exe`는 여전히 하나                                        |
+| 9   | 알림이 오는 상황(알림 규칙 발동, 또는 브리핑 도착)에서 알림이 떠 있는 동안 클릭 | 창이 앞으로 오고 해당 화면으로 이동(ui/screens 이후). 알림 센터로 넘어간 뒤 클릭은 동작하지 않을 수 있음  |
+| 10  | 작업 관리자에서 `vater-core.exe`만 끝내기                                       | 몇 초 안에 새 `vater-core.exe`가 뜨고 화면이 다시 연결됨                                                  |
+| 11  | 10을 10분 안에 4번 반복                                                         | 재시작을 멈추고 UI가 실패 상태(`sidecar-state` = `failed`)를 보임                                         |
+| 12  | 트레이 메뉴 "종료"                                                              | 창과 트레이 아이콘이 사라지고, 5초 안에 `Vater.exe`와 `vater-core.exe`가 모두 작업 관리자에서 사라짐      |
+| 13  | 첫 실행 마법사(ui/screens 이후)에서 자동 실행 켜고 로그아웃 → 로그인            | Vater가 창 없이 트레이로 시작(`--autostart`). 끄면 다시 시작하지 않음                                     |
+| 14  | 설정 → 앱 → Vater 제거                                                          | 설치 폴더가 지워짐(데이터 `%APPDATA%\Vater`는 남음)                                                       |
+
+- 알려진 한계: `Vater.exe`가 비정상 종료되거나 작업 관리자에서 강제로 끝나면 `vater-core.exe`가 남습니다(작업 개체로 묶지 않음). 이 경우 다음 실행 전에 작업 관리자에서 끝내 주세요.
