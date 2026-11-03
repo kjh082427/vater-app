@@ -30,6 +30,7 @@
 | 2026-11-03 | PyInstaller | 6.22.3 (2026-09-12 배포) | CI에서만, `uv run --with`로 잠깐 얹음 (설치·잠금 파일 변경 없음) | 사이드카 onedir `vater-core.exe` | `apps/desktop/src-tauri/packaging/build-sidecar.ps1`. `sidecar/pyproject.toml`과 `uv.lock`은 그대로 |
 | 2026-11-03 | GitHub Action `Swatinem/rust-cache` | v2 | `.github/workflows/desktop.yml` | Windows 러너의 Cargo 빌드 캐시 | 서드파티 액션. 그 밖에 `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `astral-sh/setup-uv@v6` |
 | 2026-11-03 | Rust (CI) | 1.99.1 (+ clippy) | Windows 러너 (`rustup toolchain install`) | `desktop.yml`의 clippy·test·Tauri 빌드 | 로컬과 같은 버전으로 고정 |
+| 2026-11-03 | `tauri-plugin-updater` | 2.14.0 (2026-10-14 배포) | `apps/desktop/src-tauri/Cargo.toml`(`=` 고정) | 앱 자동 업데이트 | `infra/release`. 2.14.1은 2026-10-28 배포라 2주 기준에 못 미쳐 쓰지 않음. 간접 의존성 openssl-probe 0.2.1, webpki-root-certs 1.0.10으로 맞춤. rustls-webpki 0.103.16은 2026-10-20 배포(딱 2주, 보안 민감) |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |
