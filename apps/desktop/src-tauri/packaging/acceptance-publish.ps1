@@ -26,7 +26,8 @@ function Fresh {
     $env:PRERELEASE = 'false'
 }
 function Publish {
-    & pwsh -NoProfile -File (Join-Path $here 'publish-release.ps1') -Bundle $bundle
+    # 출력을 파이프라인으로 흘리면 함수의 반환값에 섞인다
+    & pwsh -NoProfile -File (Join-Path $here 'publish-release.ps1') -Bundle $bundle | Out-Host
     return $LASTEXITCODE
 }
 function State { Get-Content (Join-Path $env:FAKE_GH_DIR 'state.json') -Raw | ConvertFrom-Json }
