@@ -2,7 +2,8 @@
 //!
 //! 계약(ui/screens 브랜치가 쓴다, README에 같은 내용):
 //! - `get_sidecar_info` → `{ state: "starting"|"ready"|"failed"|"stopped", port?: number, token?: string }`
-//! - 이벤트 `sidecar-state`: 상태가 바뀔 때마다 같은 형식. 재시작하면 포트와 토큰이 바뀌므로 다시 읽는다.
+//! - 이벤트 `sidecar-state`: 상태가 바뀔 때마다 `{ state, port? }`(토큰 없음). 받으면 `get_sidecar_info`를 다시 부른다
+//!   (재시작하면 포트와 토큰이 바뀐다). UI는 이 이벤트를 **먼저 구독하고** 그다음 `get_sidecar_info`를 부른다.
 //! - 이벤트 `navigate`: `{ route: string }`, 알림을 눌렀을 때.
 
 use serde::Serialize;
@@ -39,6 +40,24 @@ impl From<&SidecarInfo> for SidecarInfoDto {
             state,
             port: info.port,
             token: info.token.clone(),
+        }
+    }
+}
+
+/// `sidecar-state` 이벤트의 내용. 토큰은 싣지 않는다(토큰은 `get_sidecar_info`로만).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SidecarStateEvent {
+    pub state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+}
+
+impl From<&SidecarInfo> for SidecarStateEvent {
+    fn from(info: &SidecarInfo) -> Self {
+        let dto = SidecarInfoDto::from(info);
+        Self {
+            state: dto.state,
+            port: dto.port,
         }
     }
 }
@@ -106,6 +125,21 @@ mod tests {
             let dto = SidecarInfoDto::from(&info(state, None, None));
             assert_eq!(serde_json::to_value(dto).unwrap(), json!({ "state": name }));
         }
+    }
+
+    #[test]
+    fn state_event_never_carries_the_token() {
+        // 토큰은 get_sidecar_info로만 넘긴다. 이벤트는 상태(와 포트)만 알리고, UI가 다시 읽는다.
+        let ev = SidecarStateEvent::from(&info(SidecarState::Ready, Some(54321), Some("ab12")));
+        assert_eq!(
+            serde_json::to_value(ev).unwrap(),
+            json!({"state": "ready", "port": 54321})
+        );
+        let ev = SidecarStateEvent::from(&info(SidecarState::Starting, None, None));
+        assert_eq!(
+            serde_json::to_value(ev).unwrap(),
+            json!({"state": "starting"})
+        );
     }
 
     #[test]

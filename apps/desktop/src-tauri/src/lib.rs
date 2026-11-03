@@ -21,7 +21,7 @@ use vater_sidecar::events::SidecarEvent;
 use vater_sidecar::launch;
 use vater_sidecar::process::{ManagerConfig, SidecarManager, SidecarState};
 
-use crate::commands::{NAVIGATE_EVENT, NavigatePayload, SIDECAR_STATE_EVENT, SidecarInfoDto};
+use crate::commands::{NAVIGATE_EVENT, NavigatePayload, SIDECAR_STATE_EVENT, SidecarStateEvent};
 
 const MAIN_WINDOW: &str = "main";
 const TRAY_ID: &str = "main";
@@ -238,7 +238,7 @@ fn forward_sidecar_state(app: AppHandle) {
                 let _ = shell.toggle_item.set_text(tray::menu_label(false));
             }
             let _ = shell.toggle_item.set_enabled(ready);
-            let _ = app.emit(SIDECAR_STATE_EVENT, SidecarInfoDto::from(&info));
+            let _ = app.emit(SIDECAR_STATE_EVENT, SidecarStateEvent::from(&info));
             if rx.changed().await.is_err() {
                 break;
             }

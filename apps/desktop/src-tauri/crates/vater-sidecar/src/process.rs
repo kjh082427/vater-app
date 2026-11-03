@@ -3,7 +3,7 @@
 //! - 실행할 때마다 새 일회용 토큰을 만들어 `spawn_fn(token)`이 만든 명령으로 사이드카를 띄운다.
 //! - stdout을 한 줄씩 읽는다. `ready`면 상태가 `Ready{port, token}`, `notify`·`log`는 `on_event`로 넘긴다.
 //!   JSON이 아닌 줄, 모르는 type, 깨진 UTF-8, 너무 긴 줄은 건너뛰고 계속 읽는다.
-//! - `ready`가 `ready_timeout`(30초) 안에 오지 않거나 요청하지 않은 종료가 나면 `RestartPolicy`를 따른다.
+//! - `ready`가 `ready_timeout`(60초) 안에 오지 않거나 요청하지 않은 종료가 나면 `RestartPolicy`를 따른다.
 //!   10분 안에 3회를 넘으면 `Failed`에서 멈춘다.
 //! - `shutdown()`은 `POST /shutdown` 뒤 `shutdown_grace`(5초) 안에 끝나지 않으면 강제 종료한다.
 //!
@@ -41,7 +41,8 @@ pub struct ManagerConfig {
 impl Default for ManagerConfig {
     fn default() -> Self {
         Self {
-            ready_timeout: Duration::from_secs(30),
+            // 147MB onedir를 처음 실행하면 백신 검사로 수십 초가 걸릴 수 있다(느린 PC의 첫 실행)
+            ready_timeout: Duration::from_secs(60),
             shutdown_grace: Duration::from_secs(5),
             policy: RestartPolicy::default(),
         }
@@ -554,7 +555,7 @@ mod tests {
     #[test]
     fn default_config_matches_the_spec() {
         let config = ManagerConfig::default();
-        assert_eq!(config.ready_timeout, Duration::from_secs(30));
+        assert_eq!(config.ready_timeout, Duration::from_secs(60));
         assert_eq!(config.shutdown_grace, Duration::from_secs(5));
     }
 }
