@@ -15,7 +15,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   column-gap: var(--space-3);
-  min-height: var(--size-section-head);
   margin-bottom: var(--space-3);
 }
 

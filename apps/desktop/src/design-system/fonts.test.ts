@@ -69,12 +69,17 @@ describe('글꼴 파일 (fonts.css)', () => {
 
 describe('오프라인 보장', () => {
   it('CSS, HTML, 소스 어디에서도 외부 글꼴·스타일을 불러오지 않는다', () => {
-    const files = [
-      ...filesUnder(join(appRoot, 'src'), /\.(css|tsx?|html)$/),
-      ...filesUnder(appRoot, /^[^/]*\.html$/).filter((p) => !p.includes('/dist/')),
-      join(appRoot, 'index.html'),
-      join(appRoot, 'gallery.html'),
-    ].filter((p) => !p.endsWith('.test.ts') && !p.endsWith('.test.tsx'));
+    // 앱 뿌리는 맨 위 HTML만 본다. 뿌리를 통째로 훑으면 node_modules·src-tauri/target까지 읽어 느리다.
+    const topHtml = readdirSync(appRoot)
+      .filter((name) => name.endsWith('.html'))
+      .map((name) => join(appRoot, name));
+    // 다른 브랜치가 맨 위 HTML을 더해도(예: mock.html) 같이 검사한다
+    expect(topHtml.map((p) => relative(appRoot, p))).toEqual(
+      expect.arrayContaining(['gallery.html', 'index.html']),
+    );
+    const files = [...filesUnder(join(appRoot, 'src'), /\.(css|tsx?|html)$/), ...topHtml].filter(
+      (p) => !p.endsWith('.test.ts') && !p.endsWith('.test.tsx'),
+    );
     const offenders = files.filter((path) =>
       /(url\(\s*['"]?https?:|@import\s+(url\()?['"]?https?:|<link[^>]+href=["']https?:)/i.test(
         readFileSync(path, 'utf8'),

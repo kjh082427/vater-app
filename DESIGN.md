@@ -335,7 +335,7 @@ components:
 - 결정 6가지를 5칸 눈금 위의 위치로 보여 준다. 빈 칸은 1px `ink-3` 테두리, 한 칸만 채운다: 매수 쪽 `up`, 매도 쪽 `down`, 보유 먹. 결정 이름은 굵은 12px 먹 글자. 검토 필요는 눈금 밖(다섯 칸을 비우고 황토 테두리). 진하게 채운 버튼 모양으로 만들지 않는다(주문 버튼처럼 읽히면 안 된다).
 
 ### AI 문장 (AiText)
-- `lead`(16/24, 600, 먹)와 `body`(14/22, 400, `ink-2`, 최대 40rem). 왼쪽 2px `accent-weak` 선 + 12px 들여쓰기, `data-voice="ai"`. 꼬리표("AI 해석")는 `accent-weak` 바탕 + `accent-strong` 11~12px 반굵은 글자의 작은 표지.
+- `lead`(16/24, 600, 먹)와 `body`(14/22, 400, `ink-2`, 최대 40rem). 왼쪽 2px `accent-weak` 선 + 12px 들여쓰기, `data-voice="ai"`. 꼬리표("AI 해석")는 `accent-weak` 바탕 + `accent-strong` 12px 반굵은 글자의 작은 표지.
 
 ### 면책 문구 (Disclaimer)
 - 스펙 문구 그대로, 12px `ink-3`. 문구를 바꾸지 않는다.
@@ -362,7 +362,7 @@ components:
 - **Don't** 결정 배지를 진하게 채운 버튼처럼 만들거나 "매수하기" 같은 행동 유도를 두지 않는다. Vater는 주문 기능이 없다.
 - **Don't** 부품 CSS에 색 값을 직접 쓰지 않는다(`var(--color-*)`만).
 - **Don't** 실행 중 CDN에서 글꼴·아이콘·스타일을 받지 않는다.
-- **Don't** 12px보다 작은 글자(꼬리표의 11px 예외는 README), 회색만으로 된 본문을 쓰지 않는다.
+- **Don't** 12px보다 작은 글자, 회색만으로 된 본문을 쓰지 않는다.
 
 ## 결정 기록
 
@@ -393,4 +393,6 @@ components:
 
 - `npm test`: 숫자 표기, 토큰 대비·색상 거리·채도·방향 색 사용처, 글꼴 파일·용량·라이선스·외부 URL 없음, 부품별 접근성(이름, 역할, 키보드).
 - `npm run lint`(ESLint + jsx-a11y strict + Prettier), `npm run typecheck`, `npm run build`.
-- 견본(`gallery.html`)을 1280×800, 1024×600, 배율 1.5에서 찍었다: `docs/design/system/shots/`. 의도한 예외는 `apps/desktop/src/design-system/README.md`.
+- 견본(`gallery.html`, `#dashboard`, `#shell`, `#shell-offline`)을 1280×800, 1024×600, 배율 1.5에서 찍었고 Select·Menu·Dialog를 연 상태도 찍었다: `docs/design/system/shots/`.
+- impeccable 검출기(`detect`)를 소스와 네 견본 화면(1280×800, 1024×600)에 돌려 지적 0건(참고 알림 `em-dash-overuse`는 값 없음 표시 `—` 때문). 의도한 예외는 `apps/desktop/src/design-system/README.md`.
+- `ui/screens`에 이 디자인 시스템을 바꿔 끼운 복사본에서 화면 테스트 345개 모두 통과, `tsc`·ESLint 통과(전체 688개 중 실패 1개는 복사본 위치 때문에 OpenAPI 스냅샷 파일을 못 찾은 것).

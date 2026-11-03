@@ -50,7 +50,8 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 
 /* ---------- 색 ---------- */
 
-const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
+/** [토큰, 역할, 대비를 잴 바탕(없으면 흰 카드, 'bg'면 바탕 색이라 재지 않음)] */
+const COLOR_GROUPS: { name: string; tokens: [string, string, string?][] }[] = [
   {
     name: '바탕',
     tokens: [
@@ -66,14 +67,14 @@ const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
     tokens: [
       ['--color-accent', '주 버튼, 활성 탭, 링크, 포커스'],
       ['--color-accent-strong', '주 버튼 호버, 선택 글자'],
-      ['--color-accent-weak', '선택 바탕'],
+      ['--color-accent-weak', '선택 바탕', 'bg'],
     ],
   },
   {
     name: '표 머리줄',
     tokens: [
       ['--color-table-head', '머리줄 바탕'],
-      ['--color-on-table-head', '머리줄 글자'],
+      ['--color-on-table-head', '머리줄 글자', '--color-table-head'],
     ],
   },
   {
@@ -136,6 +137,7 @@ function ratio(rawA: string, rawB: string): string {
 function readTokenValues(): Map<string, string> {
   const style = getComputedStyle(document.documentElement);
   const names = COLOR_GROUPS.flatMap((g) => g.tokens.map(([name]) => name));
+  names.push('--color-card');
   return new Map(names.map((name) => [name, style.getPropertyValue(name).trim()]));
 }
 
@@ -148,7 +150,7 @@ function Colors() {
         <div key={group.name} className={styles.swatchGroup}>
           <h3 className={styles.groupName}>{group.name}</h3>
           <div className={styles.swatches}>
-            {group.tokens.map(([name, role]) => (
+            {group.tokens.map(([name, role, against]) => (
               <div key={name} className={styles.swatch}>
                 <div className={styles.chip} style={{ background: `var(${name})` }} />
                 <div className={styles.swatchText}>
@@ -156,9 +158,9 @@ function Colors() {
                   <code>{name}</code>
                   <span className="vt-num">
                     {hex6(values.get(name) ?? '') || MISSING} ·{' '}
-                    {group.name === '바탕' || name.endsWith('-bg')
+                    {group.name === '바탕' || name.endsWith('-bg') || against === 'bg'
                       ? '바탕'
-                      : ratio(values.get(name) ?? '', paper)}
+                      : ratio(values.get(name) ?? '', values.get(against ?? '') ?? paper)}
                   </span>
                 </div>
               </div>
