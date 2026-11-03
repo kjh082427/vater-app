@@ -1,5 +1,6 @@
 import asyncio
 import sqlite3
+import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -38,6 +39,7 @@ def db(tmp_path: Path) -> sqlite3.Connection:
             ("KR", "000660", "KOSPI", "SK하이닉스", None, "stock"),
             ("KR", "035420", "KOSPI", "NAVER", None, "stock"),
             ("KR", "005380", "KOSPI", "현대차", None, "stock"),
+            ("US", "AAPL", "NAS", "애플", "APPLE INC", "stock"),
         ],
     )
     conn.commit()
@@ -62,6 +64,7 @@ class FakeRealtime:
         self.on_state = on_state
         self.max = max_subs
         self.subs: list[tuple[str, str]] = []
+        self.subscription_errors: dict[tuple[str, str], str] = {}  # 서버가 거부한 구독
         self.state = "connected"
         self.running = False
         self.cancelled = False
@@ -99,7 +102,7 @@ class Market:
         self.prices: dict[str, float] = {}
         self.price_calls: list[str] = []
         self.bar_calls: list[tuple[str, date]] = []
-        self.closes: dict[str, float] = {}  # through 날짜에 넣을 종가
+        self.closes: dict[tuple[str, date], float] = {}  # (종목, 날짜) → 그날 확정 종가
         self.fail: Exception | None = None
         self.fail_for: dict[str, Exception] = {}  # 종목별 오류
 
@@ -109,17 +112,22 @@ class Market:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
-        return Quote("KR", item.code, self.prices.get(item.code, 100.0), 0.0, 0.0, 1000)
+        price = self.prices.get(item.code, 100.0)
+        return Quote(item.market, item.code, price, 0.0, 0.0, 1000)  # type: ignore[arg-type]
 
     async def bars(self, item: WatchItem, through: date) -> int:
+        """refresh_bars처럼: 이미 `through`까지 있으면 한투를 부르지 않는다."""
+        last = BarRepo(self.db).last_day(item.market, item.code)
+        if last is not None and last >= through:
+            return 0
         self.bar_calls.append((item.code, through))
         if self.fail is not None:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
-        if item.code not in self.closes:
-            return 0
-        c = self.closes[item.code]
+        if (item.code, through) not in self.closes:
+            return 1  # 예전 봉만 왔다(그날 확정 봉은 아직 없음)
+        c = self.closes[(item.code, through)]
         return BarRepo(self.db).upsert(item.market, item.code, [Bar(through, c, c, c, c, 1000)])
 
 
@@ -168,10 +176,12 @@ class Rig:
             throttle=throttle,
         )
 
-    def watch(self, code: str, kind: str = "price_above", **params: Any) -> tuple[WatchItem, int]:
+    def watch(
+        self, code: str, kind: str = "price_above", market: str = "KR", **params: Any
+    ) -> tuple[WatchItem, int]:
         repo = WatchlistRepo(self.db)
         item = next((w for w in repo.list() if w.code == code), None) or repo.add(
-            resolve_target(self.db, "KR", code)
+            resolve_target(self.db, market, code)
         )
         timing = "close" if kind == "ma_break" else "realtime"
         rule = RuleRepo(self.db).create(item.id, kind, params or {"price": 60000}, timing, True)
@@ -310,8 +320,10 @@ async def test_after_close_refreshes_bars_and_evaluates_close_rules_once(
     _, rule = rig.watch("000660", "ma_break", period=3)
     prior = [Bar(DAY - timedelta(days=d), 10, 10, 10, 10, 1000) for d in (4, 3, 2, 1)]
     BarRepo(db).upsert("KR", "000660", prior)
-    rig.market.closes["000660"] = 20  # 확정 종가 20 > 3일 평균 13.33 → 돌파
-    await rig.monitor.tick_once()  # 장중: 실시간 구독
+    rig.market.closes[("000660", DAY)] = 20  # 확정 종가 20 > 3일 평균 13.33 → 돌파
+    rig.market.closes[("005930", DAY - timedelta(days=1))] = 100
+    rig.market.closes[("005930", DAY)] = 100
+    await rig.monitor.tick_once()  # 장중: 실시간 구독, 전 세션(월요일) 종가 평가는 변화 없음
     assert rig.realtime is not None and rig.realtime.subs == [("KR", "005930")]
 
     rig.clock.at = KR_SETTLING
@@ -337,6 +349,7 @@ async def test_intraday_bars_stop_at_the_previous_day(db: sqlite3.Connection) ->
     # 장중에 오늘 일봉(미확정)을 저장하면 마감 후 갱신이 '이미 최신'으로 건너뛴다
     rig = Rig(db, KR_OPEN)
     rig.watch("005930")
+    rig.market.closes[("005930", DAY - timedelta(days=1))] = 100
     await rig.monitor.tick_once()
     rig.clock.at = KR_OPEN + timedelta(seconds=30)
     await rig.monitor.tick_once()
@@ -348,7 +361,7 @@ async def test_close_pass_retries_after_offline(db: sqlite3.Connection) -> None:
     _, rule = rig.watch("000660", "ma_break", period=3)
     prior = [Bar(DAY - timedelta(days=d), 10, 10, 10, 10, 1000) for d in (4, 3, 2, 1)]
     BarRepo(db).upsert("KR", "000660", prior)
-    rig.market.closes["000660"] = 20
+    rig.market.closes[("000660", DAY)] = 20
 
     rig.market.fail = VaterError("KIS_UNREACHABLE", "끊김", status=503)
     await rig.monitor.tick_once()
@@ -442,3 +455,113 @@ async def test_get_alerts_without_kis_keys_stays_idle(db: sqlite3.Connection) ->
 
     assert monitor.status()["state"] != "offline"
     await monitor.stop()
+
+
+US_EVENING = datetime(2026, 11, 3, 11, 0, tzinfo=UTC)  # 화 20:00 KST = 06:00 뉴욕(장 전)
+NY_MON = date(2026, 11, 2)
+
+
+async def test_missed_us_close_is_caught_up_in_the_kst_evening(db: sqlite3.Connection) -> None:
+    # 미국 마감 평가 창(06:10~14:00 KST)에 PC가 꺼져 있었어도 저녁에 켜면 따라잡는다
+    rig = Rig(db, US_EVENING)
+    _, rule = rig.watch("AAPL", "ma_break", market="US", period=3)
+    prior = [Bar(date(2026, 10, d), 10, 10, 10, 10, 1000) for d in (28, 29, 30)]
+    BarRepo(db).upsert("US", "AAPL", prior)
+    rig.market.closes[("AAPL", NY_MON)] = 20
+
+    await rig.monitor.tick_once()
+
+    assert rig.market.bar_calls == [("AAPL", NY_MON)]
+    assert rig.state(rule) is True
+    assert rig.notes.sent[0][0] == "알림: 애플" and rig.notes.sent[0][2] == "/symbols/US/AAPL"
+    fired = db.execute("SELECT fired_at FROM alert_events").fetchall()
+    assert fired == [("2026-11-03T20:00:00+09:00",)]
+
+    rig.clock.at = US_EVENING + timedelta(minutes=30)
+    await rig.monitor.tick_once()
+    assert len(rig.notes.sent) == 1
+
+
+async def test_close_pass_waits_for_the_sessions_own_bar(db: sqlite3.Connection) -> None:
+    # 받은 일봉에 오늘 봉이 없으면 어제 값으로 '오늘 종가'를 판정하지 않고 다시 시도한다
+    rig = Rig(db, KR_AFTER)
+    _, rule = rig.watch("000660", "ma_break", period=3)
+    prior = [Bar(DAY - timedelta(days=d), c, c, c, c, 1000) for d, c in ((3, 10), (2, 10), (1, 20))]
+    BarRepo(db).upsert("KR", "000660", prior)  # 어제까지로 판정하면 '돌파'가 참
+
+    await rig.monitor.tick_once()
+    assert rig.state(rule) is False and rig.notes.sent == []
+
+    rig.clock.at = KR_AFTER + timedelta(minutes=1)
+    await rig.monitor.tick_once()
+    assert len(rig.market.bar_calls) == 1  # 몇 분 간격을 두고 다시 묻는다
+
+    rig.market.closes[("000660", DAY)] = 30  # 오늘 확정 종가 30 > 3일 평균 20 → 돌파
+    rig.clock.at = KR_AFTER + timedelta(minutes=5)
+    await rig.monitor.tick_once()
+    assert rig.state(rule) is True
+    assert [n[1] for n in rig.notes.sent] == ["3일 이동평균(20.00) 돌파, 현재가 30.00"]
+
+
+async def test_close_pass_retries_a_failed_symbol_the_same_day(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    _, rule = rig.watch("000660", "ma_break", period=3)
+    prior = [Bar(DAY - timedelta(days=d), 10, 10, 10, 10, 1000) for d in (3, 2, 1)]
+    BarRepo(db).upsert("KR", "000660", prior)
+    rig.market.closes[("000660", DAY)] = 20
+    rig.market.fail_for["000660"] = KisApiError("EGW00500", "일시 오류")
+
+    await rig.monitor.tick_once()
+    assert rig.state(rule) is False
+
+    del rig.market.fail_for["000660"]
+    rig.clock.at = KR_AFTER + timedelta(minutes=5)
+    await rig.monitor.tick_once()
+    assert rig.state(rule) is True
+    assert len(rig.market.bar_calls) == 2
+
+
+async def test_bars_for_realtime_rules_are_retried_after_a_failure(db: sqlite3.Connection) -> None:
+    # 장중 지표(신고가 등)가 어제 봉 없이 하루 종일 평가되지 않게 한다
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.market.closes[("005930", DAY - timedelta(days=1))] = 100
+    rig.market.fail_for["005930"] = KisApiError("EGW00500", "일시 오류")
+    await rig.monitor.tick_once()
+    assert BarRepo(db).last_day("KR", "005930") is None
+
+    del rig.market.fail_for["005930"]
+    rig.clock.at = KR_OPEN + timedelta(minutes=5)
+    await rig.monitor.tick_once()
+    assert BarRepo(db).last_day("KR", "005930") == DAY - timedelta(days=1)
+
+
+async def test_a_newer_tick_drops_the_pending_older_one(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN, throttle=0.05)
+    _, rule = rig.watch("005930")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+
+    rig.realtime.on_tick(Tick("KR", "005930", 59000, 0.0, 1000, "100001"))  # 바로 평가: 거짓
+    rig.realtime.on_tick(Tick("KR", "005930", 61000, 0.0, 1100, "100001"))  # 1초 안: 미룸
+    time.sleep(0.06)  # 루프가 미룬 틱을 처리하기 전에 1초(여기선 0.05초)가 지난다
+    rig.realtime.on_tick(Tick("KR", "005930", 59000, 0.0, 1200, "100002"))  # 바로 평가: 거짓
+    await asyncio.sleep(0.15)
+
+    assert rig.state(rule) is False
+    assert rig.notes.sent == []  # 지난 가격(61,000)으로 울리지 않는다
+
+
+async def test_subscription_rejected_by_the_server_is_polled(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None and rig.market.price_calls == []
+
+    rig.realtime.subscription_errors[("H0STCNT0", "000660")] = "OPSP0008: 구독 한도 초과"
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+
+    assert rig.market.price_calls == ["000660"]
+    assert rig.monitor.status() == {"state": "running", "realtime": 1, "polling": 1}

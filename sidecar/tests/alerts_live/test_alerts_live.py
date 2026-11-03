@@ -163,3 +163,58 @@ async def test_price_rule_end_to_end(
     assert len(fired) == 1 and again == []
     assert sent == [("알림: 삼성전자", sent[0][1], "/symbols/KR/005930")]
     assert db.execute("SELECT count(*) FROM alert_events").fetchone()[0] == 1
+
+
+async def test_monitor_one_tick_with_real_kis(db: sqlite3.Connection, tmp_path: Path) -> None:
+    """실제 키로 감시 루프 1회: 전 세션 일봉 따라잡기, (장중이면) 실시간 구독과 틱 평가."""
+    if not ROOT_ENV.exists():
+        pytest.skip("no root .env")
+    from typing import cast
+
+    from vater_core.alerts.monitor import get_alerts
+    from vater_core.api.deps import AppDeps
+    from vater_core.secrets.store import SecretStore
+
+    deps = AppDeps(
+        token="t",
+        dev=True,
+        data_dir=tmp_path,
+        db=db,
+        secrets=cast(SecretStore, DevStore()),
+        events=EventBus(),
+    )
+    item = WatchlistRepo(db).add(resolve_target(db, "KR", CODE))
+    rules = RuleRepo(db)
+    live_rule = rules.create(item.id, "price_above", {"price": 1000.0}, "realtime", True)
+    close_rule = rules.create(item.id, "ma_break", {"period": 20}, "close", True)
+    monitor = get_alerts(deps)
+    try:
+        await monitor.tick_once()
+        clock = monitor._clock  # 테스트에서만 들여다본다
+        last = await clock.last_closed_session("KR")
+        is_open = await clock.is_open("KR")
+        first = monitor.status()  # 첫 회차에는 WebSocket이 아직 연결 중이라 폴링으로 감시한다
+        if is_open:
+            for _ in range(20):  # 틱이 와서 평가될 때까지 최대 10초
+                if rules.get(live_rule.id).last_state is not None:
+                    break
+                await asyncio.sleep(0.5)
+            await monitor.tick_once()  # 연결된 뒤: 실시간으로 넘어간다
+        status = monitor.status()
+        print(
+            f"\nlast closed KR session {last}, open={is_open}, first {first}, status {status}, "
+            f"bars through {BarRepo(db).last_day('KR', CODE)}, "
+            f"close rule state {rules.get(close_rule.id).last_state}, "
+            f"live rule state {rules.get(live_rule.id).last_state}"
+        )
+        assert BarRepo(db).last_day("KR", CODE) == last
+        assert rules.get(close_rule.id).last_state is not None  # 전 세션 종가로 기준값
+        if is_open:
+            assert status == {"state": "running", "realtime": 1, "polling": 0}
+            assert rules.get(live_rule.id).last_state is True  # 틱(현재가 > 1,000원)으로 기준값
+        else:
+            assert status["state"] == "closed"
+    finally:
+        await monitor.stop()
+        if deps.http is not None:
+            await deps.http.aclose()

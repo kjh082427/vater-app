@@ -3,8 +3,10 @@
 `tick_once()`를 일정 간격(최대 30초, 폴링 간격이 더 짧으면 그 간격)마다 돈다.
 - 열린 시장: realtime 규칙이 있는 종목을 WebSocket에 구독한다(한도 안). 한도를 넘은 종목과
   WebSocket이 끊긴 동안의 모든 종목은 `alerts.poll_interval_sec`마다 REST 현재가로 평가한다.
-- 닫힌 시장: 구독을 푼다. 마감 + 10분이 지난 첫 회에 일봉을 갱신하고 close 규칙을 평가한다
-  (시장별 하루 1번).
+- 닫힌 시장: 구독을 푼다.
+- 마감 평가: 일봉이 확정된 가장 최근 세션(마감 + 10분)을 종목마다 한 번씩 평가한다. 앱이 그 시간에
+  꺼져 있었어도 다음 실행 때 따라잡는다. 그 세션의 봉이 아직 없거나 조회가 실패하면 어제 값으로
+  판정하지 않고 5분 뒤 다시 받는다. 장중 지표(신고가 등)도 이렇게 받은 전 세션까지의 일봉을 쓴다.
 - 틱은 종목별로 1초에 최대 1번 평가한다. 그 사이의 틱은 최신가만 남겨 두었다가 1초가 차면 평가한다.
 - 인터넷이 끊기면(`KIS_UNREACHABLE`, 연결 오류) `offline`.
   다음 회차에 다시 시도하고 복구되면 재개한다.
@@ -31,7 +33,7 @@ from vater_core.alerts.rules import Live
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
 from vater_core.kis.models import Quote, UsExchange
-from vater_core.kis.ws import Tick
+from vater_core.kis.ws import DOMESTIC_TR, US_TR, Tick
 from vater_core.stdout_events import notify
 from vater_core.store.settings import SettingsRepo
 
@@ -41,6 +43,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 TICK_SEC = 30.0
+CLOSE_RETRY = timedelta(minutes=5)  # 마감 평가용 일봉을 다시 받기까지 기다리는 시간
 MARKETS: tuple[MarketId, ...] = ("KR", "US")
 OFFLINE_CODES = {"KIS_UNREACHABLE"}
 Key = tuple[str, str]
@@ -49,6 +52,8 @@ Key = tuple[str, str]
 class Realtime(Protocol):
     @property
     def state(self) -> str: ...
+    @property
+    def subscription_errors(self) -> dict[tuple[str, str], str]: ...
 
     async def subscribe(self, market: Any, code: str, exchange: Any = None) -> bool: ...
     async def unsubscribe(self, market: Any, code: str, exchange: Any = None) -> None: ...
@@ -77,6 +82,13 @@ def _is_offline(e: BaseException) -> bool:
 
 def _key(item: WatchItem) -> Key:
     return item.market, item.code
+
+
+def _ws_key(item: WatchItem) -> tuple[str, str]:
+    """KisRealtime이 구독을 구분하는 (tr_id, tr_key)."""
+    if item.market == "KR":
+        return DOMESTIC_TR, item.code
+    return US_TR, f"D{item.exchange}{item.code}"
 
 
 class AlertMonitor:
@@ -114,8 +126,8 @@ class AlertMonitor:
         self._subscribed: dict[Key, WatchItem] = {}
         self._session_day: dict[str, date] = {}
         self._last_poll: dict[Key, datetime] = {}
-        self._bars_day: dict[Key, date] = {}  # 장중 일봉(전날까지)을 확인한 세션 날짜
-        self._close_done: dict[str, date] = {}
+        self._close_done: dict[Key, date] = {}  # 종목별로 마감 평가를 마친 세션 날짜
+        self._close_retry: dict[Key, tuple[date, datetime]] = {}  # (세션, 다시 받을 시각)
         self._last_eval: dict[Key, float] = {}
         self._pending: dict[Key, Tick] = {}
 
@@ -195,6 +207,7 @@ class AlertMonitor:
                 timings.setdefault(r.watchlist_id, set()).add(r.timing)
             for market in MARKETS:
                 mine = [i for i in items if i.market == market]
+                await self._close_pass(market, mine, timings)
                 if await self._clock.is_open(market):
                     any_open = True
                     live_items = [i for i in mine if "realtime" in timings.get(i.id, set())]
@@ -203,7 +216,6 @@ class AlertMonitor:
                     polling += polled
                 else:
                     await self._unsubscribe_market(market)
-                    await self._close_pass(market, mine, timings)
         except _Offline:
             offline = True
         except VaterError as e:
@@ -231,13 +243,7 @@ class AlertMonitor:
             return None
 
     async def _open_market(self, market: MarketId, items: list[WatchItem]) -> tuple[int, int]:
-        day = await self._clock.session_date(market)
-        self._session_day[market] = day
-        for item in items:  # 지표용 일봉은 장중에는 전날까지만(오늘 봉은 미확정), 하루 1번
-            if self._bars_day.get(_key(item)) != day:
-                await self._guard(item, self._bars(item, day - timedelta(days=1)))
-                self._bars_day[_key(item)] = day
-
+        self._session_day[market] = await self._clock.session_date(market)
         wanted = {_key(i): i for i in items}
         rt = self._ensure_realtime() if items else self._rt
         for key in [k for k in self._subscribed if k[0] == market and k not in wanted]:
@@ -249,7 +255,10 @@ class AlertMonitor:
                     self._subscribed[_key(item)] = item
                     on_realtime.append(item)
         connected = rt is not None and rt.state == "connected"
-        live_keys = {_key(i) for i in on_realtime} if connected else set()
+        rejected = rt.subscription_errors if rt is not None else {}
+        live_keys = (
+            {_key(i) for i in on_realtime if _ws_key(i) not in rejected} if connected else set()
+        )
         to_poll = [i for i in items if _key(i) not in live_keys]
 
         now = self._now()
@@ -267,21 +276,32 @@ class AlertMonitor:
     async def _close_pass(
         self, market: MarketId, items: list[WatchItem], timings: dict[int, set[str]]
     ) -> None:
-        if not items or not await self._clock.after_close(market):
+        if not items:
             return
-        day = await self._clock.session_date(market)
-        if self._close_done.get(market) == day:
+        day = await self._clock.last_closed_session(market)
+        if day is None:
             return
+        now = self._now()
+        bars = BarRepo(self._db())
         evaluator = self._evaluator()
         for item in items:
-            saved = await self._guard(item, self._bars(item, day))
-            if saved is None:  # 일봉을 못 받았으면 어제 값으로 '오늘 종가'를 판정하지 않는다
+            key = _key(item)
+            if self._close_done.get(key) == day:
+                continue
+            retry = self._close_retry.get(key)
+            if retry is not None and retry[0] == day and now < retry[1]:
+                continue
+            saved = await self._guard(item, self._bars(item, day))  # 인터넷 끊김은 여기서 멈춘다
+            last = bars.last_day(item.market, item.code)
+            if saved is None or last is None or last < day:
+                # 그 세션의 확정 봉이 아직 없다: 어제 값으로 '그날 종가'를 판정하지 않는다
+                self._close_retry[key] = (day, now + CLOSE_RETRY)
                 continue
             if "close" in timings.get(item.id, set()):
                 rules = RuleRepo(self._db()).list(item.id, enabled_only=True)
-                history = BarRepo(self._db()).history(item.market, item.code)
+                history = bars.history(item.market, item.code)
                 evaluator.evaluate(item, rules, history, None, day)
-        self._close_done[market] = day
+            self._close_done[key] = day
 
     # ---- 실시간 ---------------------------------------------------------------
 
@@ -327,6 +347,7 @@ class AlertMonitor:
             return
         elapsed = time.monotonic() - self._last_eval.get(key, float("-inf"))
         if elapsed >= self._throttle:
+            self._pending.pop(key, None)  # 미뤄 둔 틱은 이 틱보다 오래됐다
             self._evaluate_tick(key, tick)
             return
         if key not in self._pending:

@@ -100,3 +100,33 @@ async def test_is_session_day() -> None:
     assert await c.is_session_day("KR", KR_HOLIDAY) is False
     assert await c.is_session_day("US", date(2026, 11, 26)) is False
     assert await c.is_session_day("US", date(2026, 11, 27)) is True
+
+
+@pytest.mark.parametrize(
+    ("at", "market", "expected"),
+    [
+        # 국내: 마감 + 10분(15:40)이 지나야 그날이 '확정된 마지막 세션'이다
+        (datetime(2026, 11, 3, 10, 0, tzinfo=KST), "KR", date(2026, 11, 2)),
+        (datetime(2026, 11, 3, 15, 39, tzinfo=KST), "KR", date(2026, 11, 2)),
+        (datetime(2026, 11, 3, 15, 40, tzinfo=KST), "KR", date(2026, 11, 3)),
+        (datetime(2026, 11, 4, 20, 0, tzinfo=KST), "KR", date(2026, 11, 3)),  # 휴장일 저녁
+        (datetime(2026, 11, 9, 8, 0, tzinfo=KST), "KR", date(2026, 11, 6)),  # 월요일 아침 → 금요일
+        # 미국: 한국 저녁(뉴욕 이른 아침)에는 뉴욕의 전 세션
+        (datetime(2026, 11, 3, 20, 0, tzinfo=KST), "US", date(2026, 11, 2)),
+        (datetime(2026, 11, 3, 16, 9, tzinfo=NY), "US", date(2026, 11, 2)),
+        (datetime(2026, 11, 3, 16, 10, tzinfo=NY), "US", date(2026, 11, 3)),
+        (datetime(2026, 11, 27, 13, 10, tzinfo=NY), "US", date(2026, 11, 27)),  # 조기 폐장 13:00
+        (datetime(2026, 11, 26, 20, 0, tzinfo=NY), "US", date(2026, 11, 25)),  # 추수감사절 휴장
+    ],
+)
+async def test_last_closed_session(at: datetime, market: str, expected: date) -> None:
+    assert await clock(at).last_closed_session(market) == expected  # type: ignore[arg-type]
+
+
+async def test_last_closed_session_gives_up_after_a_long_holiday() -> None:
+    class Closed(Holidays):
+        async def __call__(self, day: date) -> bool:
+            return False
+
+    at = datetime(2026, 11, 3, 20, 0, tzinfo=KST)
+    assert await clock(at, Closed()).last_closed_session("KR") is None

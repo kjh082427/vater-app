@@ -21,6 +21,7 @@ KST = ZoneInfo("Asia/Seoul")
 NY = ZoneInfo("America/New_York")
 KR_OPEN, KR_CLOSE = time(9, 0), time(15, 30)
 SETTLE = timedelta(minutes=10)  # 마감 뒤 일봉이 확정될 때까지 기다리는 시간
+LOOKBACK_DAYS = 15  # 마지막 세션을 찾을 때 거슬러 올라가는 날 수 (설·추석 연휴 포함)
 
 TradingDayFn = Callable[[date], Awaitable[bool]]
 
@@ -87,6 +88,24 @@ class MarketClock:
             return False
         opened, closed = session
         return opened <= self._now() < closed
+
+    async def last_closed_session(self, market: MarketId) -> date | None:
+        """일봉이 확정된(마감 + 10분이 지난) 가장 최근 세션의 현지 날짜.
+
+        앱이 마감 직후에 꺼져 있었어도 다음 실행 때 그 세션을 평가할 수 있게 한다.
+        """
+        day = self._local(market).date()
+        for _ in range(LOOKBACK_DAYS):
+            if await self.is_session_day(market, day):
+                close = (
+                    datetime.combine(day, KR_CLOSE, tzinfo=KST)
+                    if market == "KR"
+                    else self._us_session(day)[1]
+                )
+                if self._now() >= close + SETTLE:
+                    return day
+            day -= timedelta(days=1)
+        return None
 
     async def after_close(self, market: MarketId) -> bool:
         """오늘이 거래일이고, 마감 후 일봉이 확정될 시간이 지났다."""
