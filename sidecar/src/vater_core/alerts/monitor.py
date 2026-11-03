@@ -104,6 +104,7 @@ class AlertMonitor:
         notify_fn: NotifyFn = notify,
         now: NowFn = _now_default,
         throttle: float = 1.0,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._deps = deps
         self._clock = clock
@@ -114,6 +115,7 @@ class AlertMonitor:
         self._notify = notify_fn
         self._now = now
         self._throttle = throttle
+        self._monotonic = monotonic  # 틱 1초 제한용 시계 (테스트에서 바꾼다)
 
         self._paused = False
         self._state = "closed"
@@ -345,7 +347,7 @@ class AlertMonitor:
         key = (tick.market, tick.code)
         if key not in self._subscribed:
             return
-        elapsed = time.monotonic() - self._last_eval.get(key, float("-inf"))
+        elapsed = self._monotonic() - self._last_eval.get(key, float("-inf"))
         if elapsed >= self._throttle:
             self._pending.pop(key, None)  # 미뤄 둔 틱은 이 틱보다 오래됐다
             self._evaluate_tick(key, tick)
@@ -360,7 +362,7 @@ class AlertMonitor:
             self._evaluate_tick(key, tick)
 
     def _evaluate_tick(self, key: Key, tick: Tick) -> None:
-        self._last_eval[key] = time.monotonic()
+        self._last_eval[key] = self._monotonic()
         self._evaluate_live(self._subscribed[key], tick.price, tick.change_pct, tick.volume)
 
     def _evaluate_live(self, item: WatchItem, price: float, change_pct: float, volume: int) -> None:

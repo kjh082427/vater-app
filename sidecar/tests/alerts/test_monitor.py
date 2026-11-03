@@ -134,13 +134,26 @@ class Market:
 class Notes:
     def __init__(self) -> None:
         self.sent: list[tuple[str, str, str | None]] = []
+        self.delay = 0.0  # 느린 컴퓨터(CI 서버) 흉내: 알림 1건 처리에 걸리는 실제 시간
 
     def __call__(self, title: str, body: str, route: str | None = None) -> None:
+        time.sleep(self.delay)
         self.sent.append((title, body, route))
+
+
+class Mono:
+    """틱 1초 제한용 가짜 시계(초). 테스트가 직접 움직인다."""
+
+    def __init__(self) -> None:
+        self.t = 1000.0
+
+    def __call__(self) -> float:
+        return self.t
 
 
 class Rig:
     def __init__(self, db: sqlite3.Connection, at: datetime, throttle: float = 0.05) -> None:
+        self.mono = Mono()
         self.db = db
         self.clock = Clock(at)
         self.bus = EventBus()
@@ -174,6 +187,7 @@ class Rig:
             notify_fn=self.notes,
             now=self.clock,
             throttle=throttle,
+            monotonic=self.mono,
         )
 
     def watch(
@@ -241,6 +255,7 @@ async def test_polled_price_fires_alert(db: sqlite3.Connection) -> None:
 
 async def test_tick_fires_and_is_throttled_then_flushed(db: sqlite3.Connection) -> None:
     rig = Rig(db, KR_OPEN, throttle=0.05)
+    rig.notes.delay = 0.1  # 평가가 1초(여기선 0.05초)보다 오래 걸려도 판단은 같아야 한다
     _, rule = rig.watch("005930")
     await rig.monitor.tick_once()
     assert rig.realtime is not None
@@ -248,6 +263,7 @@ async def test_tick_fires_and_is_throttled_then_flushed(db: sqlite3.Connection) 
     rig.realtime.on_tick(Tick("KR", "005930", 70000, 1.0, 1000, "100001"))
     assert rig.state(rule) is True and len(rig.notes.sent) == 1
 
+    rig.mono.t += 0.01
     rig.realtime.on_tick(Tick("KR", "005930", 50000, -1.0, 1100, "100001"))
     assert rig.state(rule) is True  # 1초(여기선 0.05초) 안의 틱은 바로 평가하지 않는다
 
@@ -543,8 +559,9 @@ async def test_a_newer_tick_drops_the_pending_older_one(db: sqlite3.Connection) 
     assert rig.realtime is not None
 
     rig.realtime.on_tick(Tick("KR", "005930", 59000, 0.0, 1000, "100001"))  # 바로 평가: 거짓
+    rig.mono.t += 0.01
     rig.realtime.on_tick(Tick("KR", "005930", 61000, 0.0, 1100, "100001"))  # 1초 안: 미룸
-    time.sleep(0.06)  # 루프가 미룬 틱을 처리하기 전에 1초(여기선 0.05초)가 지난다
+    rig.mono.t += 0.05  # 루프가 미룬 틱을 처리하기 전에 1초(여기선 0.05초)가 지난다
     rig.realtime.on_tick(Tick("KR", "005930", 59000, 0.0, 1200, "100002"))  # 바로 평가: 거짓
     await asyncio.sleep(0.15)
 
