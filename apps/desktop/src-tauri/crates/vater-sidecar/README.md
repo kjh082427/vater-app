@@ -14,6 +14,7 @@ Tauri 앱 크레이트(`apps/desktop/src-tauri`)가 경로 의존성으로 쓰�
 | `restart` | 재시작 정책입니다. 최근 10분 안의 비정상 종료가 3회를 넘으면 `GiveUp`, 아니면 1·2·4초 백오프로 `Restart`합니다. `ready`를 받으면 백오프만 처음으로 돌아갑니다.                                                                                                                                                                                                                                                                                                 |
 | `launch`  | 실행 명령을 만듭니다. 운영은 `<resources>/vater-core/vater-core.exe`, 개발은 `sidecar/`에서 `uv run python -m vater_core`(`VATER_DEV=1`)입니다. `VATER_TOKEN`을 넘기고 stdout은 파이프, stdin은 닫고, Windows에서는 콘솔 창을 숨깁니다(`CREATE_NO_WINDOW`). `new_token()`은 32바이트 난수의 16진수 64자입니다.                                                                                                                                                 |
 | `process` | `SidecarManager`입니다. 실행할 때마다 새 토큰으로 띄우고, `ready`면 `Ready{port, token}`, `notify`·`log`는 콜백으로 넘깁니다. `ready`가 30초 안에 오지 않거나 요청하지 않은 종료면 재시작 정책을 따르고, 넘으면 `Failed`에서 멈춥니다. `shutdown()`은 `POST /shutdown` 뒤 5초 안에 끝나지 않으면 강제 종료합니다. 상태는 `info()`와 `subscribe()`로 읽고, `post_json(path)`은 `Ready`인 사이드카에 토큰을 붙여 요청합니다(토큰이 크레이트 밖으로 나가지 않음). |
+| `job`     | Windows 작업 개체입니다. 관리자가 띄운 사이드카를 셸 프로세스의 작업 개체(`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`)에 넣어, 셸이 비정상 종료되거나 강제로 끝나도 사이드카가 남지 않게 합니다(다시 실행했을 때 사이드카가 둘이 되지 않음). 다른 운영체제에서는 아무것도 하지 않습니다.                                                                                                                                                                              |
 
 ## 쓰는 법 (`src-tauri/src/lib.rs`가 하는 일)
 
@@ -35,7 +36,7 @@ let outcome = manager.shutdown().await; // 트레이 "종료"
 - 토큰은 메모리에만 둡니다. `SidecarInfo`의 `{:?}` 출력은 토큰을 가립니다. `std::process::Command`의 `{:?}`는 환경변수(토큰)를 보여 주므로 로그에 쓰지 않습니다.
 - `VATER_DATA_DIR`는 넘기지 않습니다(사이드카가 `%APPDATA%\Vater`를 씁니다). 운영 모드는 사용자 환경에 남은 `VATER_DEV`를 지웁니다.
 - 사이드카로 보내는 HTTP 요청은 127.0.0.1로만 가고 프록시를 쓰지 않습니다.
-- 알려진 한계: Linux 개발 모드에서 강제 종료하면 `uv`만 끝나고 그 아래 `python`이 남을 수 있습니다(정상 종료는 문제없음). 운영의 onedir `vater-core.exe`는 프로세스 하나라서 해당하지 않습니다.
+- 알려진 한계: Linux 개발 모드에서 강제 종료하면 `uv`만 끝나고 그 아래 `python`이 남을 수 있습니다(정상 종료는 문제없음). Linux에는 작업 개체가 없어 셸이 비정상 종료될 때도 사이드카가 남을 수 있습니다(개발 전용). Windows 개발 모드는 `uv`를 작업에 넣기 전에 `uv`가 `python`을 띄우면 그 `python`은 작업 밖에 남을 수 있습니다. 운영의 onedir `vater-core.exe`는 프로세스 하나라서 해당하지 않습니다.
 
 ## 확인 방법
 

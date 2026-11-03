@@ -17,22 +17,75 @@ pub(crate) fn bind_to_shell(child: &tokio::process::Child) -> io::Result<()> {
 #[cfg(windows)]
 mod imp {
     use std::io;
+    use std::sync::OnceLock;
 
-    use windows_sys::Win32::Foundation::HANDLE;
-    use windows_sys::Win32::System::JobObjects::JOBOBJECT_EXTENDED_LIMIT_INFORMATION;
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+        SetInformationJobObject,
+    };
+
+    /// 셸이 끝날 때까지 닫지 않는 작업 개체 핸들.
+    struct Job(HANDLE);
+
+    // SAFETY: 작업 개체 핸들은 프로세스 전체의 커널 핸들이라 어느 스레드에서 써도 된다.
+    // 닫지 않으므로(셸이 끝날 때 운영체제가 닫는다) 해제 경쟁도 없다.
+    unsafe impl Send for Job {}
+    unsafe impl Sync for Job {}
+
+    /// 만들지 못했으면 그때의 Windows 오류 코드.
+    static JOB: OnceLock<Result<Job, i32>> = OnceLock::new();
 
     /// 작업 개체에 거는 제한: 핸들이 닫히면 안의 프로세스를 모두 끝낸다.
     pub(super) fn limits() -> JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default()
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        info
+    }
+
+    fn create() -> io::Result<Job> {
+        // SAFETY: 기본 보안 설정과 이름 없는 작업 개체(두 인자 모두 null).
+        let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+        if handle.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let info = limits();
+        // SAFETY: `info`는 이 호출 동안 살아 있고, 형식과 크기를 정확히 넘긴다.
+        let ok = unsafe {
+            SetInformationJobObject(
+                handle,
+                JobObjectExtendedLimitInformation,
+                (&raw const info).cast(),
+                size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            )
+        };
+        if ok == 0 {
+            let error = io::Error::last_os_error();
+            // SAFETY: 방금 만든 핸들이고 다른 곳에 넘기지 않았다.
+            unsafe { CloseHandle(handle) };
+            return Err(error);
+        }
+        Ok(Job(handle))
     }
 
     /// 셸 프로세스의 작업 개체(처음 부를 때 만든다).
     pub(super) fn job_handle() -> io::Result<HANDLE> {
-        Err(io::Error::other("not implemented"))
+        match JOB.get_or_init(|| create().map_err(|e| e.raw_os_error().unwrap_or(-1))) {
+            Ok(job) => Ok(job.0),
+            Err(code) => Err(io::Error::from_raw_os_error(*code)),
+        }
     }
 
-    pub(super) fn bind(_child: &tokio::process::Child) -> io::Result<()> {
-        let _ = (limits(), job_handle());
+    pub(super) fn bind(child: &tokio::process::Child) -> io::Result<()> {
+        let process = child
+            .raw_handle()
+            .ok_or_else(|| io::Error::other("the child process has already been waited for"))?;
+        let job = job_handle()?;
+        // SAFETY: 작업 개체 핸들은 닫지 않고, 자식 핸들은 아직 기다리지 않아 살아 있다.
+        if unsafe { AssignProcessToJobObject(job, process as HANDLE) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
         Ok(())
     }
 }

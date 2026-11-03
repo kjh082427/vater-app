@@ -46,6 +46,7 @@
 | `crates/vater-sidecar/` | 사이드카 실행·감시·재시작·종료 로직(Tauri 없이 테스트). 자세한 내용은 그 폴더의 README                                                                        |
 
 - 트레이 "종료"는 창을 숨기고 사이드카에 `POST /shutdown`을 보낸 뒤 5초 안에 끝나지 않으면 강제 종료하고 앱을 끝냅니다. 다른 경로로 앱이 끝나도(`RunEvent::Exit`) 같은 정리를 합니다.
+- `Vater.exe`가 비정상 종료되거나 강제로 끝나도 사이드카가 남지 않습니다. 사이드카는 셸의 Windows 작업 개체(`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) 안에서 돌고, 셸이 끝나면 운영체제가 함께 끝냅니다. CI의 설치 확인이 `taskkill /F`로 이것을 확인합니다.
 - 감시 일시 중지 상태는 사이드카 메모리에만 있으므로, 사이드카가 다시 시작되면 트레이 메뉴도 `감시 일시 중지`로 돌아갑니다. 사이드카가 준비되기 전에는 이 메뉴를 누를 수 없습니다.
 - 아이콘(`icons/`)은 **임시**입니다. DESIGN.md의 ink(`#141414`) 사각형에 흰 "V"를 그린 `icons/app-icon.svg`에서 `npx @tauri-apps/cli@2.12.3 icon icons/app-icon.svg`로 만들고, 모바일용 폴더(`android/`, `ios/`)는 지웠습니다.
 
@@ -82,7 +83,7 @@ cd .. && PATH=$HOME/.cargo/bin:$PATH npx @tauri-apps/cli@2.12.3 dev
 2. `packaging/smoke-sidecar.ps1`: 그 exe를 `VATER_TOKEN`, `VATER_BACKGROUND_JOBS=0`, 임시 데이터 폴더, `VATER_SECRET_BACKEND=envfile`로 띄워 `ready` → `GET /health` 200 → `POST /shutdown` 202 → 종료 코드 0을 확인합니다.
 3. `cargo clippy`, `cargo test`(가짜 사이드카로 Windows 프로세스 동작까지) → `npx @tauri-apps/cli@2.12.3 build --bundles nsis`.
 4. 설치 파일을 산출물 **`vater-windows-installer`**로 올립니다(14일 보관). Actions 실행 화면의 Artifacts에서 받습니다.
-5. `packaging/smoke-installed.ps1`: 설치 파일을 `/S`로 조용히 설치하고 `Vater.exe`를 띄워, 함께 설치된 `vater-core.exe`가 `Vater.exe`의 자식으로 127.0.0.1에서 요청을 받는지(토큰 없이 `/health` → 401) 확인합니다.
+5. `packaging/smoke-installed.ps1`: 설치 파일을 `/S`로 조용히 설치하고 `Vater.exe`를 띄워, 함께 설치된 `vater-core.exe`가 `Vater.exe`의 자식으로 127.0.0.1에서 요청을 받는지(토큰 없이 `/health` → 401) 확인합니다. 마지막으로 `Vater.exe`를 `taskkill /F`로 끝내 `vater-core.exe`도 5초 안에 끝나는지 봅니다.
 
 첫 성공 실행([41576477065](https://github.com/kjh082427/vater-app/actions/runs/41576477065)): 사이드카 onedir 146.9MB, `Vater.exe` 12.2MB, 설치 파일 `Vater_0.1.0_x64-setup.exe` 55.8MB, 설치 후 `vater-core.exe`가 9.6초 만에 요청을 받음.
 
@@ -111,7 +112,6 @@ CI 산출물 `vater-windows-installer`의 설치 파일을 받아 확인합니�
 | 10  | 작업 관리자에서 `vater-core.exe`만 끝내기                                       | 몇 초 안에 새 `vater-core.exe`가 뜨고 화면이 다시 연결됨                                                  |
 | 11  | 10을 10분 안에 4번 반복                                                         | 재시작을 멈추고 UI가 실패 상태(`sidecar-state` = `failed`)를 보임                                         |
 | 12  | 트레이 메뉴 "종료"                                                              | 창과 트레이 아이콘이 사라지고, 5초 안에 `Vater.exe`와 `vater-core.exe`가 모두 작업 관리자에서 사라짐      |
+| 12a | 작업 관리자에서 `Vater.exe`를 강제로 끝내기(비정상 종료와 같음)                 | 몇 초 안에 `vater-core.exe`도 사라짐(Windows 작업 개체). 다시 실행하면 `vater-core.exe`는 하나            |
 | 13  | 첫 실행 마법사(ui/screens 이후)에서 자동 실행 켜고 로그아웃 → 로그인            | Vater가 창 없이 트레이로 시작(`--autostart`). 끄면 다시 시작하지 않음                                     |
 | 14  | 설정 → 앱 → Vater 제거                                                          | 설치 폴더가 지워짐(데이터 `%APPDATA%\Vater`는 남음)                                                       |
-
-- 알려진 한계: `Vater.exe`가 비정상 종료되거나 작업 관리자에서 강제로 끝나면 `vater-core.exe`가 남습니다(작업 개체로 묶지 않음). 이 경우 다음 실행 전에 작업 관리자에서 끝내 주세요.
