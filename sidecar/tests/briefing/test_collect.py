@@ -57,6 +57,12 @@ class FakeFeeds:
         self._check("index_quote", m)
         return iq("0001" if m == "KOSPI" else "1001", m)
 
+    async def index_daily(self, m: str, start: date, end: date) -> list[Bar]:
+        self._check("index_daily", m)
+        # 세션 다음 날의 (장중 미확정) 봉까지 섞어 준다: 수집이 걸러야 한다
+        days = [end + timedelta(days=1)] + [end - timedelta(days=i) for i in range(40)]
+        return [Bar(d, 1, 1, 1, float(d.toordinal() % 1000), 1) for d in sorted(days)]
+
     async def sector_board(self, m: str) -> SectorBoard:
         self._check("sector_board", m)
         return SectorBoard(iq("0001", m), 500, 300, 50, [iq("0013", "전기전자")])
@@ -101,13 +107,17 @@ async def test_kr_collects_every_section(db: sqlite3.Connection) -> None:
         "2026-11-03T16:00:00+09:00",
     )
     assert [i["name"] for i in d["indices"]] == ["KOSPI", "KOSDAQ"]
-    assert d["indices"][0] == {
+    kospi = d["indices"][0]
+    assert {k: kospi[k] for k in ("code", "name", "value", "change", "change_pct")} == {
         "code": "0001",
         "name": "KOSPI",
         "value": 100.0,
         "change": 1.0,
         "change_pct": 1.0,
     }
+    # 국내 지수도 미니 차트용 최근 30거래일 종가. 세션 다음 날 봉은 빠진다
+    assert len(kospi["closes"]) == 30
+    assert kospi["closes"][-1] == {"day": "2026-11-03", "close": float(KR_DAY.toordinal() % 1000)}
     assert set(d["sectors"]) == {"KOSPI", "KOSDAQ"}
     assert d["sectors"]["KOSPI"]["advancers"] == 500
     assert d["sectors"]["KOSPI"]["sectors"][0]["name"] == "전기전자"
@@ -215,3 +225,10 @@ async def test_us_alerts_use_the_new_york_session_window(db: sqlite3.Connection)
         "kind": "price_above",
         "message": "애플 장중 (한국 월요일 밤)",
     }
+
+
+async def test_kr_index_closes_failing_makes_indices_missing(db: sqlite3.Connection) -> None:
+    feeds = FakeFeeds()
+    feeds.fail[("index_daily", "KOSDAQ")] = KisApiError("EGW00500", "일시 오류")
+    got = await collect("KR", KR_DAY, feeds, db, alerts_until=KR_NOW)
+    assert got.missing == ["indices"] and "indices" not in got.data
