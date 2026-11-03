@@ -232,9 +232,14 @@ class AlertMonitor:
         if change is not None:
             if day is not None:
                 self._prev_close[key] = (day, price - change)
-        else:
+        elif day is not None:
             prev = self._prev_close.get(key)
-            if prev is not None and day is not None and prev[0] == day:
+            if prev is None or prev[0] != day:  # 받아 둔 일봉의 전 세션 종가(마감 평가가 채운다)
+                close = BarRepo(self._db()).close_before(item.market, item.code, day)
+                if close is not None:
+                    prev = (day, close)
+                    self._prev_close[key] = prev
+            if prev is not None and prev[0] == day:
                 change = round(price - prev[1], 6)
         at = self._now().astimezone(KST).isoformat(timespec="seconds")
         quote = WatchQuote(price, change, change_pct, at, source)

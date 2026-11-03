@@ -793,3 +793,19 @@ async def test_watch_quotes_never_fail_as_a_whole(db: sqlite3.Connection, error:
 
     assert got["005930"]["price"] is None and got["005930"]["source"] is None
     assert got["000660"]["price"] == 198700.0
+
+
+async def test_realtime_change_uses_the_previous_daily_close(db: sqlite3.Connection) -> None:
+    # 실시간으로 잘 연결된 종목은 REST 시세를 받을 일이 없다: 받아 둔 일봉의 전 세션 종가를 쓴다
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    BarRepo(db).upsert("KR", "005930", [Bar(DAY - timedelta(days=1), 1, 1, 1, 69000, 1000)])
+    BarRepo(db).upsert("KR", "005930", [Bar(DAY - timedelta(days=2), 1, 1, 1, 68000, 1000)])
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1000, "100001"))
+
+    assert [(q["price"], q["change"]) for q in quotes(drained(sub))] == [(71000, 2000.0)]
+    assert len(rig.market.price_calls) == 0  # 한투를 더 부르지 않는다
