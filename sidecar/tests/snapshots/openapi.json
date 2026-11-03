@@ -1350,6 +1350,7 @@
               "running",
               "paused",
               "offline",
+              "auth_invalid",
               "closed"
             ],
             "title": "State",
@@ -1395,6 +1396,7 @@
               "running",
               "paused",
               "offline",
+              "auth_invalid",
               "closed"
             ],
             "title": "State",

@@ -9,6 +9,8 @@
   판정하지 않고 5분 뒤 다시 받는다. 장중 지표(신고가 등)도 이렇게 받은 전 세션까지의 일봉을 쓴다.
 - 틱은 종목별로 1초에 최대 1번 평가한다. 그 사이의 틱은 최신가만 남겨 두었다가 1초가 차면 평가한다.
 - 인터넷이 끊기면(`KIS_UNREACHABLE`, 연결 오류) `offline`.
+- 한투 키가 틀렸거나 만료되면(`KIS_AUTH_INVALID`) `auth_invalid`.
+  감시를 멈추고 다음 회차에 다시 확인한다(스펙 8장).
   다음 회차에 다시 시도하고 복구되면 재개한다.
 - 상태가 바뀌면 SSE `alerts.state` `{state, realtime, polling}`을 보낸다.
 
@@ -69,6 +71,10 @@ SleepFn = Callable[[float], Awaitable[None]]
 
 
 class _Offline(Exception):
+    pass
+
+
+class _AuthInvalid(Exception):
     pass
 
 
@@ -216,7 +222,7 @@ class AlertMonitor:
         감시 루프가 끊김(offline)이면 부르지 않는다: 종목마다 연결 제한 시간을 기다리지 않게.
         """
         key = _key(item)
-        if self._state == "offline":
+        if self._state in ("offline", "auth_invalid"):
             return None
         running = self._rest_inflight.get(key)
         if running is not None:
@@ -371,6 +377,7 @@ class AlertMonitor:
             self._publish_status()
             return
         offline = False
+        auth_invalid = False
         any_open = False
         realtime = polling = 0
         items: list[WatchItem] = []
@@ -404,12 +411,18 @@ class AlertMonitor:
                     feeds.update({_key(i): "closed" for i in mine})
         except _Offline:
             offline = True
+        except _AuthInvalid:
+            auth_invalid = True
         except VaterError as e:
             if e.code != "KIS_NOT_CONFIGURED":
                 raise
             logger.debug("alert monitor idle: KIS keys are not configured")
         self._stop_realtime_if_idle()
-        self._state = "offline" if offline else ("running" if any_open else "closed")
+        if auth_invalid:
+            self._state = "auth_invalid"
+        else:
+            self._state = "offline" if offline else ("running" if any_open else "closed")
+        offline = offline or auth_invalid  # 종목별 수신 상태는 둘 다 끊김
         self._counts = (realtime, polling)
         self._feeds = [
             {
@@ -435,6 +448,8 @@ class AlertMonitor:
         except Exception as e:
             if _is_offline(e):
                 raise _Offline from e
+            if isinstance(e, VaterError) and e.code == "KIS_AUTH_INVALID":
+                raise _AuthInvalid from e
             if isinstance(e, VaterError) and e.code == "KIS_NOT_CONFIGURED":
                 raise
             logger.warning("alert monitor: %s %s failed: %s", item.market, item.code, e)

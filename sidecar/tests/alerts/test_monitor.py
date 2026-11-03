@@ -928,3 +928,26 @@ async def test_a_failing_symbol_is_retried_once_per_window(db: sqlite3.Connectio
     rig.clock.at = KR_AFTER + timedelta(seconds=31)
     await rig.monitor.watch_quotes()
     assert rig.market.price_calls == ["005930", "005930"]
+
+
+async def test_kis_auth_invalid_is_reported_and_recovers(db: sqlite3.Connection) -> None:
+    """스펙 8장: 한투 키가 틀렸거나 만료됨 → 해당 기능만 중지(4단계 확인 U10)."""
+    SettingsRepo(db).update({"kis.ws_max_subscriptions": 1})
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    rig.watch("000660")
+    sub = rig.bus.subscribe()
+
+    rig.market.fail = VaterError(
+        "KIS_AUTH_INVALID", "한국투자증권 인증에 실패했습니다.", "앱키를 확인하세요.", 401
+    )
+    await rig.monitor.tick_once()
+    assert rig.monitor.status()["state"] == "auth_invalid"
+    assert {f["feed"] for f in rig.monitor.status()["feeds"]} == {"offline"}
+    event = await asyncio.wait_for(anext(sub), 1)
+    assert (event.type, event.data["state"]) == ("alerts.state", "auth_invalid")
+
+    rig.market.fail = None
+    rig.clock.at = KR_OPEN + timedelta(seconds=30)
+    await rig.monitor.tick_once()
+    assert rig.monitor.status()["state"] == "running"
