@@ -37,7 +37,7 @@ const MOVE: Record<string, (index: number, last: number) => number> = {
 };
 
 /**
- * 데이터 표. 숫자 열은 오른쪽 정렬, 행 높이 40px, 행 사이 가는 선.
+ * 데이터 표. 짙은 머리줄, 교차 행 바탕, 숫자 열은 오른쪽 정렬, 행 높이 38px.
  * 행 동작이 있으면 행 하나만 Tab 순서에 들어가고(roving tabindex) ↑↓·Home·End로 옮긴다.
  * 행 안의 버튼·링크·입력은 제 동작만 하고 행을 열지 않는다.
  */
@@ -79,7 +79,10 @@ export function DataTable<Row>({
   }
 
   return (
-    <table className={cx(styles.table, className)}>
+    <table
+      className={cx(styles.table, className)}
+      data-empty={rows.length === 0 ? 'true' : undefined}
+    >
       <caption className={styles.caption} data-hidden={captionVisible ? 'false' : 'true'}>
         {caption}
       </caption>
@@ -105,7 +108,7 @@ export function DataTable<Row>({
       <tbody>
         {rows.length === 0 ? (
           <tr>
-            <td className={styles.empty} colSpan={columns.length}>
+            <td className={cx(styles.td, styles.empty)} colSpan={columns.length}>
               {empty}
             </td>
           </tr>

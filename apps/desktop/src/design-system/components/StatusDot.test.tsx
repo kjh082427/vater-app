@@ -10,6 +10,7 @@ describe('FeedStatus: 종목별 시세 수신 상태', () => {
     [{ state: 'polling' } as const, '폴링'],
     [{ state: 'disconnected' } as const, '끊김 · 재연결 중'],
     [{ state: 'closed' } as const, '장 마감'],
+    [{ state: 'idle' } as const, '감시 안 함'],
   ])('%o → "%s"', (props, label) => {
     const { container } = render(<FeedStatus {...props} />);
     const el = container.firstElementChild;
@@ -29,6 +30,7 @@ describe('FeedStatus: 종목별 시세 수신 상태', () => {
     ['polling', 'caution'],
     ['disconnected', 'caution-strong'],
     ['closed', 'off'],
+    ['idle', 'off'],
   ] as const)('%s의 점 모양은 %s', (state, dot) => {
     const { container } = render(<FeedStatus state={state} />);
     expect(container.querySelector('[data-dot]')).toHaveAttribute('data-dot', dot);

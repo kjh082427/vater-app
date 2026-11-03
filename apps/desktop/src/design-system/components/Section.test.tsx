@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Button } from './Button';
 import { Section } from './Section';
 
-describe('Section: 굵은 먹선으로 나눈 구역', () => {
+describe('Section: 칸 카드 모양의 구역', () => {
   it('제목으로 이름 붙은 구역(region)과 제목(h2), 보조 정보, 행동', () => {
     render(
       <Section title="감시 종목" meta="5종목" actions={<Button variant="quiet">종목 추가</Button>}>
@@ -24,7 +24,7 @@ describe('Section: 굵은 먹선으로 나눈 구역', () => {
       </Section>,
     );
     expect(screen.getByRole('heading', { level: 3, name: '강세 측 의견' })).toBeInTheDocument();
-    // 안쪽 구역은 겉모양도 한 단계 낮다(1px 먹선, 작은 제목)
+    // 안쪽 구역은 카드가 아니라 한 단계 낮은 묶음이다(1px 선, 작은 제목: 카드 안 카드 금지)
     expect(screen.getByRole('region', { name: '강세 측 의견' })).toHaveAttribute('data-level', '3');
   });
 

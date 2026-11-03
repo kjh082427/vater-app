@@ -1,20 +1,32 @@
+/* 왼쪽 사이드바: 흰 바탕, 현재 화면만 옅은 강조 바탕 + 왼쪽 강조 막대 */
 .side {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-3) var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3);
   background: var(--color-card);
   border-right: var(--rule-hair) solid var(--color-line);
 }
 
-/* 워드마크: 고딕 굵게(글꼴은 Pretendard 하나) */
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-2-5) var(--space-5);
+  padding: 0 var(--space-2) var(--space-4);
+}
+
+/* 워드마크 앞 표지: 강조색 네모 안의 막대 셋(장식) */
+.mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: var(--radius-control);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .wordmark {
@@ -27,6 +39,7 @@
 .tagline {
   font-size: var(--text-xs);
   color: var(--color-ink-3);
+  white-space: nowrap;
 }
 
 .list {
@@ -38,14 +51,18 @@
 }
 
 .link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2-5);
   height: var(--size-nav-item);
   padding: 0 var(--space-2-5);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   color: var(--color-ink-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
   text-decoration: none;
+  white-space: nowrap;
   transition:
     background-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out);
@@ -62,26 +79,20 @@
   font-weight: var(--weight-semibold);
 }
 
+/* 현재 화면: 사이드바 왼쪽 끝의 강조 막대 */
+.link[aria-current='page']::before {
+  position: absolute;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  left: calc(var(--space-3) * -1);
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-accent);
+  content: '';
+}
+
 .link:focus-visible {
   outline-offset: calc(var(--rule-focus) * -1);
-}
-
-.badge {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-}
-
-.foot {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: auto;
-  padding: var(--space-3) var(--space-2-5) 0;
-  border-top: var(--rule-hair) solid var(--color-line);
-  font-size: var(--text-sm);
-  color: var(--color-ink-2);
 }
 
 /* 메뉴 아이콘은 중립 회색, 현재 화면만 강조색 */
@@ -91,4 +102,30 @@
 
 .link[aria-current='page'] > svg {
   color: var(--color-accent);
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.125rem;
+  margin-left: auto;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-round);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-xs);
+  line-height: 1;
+  font-weight: var(--weight-semibold);
+}
+
+.foot {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding: var(--space-3) var(--space-1-5) 0;
+  border-top: var(--rule-hair) solid var(--color-line);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
 }

@@ -14,7 +14,7 @@ export interface SectionProps {
   children: ReactNode;
 }
 
-/** 구역: 위쪽 2px 먹선 + 머리(제목, 보조 정보, 행동) + 본문. 카드 상자를 쓰지 않는다. */
+/** 구역: 칸 카드 모양(제목, 설명 한 줄, 행동) + 본문. 안쪽 구역(3·4단계)은 카드가 아니라 선으로 나눈다. */
 export function Section({
   title,
   meta,

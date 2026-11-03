@@ -35,12 +35,12 @@
   --color-ink: #161c2a;
   --color-ink-2: #3b4456;
   --color-ink-3: #5a6275;
-  --color-on-ink: #ffffff;
 
   /* 강조(인디고-바이올렛) 하나: 선택, 주 버튼, 활성 탭, 링크, 포커스. 빨강·파랑과 색상이 40도 이상 떨어진다 */
   --color-accent: #7a45d8;
   --color-accent-strong: #6232c4;
   --color-accent-weak: #f1ecfd;
+  --color-accent-line: #cdbff5; /* 장식 선(AI 문장 왼쪽 선, 편집 중 칸 테두리). 정보를 싣지 않는다 */
   --color-on-accent: #ffffff;
 
   /* 분류 표지(지수 이름 옆 네모 등): 중립 회색. 빨강·파랑으로 분류하지 않는다 */
@@ -63,6 +63,7 @@
   --color-selected: var(--color-accent-weak);
   --color-rule-section: var(--color-line);
   --color-ink-hover: var(--color-ink-2);
+  --color-on-ink: var(--color-on-accent);
 
   /* 그림자: 칸 카드는 아주 옅게 */
   --shadow-card: 0 1px 2px var(--color-card-shadow), 0 2px 8px var(--color-card-shadow);

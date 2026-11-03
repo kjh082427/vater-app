@@ -13,7 +13,7 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
-/** 앱 창 틀(스펙 9-1): 왼쪽 사이드바 216px, 본문, 하단 상태 표시줄 32px. */
+/** 앱 창 틀(스펙 9-1): 왼쪽 사이드바 200px, 캔버스 바탕의 본문, 하단 상태 표시줄 28px. */
 export function AppShell({ sidebar, statusBar, banner, className, children }: AppShellProps) {
   const mainId = useId();
   const mainRef = useRef<HTMLElement>(null);

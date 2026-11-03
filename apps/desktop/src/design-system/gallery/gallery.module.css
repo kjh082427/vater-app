@@ -204,10 +204,6 @@ code {
   width: 20rem;
 }
 
-.ruleSection {
-  border-top: var(--rule-section) solid var(--color-rule-section);
-}
-
 .ruleLine {
   border-top: var(--rule-hair) solid var(--color-line);
 }
@@ -216,11 +212,31 @@ code {
   border-top: var(--rule-hair) solid var(--color-rule);
 }
 
+.radiusRow {
+  display: flex;
+  gap: var(--space-3);
+}
+
 .radiusDemo {
   width: 4rem;
-  height: 2rem;
+  height: 2.5rem;
   border: var(--rule-hair) solid var(--color-control);
+}
+
+.radiusDemo[data-r='sm'] {
   border-radius: var(--radius-sm);
+}
+
+.radiusDemo[data-r='control'] {
+  border-radius: var(--radius-control);
+}
+
+.radiusDemo[data-r='md'] {
+  border-radius: var(--radius-md);
+}
+
+.radiusDemo[data-r='pop'] {
+  border-radius: var(--radius-pop);
 }
 
 /* 표 안의 조합 */

@@ -230,15 +230,19 @@ function SpacingAndRules() {
             ))}
           </div>
         </Row>
-        <Row label="선: 구역 2px 먹 / 표 머리 1px / 행 1px">
+        <Row label="선: 경계 1px(line) / 행 1px(rule)">
           <div className={styles.ruleDemo}>
-            <div className={styles.ruleSection} />
             <div className={styles.ruleLine} />
             <div className={styles.ruleRow} />
           </div>
         </Row>
-        <Row label="모서리 4px (버튼, 칩)">
-          <div className={styles.radiusDemo} />
+        <Row label="모서리: 칩 4 · 버튼·입력 6 · 칸 카드 8 · 메뉴·대화 상자 10">
+          <div className={styles.radiusRow}>
+            <div className={styles.radiusDemo} data-r="sm" />
+            <div className={styles.radiusDemo} data-r="control" />
+            <div className={styles.radiusDemo} data-r="md" />
+            <div className={styles.radiusDemo} data-r="pop" />
+          </div>
         </Row>
         <Row label="움직임">
           <p className={styles.small}>
@@ -375,6 +379,7 @@ function States() {
             <FeedStatus state="polling" intervalSeconds={30} />
             <FeedStatus state="disconnected" />
             <FeedStatus state="closed" />
+            <FeedStatus state="idle" />
           </div>
         </Row>
         <Row label="MarketState 칩">
@@ -488,7 +493,10 @@ function TabsDemo() {
 function SectionsAndTables() {
   const [opened, setOpened] = useState('');
   return (
-    <Section title="구역과 표" meta="칸막이 상자 대신 2px 먹선. 숫자 열은 오른쪽 정렬">
+    <Section
+      title="구역과 표"
+      meta="칸 카드 안의 묶음은 선으로(카드 안 카드 금지). 짙은 머리줄, 숫자 열은 오른쪽 정렬"
+    >
       <div className={styles.twoUp}>
         <div className={styles.twoUpGrid}>
           <Section
@@ -596,7 +604,7 @@ function Notices() {
 
 function AiProse() {
   return (
-    <Section title="AI 문장" meta="AI가 쓴 문장은 명조, 데이터는 고딕. 설명 없이 눈으로 구분된다">
+    <Section title="AI 문장" meta="왼쪽 옅은 강조선과 꼬리표로 데이터와 구분한다">
       <div className={styles.rows}>
         <Row label="브리핑: 첫 문장 + 이어지는 문장">
           <div className={styles.stack}>
@@ -632,7 +640,7 @@ function Chrome() {
   return (
     <Section
       title="사이드바와 상태 표시줄"
-      meta="크롬에는 색이 없다"
+      meta="흰 바탕, 현재 화면만 강조색"
       actions={
         <a className={styles.inlineLink} href="#shell">
           창 틀 전체 보기
@@ -665,9 +673,7 @@ export function Gallery() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Vater 디자인 시스템</h1>
-          <p className={styles.lede}>
-            방향 B 리서치 노트. 시세, 문장, 알림은 모두 예시 데이터입니다.
-          </p>
+          <p className={styles.lede}>대시보드 라이트. 시세, 문장, 알림은 모두 예시 데이터입니다.</p>
         </div>
         <nav className={styles.links} aria-label="견본 보기">
           <a href="#shell">창 틀 견본</a>

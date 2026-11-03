@@ -5,9 +5,9 @@ import type { IconProps } from './Icon';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /**
-   * - primary: 먹으로 채운 주 버튼. 한 화면에 하나만(예: "새 분석").
+   * - primary: 강조색으로 채운 주 버튼. 한 화면에 하나만(예: "새 분석", "저장").
    * - secondary: 테두리 버튼(기본).
-   * - quiet: 밑줄 글자 버튼. 구역 머리의 작은 행동(예: "종목 추가", "전체 보기").
+   * - quiet: 강조색 글자의 링크 모양 버튼. 카드 머리·바닥의 작은 행동(예: "종목 추가", "브리핑 읽기").
    */
   variant?: 'primary' | 'secondary' | 'quiet';
   size?: 'md' | 'sm';
