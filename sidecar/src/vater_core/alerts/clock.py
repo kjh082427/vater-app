@@ -1,7 +1,7 @@
 """장 운영 시간과 휴장일 (스펙 4-2).
 
-- 국내: 09:00~15:30 `Asia/Seoul`. 휴장일은 한투 휴장일 API(하루 1번 확인해 캐시).
-  한투를 못 부르면 주말만 거른다.
+- 국내: 09:00~15:30 `Asia/Seoul`(수능날처럼 시간이 바뀌는 날은 `KR_SPECIAL_HOURS`).
+  휴장일은 한투 휴장일 API(하루 1번 확인해 캐시). 한투를 못 부르면 주말만 거른다.
 - 미국: `exchange_calendars`의 `XNYS`(휴장일·조기 폐장 포함), 시각은 그 세션의 개장·폐장 시각.
 """
 
@@ -23,6 +23,12 @@ KR_OPEN, KR_CLOSE = time(9, 0), time(15, 30)
 SETTLE = timedelta(minutes=10)  # 마감 뒤 일봉이 확정될 때까지 기다리는 시간
 LOOKBACK_DAYS = 15  # 마지막 세션을 찾을 때 거슬러 올라가는 날 수 (설·추석 연휴 포함)
 
+# 국내 장 시간이 평소와 다른 날. 한투 휴장일 API는 개장 여부만 알려 준다.
+# 대학수학능력시험일에는 한국거래소가 1시간 늦게 열고 1시간 늦게 닫는다. 해마다 날짜를 더한다.
+KR_SPECIAL_HOURS: dict[date, tuple[time, time]] = {
+    date(2026, 11, 19): (time(10, 0), time(16, 30)),  # 2027학년도 수능
+}
+
 TradingDayFn = Callable[[date], Awaitable[bool]]
 
 
@@ -35,6 +41,17 @@ def _xnys() -> Any:
 
 def _now_default() -> datetime:
     return datetime.now(UTC)
+
+
+def session_bounds(market: MarketId, day: date) -> tuple[datetime, datetime]:
+    """그 날의 개장·마감 시각. 휴장일인지는 보지 않는다(미국 휴장일은 오류가 난다)."""
+    if market == "KR":
+        opened, closed = KR_SPECIAL_HOURS.get(day, (KR_OPEN, KR_CLOSE))
+        return datetime.combine(day, opened, tzinfo=KST), datetime.combine(day, closed, tzinfo=KST)
+    cal = _xnys()
+    us_open: datetime = cal.session_open(day.isoformat()).to_pydatetime()
+    us_close: datetime = cal.session_close(day.isoformat()).to_pydatetime()
+    return us_open, us_close
 
 
 class MarketClock:
@@ -64,23 +81,12 @@ class MarketClock:
         self._kr_cache[day] = value
         return value
 
-    def _us_session(self, day: date) -> tuple[datetime, datetime]:
-        cal = _xnys()
-        opened = cal.session_open(day.isoformat()).to_pydatetime()
-        closed = cal.session_close(day.isoformat()).to_pydatetime()
-        return opened, closed
-
     async def _open_close(self, market: MarketId) -> tuple[datetime, datetime] | None:
         local = self._local(market)
         day = local.date()
         if not await self.is_session_day(market, day):
             return None
-        if market == "KR":
-            return (
-                datetime.combine(day, KR_OPEN, tzinfo=KST),
-                datetime.combine(day, KR_CLOSE, tzinfo=KST),
-            )
-        return self._us_session(day)
+        return session_bounds(market, day)
 
     async def is_open(self, market: MarketId) -> bool:
         session = await self._open_close(market)
@@ -96,14 +102,11 @@ class MarketClock:
         """
         day = self._local(market).date()
         for _ in range(LOOKBACK_DAYS):
-            if await self.is_session_day(market, day):
-                close = (
-                    datetime.combine(day, KR_CLOSE, tzinfo=KST)
-                    if market == "KR"
-                    else self._us_session(day)[1]
-                )
-                if self._now() >= close + SETTLE:
-                    return day
+            if (
+                await self.is_session_day(market, day)
+                and self._now() >= session_bounds(market, day)[1] + SETTLE
+            ):
+                return day
             day -= timedelta(days=1)
         return None
 
