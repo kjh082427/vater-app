@@ -1,0 +1,128 @@
+/* 첫 실행 마법사. 틀(사이드바) 없이 가운데 한 열. 색은 토큰만 쓴다. */
+
+.page {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 46rem;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-8) var(--space-10);
+  align-content: start;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.wordmark {
+  font-family: var(--font-serif);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-3xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-2);
+}
+
+/* 단계: 번호 + 이름, 지금 단계는 먹 바탕 번호와 굵은 이름 */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0 0 var(--space-3);
+  list-style: none;
+  border-bottom: var(--rule-hair) solid var(--color-line);
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-round);
+  font-size: var(--text-xs);
+}
+
+.step[aria-current='step'] {
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+
+.step[aria-current='step'] .num {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+}
+
+.step[data-done='true'] .num {
+  border-color: var(--color-ink-2);
+  color: var(--color-ink);
+}
+
+.body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.heading {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-bold);
+}
+
+.text {
+  max-width: var(--size-prose);
+  color: var(--color-ink-2);
+}
+
+.points {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-ink-2);
+}
+
+.added {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--rule-hair) solid var(--color-line);
+}
+
+.navEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}

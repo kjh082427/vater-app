@@ -11,6 +11,7 @@ import { BriefingDetailScreen } from '../screens/briefing/BriefingDetailScreen';
 import { BriefingsScreen } from '../screens/briefing/BriefingsScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { WelcomeScreen } from '../screens/welcome/WelcomeScreen';
 import { formatClock } from '../screens/common/time';
 import styles from './app.module.css';
 import { AppStatusBar } from './AppStatusBar';
@@ -135,29 +136,11 @@ function screenFor(route: Route): ReactNode {
   }
 }
 
-function Welcome() {
-  return (
-    <main className={styles.bare}>
-      <ScreenHeader
-        title="Vater 시작하기"
-        lede={
-          <>
-            첫 실행 마법사는 다음 작업에서 채웁니다.{' '}
-            <a className={styles.link} href="#/settings">
-              설정 열기
-            </a>
-          </>
-        }
-      />
-    </main>
-  );
-}
-
 export function App() {
   const route = useRoute();
   useShellNavigation();
   useWizardRedirect();
-  if (route.name === 'welcome') return <Welcome />;
+  if (route.name === 'welcome') return <WelcomeScreen />;
   return <Shell route={route} />;
 }
 

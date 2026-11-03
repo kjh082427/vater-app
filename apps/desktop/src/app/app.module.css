@@ -19,14 +19,6 @@
   color: var(--color-caution-ink);
 }
 
-/* 첫 실행 마법사처럼 틀 없이 여는 화면 */
-.bare {
-  max-width: 44rem;
-  min-height: 100vh;
-  margin: 0 auto;
-  padding: var(--space-10) var(--space-8);
-}
-
 .link {
   color: var(--color-ink);
   text-decoration: underline;
