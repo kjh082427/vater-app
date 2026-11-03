@@ -73,3 +73,21 @@ describe('navigate / useRoute', () => {
     );
   });
 });
+
+describe('홈 탭 쿼리 #/home?tab=<id>', () => {
+  it('tab을 읽는다', () => {
+    expect(parseHash('#/home?tab=d-1a2b')).toEqual({ name: 'home', tab: 'd-1a2b' });
+    expect(parseHash('#/?tab=home')).toEqual({ name: 'home', tab: 'home' });
+  });
+
+  it('형식이 틀린 tab은 없는 것으로 본다', () => {
+    expect(parseHash('#/home?tab=<x>')).toEqual({ name: 'home' });
+    expect(parseHash('#/home?tab=')).toEqual({ name: 'home' });
+    expect(parseHash('#/home?other=1')).toEqual({ name: 'home' });
+  });
+
+  it('hrefOf는 tab을 붙인다', () => {
+    expect(hrefOf({ name: 'home', tab: 'd-1' })).toBe('#/home?tab=d-1');
+    expect(hrefOf({ name: 'home' })).toBe('#/home');
+  });
+});

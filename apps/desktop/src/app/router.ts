@@ -7,7 +7,8 @@ import { useSyncExternalStore } from 'react';
 import type { MarketCode } from '../api/types';
 
 export type Route =
-  | { name: 'home' }
+  /** tab: 홈 대시보드 탭 id(`#/home?tab=<id>`). 없으면 첫 탭. */
+  | { name: 'home'; tab?: string }
   | { name: 'analyses' }
   | { name: 'analysis'; id: number }
   | { name: 'alerts' }
@@ -29,13 +30,19 @@ const SIMPLE = {
 
 const ID = /^[1-9]\d{0,9}$/;
 const CODE = /^[A-Za-z0-9.-]{1,12}$/;
+const TAB = /^[\w-]{1,40}$/;
+
+function homeOf(query: string): Route {
+  const tab = new URLSearchParams(query).get('tab');
+  return tab !== null && TAB.test(tab) ? { name: 'home', tab } : SIMPLE.home;
+}
 
 /** `#/analyses/3`, `/analyses/3`, `` 모두 읽는다. 맞지 않으면 notFound. */
 export function parseHash(hash: string): Route {
-  const path = hash.replace(/^#/, '').split('?')[0] ?? '';
+  const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
   const parts = path.split('/').filter(Boolean);
   const [head, a, b, ...rest] = parts;
-  if (head === undefined) return SIMPLE.home;
+  if (head === undefined || (head === 'home' && a === undefined)) return homeOf(query);
   const notFound: Route = { name: 'notFound', path };
   if (rest.length > 0) return notFound;
   if (a === undefined && head in SIMPLE) return SIMPLE[head as keyof typeof SIMPLE];
@@ -59,6 +66,8 @@ export function hrefOf(route: Route): string {
       return `#/symbols/${route.market}/${encodeURIComponent(route.code)}`;
     case 'notFound':
       return `#/${route.path.replace(/^\//, '')}`;
+    case 'home':
+      return route.tab ? `#/home?tab=${encodeURIComponent(route.tab)}` : '#/home';
     default:
       return `#/${route.name}`;
   }
