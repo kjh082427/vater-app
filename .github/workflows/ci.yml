@@ -16,9 +16,11 @@ jobs:
       run:
         working-directory: sidecar
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv python install 3.13
+      - uses: actions/checkout@v4.4.0
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          version: "0.13.6"
+      - run: uv python install 3.13.18
       - run: uv sync --locked  # 커밋된 uv.lock 그대로 설치 (다시 풀지 않음)
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -32,8 +34,8 @@ jobs:
       run:
         working-directory: apps/desktop
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 24
           cache: npm

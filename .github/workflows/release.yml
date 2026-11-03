@@ -37,7 +37,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -63,15 +63,17 @@ jobs:
           "prerelease=$(($version -match '-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
       # ---------- 사이드카 ----------
-      - uses: astral-sh/setup-uv@v6
-      - run: uv python install 3.13
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          version: "0.13.6"
+      - run: uv python install 3.13.18
       - name: Sidecar PyInstaller onedir
         run: ./apps/desktop/src-tauri/packaging/build-sidecar.ps1
       - name: Sidecar smoke
         run: ./apps/desktop/src-tauri/packaging/smoke-sidecar.ps1
 
       # ---------- 셸 ----------
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -83,7 +85,7 @@ jobs:
         run: |
           rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
           rustup default $env:RUST_TOOLCHAIN
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.2
         with:
           workspaces: apps/desktop/src-tauri
 
@@ -99,7 +101,7 @@ jobs:
         working-directory: apps/desktop
         run: npx --yes $env:TAURI_CLI build --bundles nsis -- --locked
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: vater-release-${{ steps.meta.outputs.version }}
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe*
