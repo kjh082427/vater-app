@@ -57,6 +57,8 @@ export function watchSummary(state: MonitorState): { tone: DotTone; text: string
       return { tone: 'off', text: '감시 일시 중지됨' };
     case 'offline':
       return { tone: 'caution-strong', text: '감시 멈춤 · 오프라인' };
+    case 'auth_invalid':
+      return { tone: 'caution-strong', text: '감시 멈춤 · 한투 키 확인 필요' };
     case 'closed':
       return { tone: 'off', text: '장 외 시간 · 감시 쉼' };
   }

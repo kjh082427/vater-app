@@ -90,3 +90,5 @@ jobs:
       # ---------- 설치해서 실행 확인 ----------
       - name: Installed app smoke (Vater.exe → bundled vater-core.exe listening)
         run: ./apps/desktop/src-tauri/packaging/smoke-installed.ps1
+      - name: Stage 4 acceptance W1–W9 (설치·트레이·단일 인스턴스·재시작 정책·작업 개체·로그·제거)
+        run: ./apps/desktop/src-tauri/packaging/acceptance-installed.ps1
