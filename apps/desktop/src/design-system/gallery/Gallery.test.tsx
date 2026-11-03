@@ -22,8 +22,10 @@ describe('디자인 시스템 견본(gallery.html)', () => {
       '수신 상태와 시장 상태',
       '버튼',
       '탭',
+      '입력과 메뉴',
       '구역과 표',
       '미니 차트',
+      '차트',
       '배너와 면책 문구',
       'AI 문장',
       '사이드바와 상태 표시줄',
@@ -38,6 +40,19 @@ describe('디자인 시스템 견본(gallery.html)', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo', { name: '상태' })).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('#dashboard: 캔버스 위 숫자 줄과 칸 카드(카드 안 카드 없음)', () => {
+    window.location.hash = '#dashboard';
+    render(<GalleryApp />);
+    expect(screen.getAllByRole('group').length).toBeGreaterThanOrEqual(5);
+    expect(screen.getByRole('region', { name: '지수 차트' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '브리핑 요약' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '감시 종목' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '최근 알림' })).toBeInTheDocument();
+    for (const region of screen.getAllByRole('region')) {
+      expect(region.parentElement?.closest('section')).toBeNull();
+    }
   });
 
   it('#shell-offline: 오프라인 배너가 붙은 창 틀', () => {

@@ -91,3 +91,19 @@ describe('Icon', () => {
     expect(svg?.querySelectorAll('path, circle').length).toBeGreaterThan(0);
   });
 });
+
+describe('Button variant="icon": 아이콘만 있는 작은 버튼(칸 머리의 ⋯, 대화 상자 닫기)', () => {
+  it('이름은 aria-label에서 오고, 아이콘은 장식이다', () => {
+    render(<Button variant="icon" aria-label="칸 메뉴" icon={<Icon name="more" />} />);
+    const button = screen.getByRole('button', { name: '칸 메뉴' });
+    expect(button).toHaveAttribute('data-variant', 'icon');
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it.each(['more', 'chevron-down', 'check', 'close'] as const)('아이콘 %s가 있다', (name) => {
+    const { container } = render(<Icon name={name} />);
+    expect(container.querySelector('svg')?.querySelectorAll('path, circle').length).toBeGreaterThan(
+      0,
+    );
+  });
+});

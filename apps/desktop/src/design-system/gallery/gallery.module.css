@@ -106,27 +106,32 @@ code {
 
 .swatches {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3) var(--space-4);
 }
 
+/* 견본 한 칸: 색 네모 + 글자. 카드 안에 또 상자를 두지 않는다 */
 .swatch {
-  overflow: hidden;
-  border: var(--rule-hair) solid var(--color-line);
-  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2-5);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
 }
 
 .chip {
-  height: 2.75rem;
-  border-bottom: var(--rule-hair) solid var(--color-line);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 var(--rule-hair) var(--color-line);
 }
 
 .swatchText {
   display: grid;
   gap: var(--space-0-5);
-  padding: var(--space-1-5) var(--space-2) var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .swatchText b {
@@ -150,9 +155,9 @@ code {
 }
 
 .sectionTitle {
-  font-size: var(--text-lg);
-  line-height: var(--leading-lg);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-card-title);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
 }
 
 .small {
@@ -162,10 +167,10 @@ code {
 }
 
 .wordmark {
-  font-family: var(--font-serif);
-  font-size: var(--text-3xl);
-  line-height: var(--leading-3xl);
-  font-weight: var(--weight-semibold);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
 }
 
@@ -204,10 +209,6 @@ code {
   width: 20rem;
 }
 
-.ruleSection {
-  border-top: var(--rule-section) solid var(--color-rule-section);
-}
-
 .ruleLine {
   border-top: var(--rule-hair) solid var(--color-line);
 }
@@ -216,18 +217,36 @@ code {
   border-top: var(--rule-hair) solid var(--color-rule);
 }
 
+.radiusRow {
+  display: flex;
+  gap: var(--space-3);
+}
+
 .radiusDemo {
   width: 4rem;
-  height: 2rem;
+  height: 2.5rem;
   border: var(--rule-hair) solid var(--color-control);
+}
+
+.radiusDemo[data-r='sm'] {
   border-radius: var(--radius-sm);
 }
 
+.radiusDemo[data-r='control'] {
+  border-radius: var(--radius-control);
+}
+
+.radiusDemo[data-r='md'] {
+  border-radius: var(--radius-md);
+}
+
+.radiusDemo[data-r='pop'] {
+  border-radius: var(--radius-pop);
+}
+
 /* 표 안의 조합 */
-.stock {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
+.stock > * + * {
+  margin-left: var(--space-2);
 }
 
 .stock b {
@@ -374,4 +393,37 @@ code {
   display: grid;
   gap: var(--space-2);
   padding-left: var(--space-5);
+}
+
+/* 입력 견본 */
+.toggles {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 16rem));
+  gap: var(--space-4);
+}
+
+.progressDemo {
+  width: 12rem;
+}
+
+/* 차트 견본 */
+.chartBox {
+  display: flex;
+  height: 12rem;
+}
+
+.chartEdges {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.barBox {
+  max-width: 26rem;
 }

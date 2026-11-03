@@ -103,6 +103,50 @@ describe('DataTable', () => {
     expect(cell).toHaveAttribute('colspan', '2');
   });
 
+  it('빈 표도 머리줄의 열 수는 columns 수 그대로이고, 안내 칸은 다른 칸과 같은 여백(td)을 쓴다', () => {
+    const { container } = render(
+      <DataTable
+        caption="감시 종목"
+        columns={columns}
+        rows={[]}
+        rowKey={(r) => r.code}
+        empty="감시 종목이 없습니다."
+      />,
+    );
+    expect(screen.getAllByRole('columnheader')).toHaveLength(columns.length);
+    expect(container.querySelectorAll('col')).toHaveLength(columns.length);
+    // 빈 표는 열 너비를 머리 글자에 맡기지 않고 고르게 나눈다(안내 문장 길이에 머리가 끌려가지 않게)
+    expect(container.querySelector('table')).toHaveAttribute('data-empty', 'true');
+    const cell = screen.getByRole('cell', { name: '감시 종목이 없습니다.' });
+    expect(cell).toHaveClass('td');
+    expect(cell).toHaveClass('empty');
+    expect(cell).toHaveAttribute('colspan', String(columns.length));
+  });
+
+  it('truncate 열은 남는 너비를 차지하고 넘치면 말줄임한다(머리와 칸 모두 표시)', () => {
+    const cols: Column<Row>[] = [
+      { key: 'name', header: '종목', truncate: true, cell: (r) => r.name },
+      { key: 'close', header: '종가', numeric: true, cell: (r) => r.code },
+    ];
+    render(<DataTable caption="지수" columns={cols} rows={rows} rowKey={(r) => r.code} />);
+    expect(screen.getByRole('columnheader', { name: '종목' })).toHaveAttribute(
+      'data-truncate',
+      'true',
+    );
+    expect(screen.getByRole('columnheader', { name: '종가' })).not.toHaveAttribute('data-truncate');
+    const cell = screen.getByRole('cell', { name: 'NAVER' });
+    expect(cell).toHaveAttribute('data-truncate', 'true');
+    // 잘린 글자도 마우스를 올리면 다 보이게
+    expect(cell).toHaveAttribute('title', 'NAVER');
+  });
+
+  it('행이 있으면 data-empty가 없다', () => {
+    const { container } = render(
+      <DataTable caption="지수" columns={columns} rows={rows} rowKey={(r) => r.code} />,
+    );
+    expect(container.querySelector('table')).not.toHaveAttribute('data-empty');
+  });
+
   it('caption은 기본으로 화면에서 숨기고(구역 제목이 대신한다) 보이게 할 수도 있다', () => {
     const { rerender } = render(
       <DataTable caption="지수" columns={columns} rows={rows} rowKey={(r) => r.code} />,

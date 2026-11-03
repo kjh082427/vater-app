@@ -8,6 +8,10 @@
   white-space: nowrap;
 }
 
+.feed[data-state='idle'] {
+  color: var(--color-ink-3);
+}
+
 .feed[data-state='disconnected'] {
   color: var(--color-caution-ink);
   font-weight: var(--weight-semibold);

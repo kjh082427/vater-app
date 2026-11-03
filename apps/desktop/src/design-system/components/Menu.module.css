@@ -1,0 +1,55 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+/* 떠 있는 메뉴: 창 기준 자리(usePopoverPosition), 진한 그림자 */
+.menu {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  gap: var(--space-0-5);
+  min-width: var(--size-menu-min);
+  max-width: 20rem;
+  padding: var(--space-1);
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-pop);
+  background: var(--color-card);
+  box-shadow: var(--shadow-pop);
+}
+
+.item {
+  display: grid;
+  min-height: var(--size-control);
+  padding: var(--space-1) var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.item:hover:not([aria-disabled='true']),
+.item:focus-visible {
+  background: var(--color-hover);
+}
+
+.item:focus-visible {
+  outline-offset: calc(var(--rule-focus) * -1);
+}
+
+.item[aria-disabled='true'] {
+  color: var(--color-ink-3);
+  cursor: not-allowed;
+}
+
+.reason {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+  white-space: normal;
+}

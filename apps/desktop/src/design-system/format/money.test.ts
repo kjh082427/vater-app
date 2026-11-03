@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   directionOf,
+  formatEok,
   formatEokChange,
   formatNumber,
   formatPercent,
@@ -185,5 +186,21 @@ describe('directionOf: 상승·하락·보합', () => {
     [Number.NaN, 'flat'],
   ] as const)('%s → %s', (value, expected) => {
     expect(directionOf(value)).toBe(expected);
+  });
+});
+
+describe('formatEok: 부호 없는 억 표기 (금액 자체, 입력은 원)', () => {
+  // formatEokChange와 같은 자릿수 규칙. 양수에 +를 붙이지 않고, 음수만 빼기 기호.
+  it.each([
+    [0, '0.0억'],
+    [40_000_000, '0.4억'],
+    [-40_000_000, '−0.4억'],
+    [996_000_000, '10억'],
+    [312_400_000_000, '3,124억'],
+    [-98_700_000_000, '−987억'],
+    [null, '—'],
+    [Number.NaN, '—'],
+  ])('%s → %s', (value, expected) => {
+    expect(formatEok(value)).toBe(expected);
   });
 });

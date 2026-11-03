@@ -1,14 +1,15 @@
 .button {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   gap: var(--space-1-5);
   height: var(--size-control);
   padding: 0 var(--space-3);
   border: var(--rule-hair) solid var(--color-control);
-  border-radius: var(--radius-sm);
-  background: var(--color-paper);
-  color: var(--color-ink);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-ink-2);
   font-size: var(--text-sm);
   line-height: 1;
   font-weight: var(--weight-medium);
@@ -18,6 +19,7 @@
   transition:
     background-color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
     text-decoration-color var(--duration-fast) var(--ease-out);
 }
 
@@ -27,53 +29,58 @@
   font-size: var(--text-xs);
 }
 
-/* 보조: 테두리 버튼 */
+/* 보조(기본): 흰 바탕 + 테두리 */
 .button[data-variant='secondary']:hover:enabled:not([aria-busy='true']) {
-  border-color: var(--color-ink-2);
+  border-color: var(--color-ink-3);
+  color: var(--color-ink);
 }
 
 .button[data-variant='secondary']:active:enabled:not([aria-busy='true']) {
   background: var(--color-hover);
 }
 
-/* 주: 먹으로 채운 버튼. 한 화면에 하나 */
+/* 주: 강조색으로 채운 버튼. 한 화면에 하나 */
 .button[data-variant='primary'] {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-on-ink);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-semibold);
 }
 
 .button[data-variant='primary']:hover:enabled:not([aria-busy='true']) {
-  border-color: var(--color-ink-hover);
-  background: var(--color-ink-hover);
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
 }
 
-/* 조용한 버튼: 밑줄 글자. 구역 머리의 "종목 추가", "전체 보기" */
+/* 조용한 버튼: 강조색 글자의 링크 모양. 카드 머리·바닥의 "종목 추가", "브리핑 읽기" */
 .button[data-variant='quiet'] {
+  height: auto;
+  min-height: var(--size-control-sm);
   padding: 0 var(--space-1);
   border-color: transparent;
   background: transparent;
+  color: var(--color-accent-strong);
+  font-weight: var(--weight-semibold);
   text-decoration: underline;
-  text-decoration-color: var(--color-control);
+  text-decoration-color: transparent;
   text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+  text-underline-offset: 3px;
 }
 
 .button[data-variant='quiet']:hover:enabled:not([aria-busy='true']) {
-  text-decoration-color: var(--color-ink);
+  text-decoration-color: currentColor;
 }
 
 .button:disabled {
   cursor: not-allowed;
   border-color: var(--color-line);
-  background: var(--color-chrome);
+  background: var(--color-row-alt);
   color: var(--color-ink-3);
 }
 
 .button[data-variant='quiet']:disabled {
   border-color: transparent;
   background: transparent;
-  text-decoration-color: var(--color-line);
 }
 
 /* 진행 중: 누를 수 없음과 구별되게 원래 색을 두고 글자만 흐리게. 글자가 "확인 중…"으로 바뀐다 */
@@ -83,5 +90,26 @@
 
 .button[aria-busy='true'][data-variant='secondary'],
 .button[aria-busy='true'][data-variant='quiet'] {
-  color: var(--color-ink-2);
+  color: var(--color-ink-3);
+}
+
+.button[aria-busy='true'][data-variant='primary'] {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
+}
+
+/* 아이콘만: 칸 머리의 ⋯, 대화 상자 닫기. 테두리 없이 호버 때만 바탕 */
+.button[data-variant='icon'] {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-ink-3);
+}
+
+.button[data-variant='icon']:hover:enabled,
+.button[data-variant='icon'][aria-expanded='true'] {
+  background: var(--color-hover);
+  color: var(--color-ink);
 }

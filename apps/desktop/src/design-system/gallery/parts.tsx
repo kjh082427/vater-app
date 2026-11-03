@@ -11,6 +11,7 @@ const watchColumns: Column<WatchRow>[] = [
   {
     key: 'name',
     header: '종목',
+    truncate: true,
     cell: (r) => (
       <span className={styles.stock}>
         <span className={styles.market}>{r.market === 'KR' ? '국내' : '미국'}</span>

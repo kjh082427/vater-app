@@ -1,45 +1,76 @@
-/* 칸막이 상자 대신 구역 위 2px 먹선. 구역 사이는 여백으로 띄운다 */
+/*
+ * 칸 카드: 흰 바탕, 모서리 8px, 아주 옅은 그림자, 안쪽 여백 16px.
+ * 머리는 제목(16px 반굵게) + 그 아래 설명 한 줄(13px, 말줄임) + 오른쪽 행동.
+ */
 .section {
-  border-top: var(--rule-section) solid var(--color-rule-section);
-  padding-top: var(--space-1);
+  min-width: 0;
+  padding: var(--space-card);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
 }
 
 .head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: var(--space-2-5);
-  min-height: var(--size-section-head);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .title {
-  font-size: var(--text-lg);
-  line-height: var(--leading-lg);
-  font-weight: var(--weight-bold);
+  grid-column: 1;
+  overflow: hidden;
+  font-size: var(--text-card-title);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .meta {
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
+  grid-column: 1;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   color: var(--color-ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {
   display: flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  flex: none;
   align-items: center;
-  gap: var(--space-2-5);
-  margin-left: auto;
+  gap: var(--space-2);
 }
 
-/* 구역 안의 구역(h3, h4): 1px 먹선과 한 단계 작은 제목 */
+/* 안쪽 구역(h3, h4): 카드 안에 카드를 넣지 않는다. 위 1px 선과 한 단계 작은 제목만 */
 .section[data-level='3'],
 .section[data-level='4'] {
-  border-top-width: var(--rule-hair);
+  padding: var(--space-3) 0 0;
+  border-top: var(--rule-hair) solid var(--color-rule);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.section[data-level='3'] .head,
+.section[data-level='4'] .head {
+  min-height: 0;
+  margin-bottom: var(--space-2);
 }
 
 .section[data-level='3'] .title,
 .section[data-level='4'] .title {
   font-size: var(--text-md);
   line-height: var(--leading-md);
-  font-weight: var(--weight-semibold);
+}
+
+.section[data-level='3'] .meta,
+.section[data-level='4'] .meta {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }

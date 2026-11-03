@@ -23,7 +23,7 @@ export interface SidebarNavProps {
   className?: string;
 }
 
-/** 왼쪽 사이드바: 워드마크, 주 메뉴, 아래쪽 상태. 크롬 바탕에 색을 쓰지 않는다. */
+/** 왼쪽 사이드바: 워드마크, 주 메뉴, 아래쪽 상태. 흰 바탕, 현재 화면만 강조색. */
 export function SidebarNav({ items, currentId, onNavigate, footer, className }: SidebarNavProps) {
   function onClick(event: MouseEvent<HTMLAnchorElement>, id: string) {
     if (!onNavigate || event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) {
@@ -36,6 +36,13 @@ export function SidebarNav({ items, currentId, onNavigate, footer, className }: 
   return (
     <aside className={cx(styles.side, className)}>
       <div className={styles.brand}>
+        <span className={styles.mark} aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="2" y="8" width="3" height="6" rx="1" />
+            <rect x="6.5" y="4" width="3" height="10" rx="1" />
+            <rect x="11" y="2" width="3" height="12" rx="1" />
+          </svg>
+        </span>
         <span className={styles.wordmark}>Vater</span>
         <span className={styles.tagline}>투자 보조</span>
       </div>

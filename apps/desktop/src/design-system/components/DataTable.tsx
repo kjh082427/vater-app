@@ -9,6 +9,11 @@ export interface Column<Row> {
   numeric?: boolean;
   /** 열 너비(CSS 길이, rem 권장). */
   width?: string;
+  /**
+   * 좁은 칸에서 이 열이 남는 너비를 차지하고, 넘치면 한 줄로 말줄임한다(긴 종목명).
+   * 칸 내용이 글자면 마우스를 올렸을 때 전체가 보인다(title).
+   */
+  truncate?: boolean;
   cell: (row: Row) => ReactNode;
 }
 
@@ -37,7 +42,7 @@ const MOVE: Record<string, (index: number, last: number) => number> = {
 };
 
 /**
- * 데이터 표. 숫자 열은 오른쪽 정렬, 행 높이 40px, 행 사이 가는 선.
+ * 데이터 표. 짙은 머리줄, 교차 행 바탕, 숫자 열은 오른쪽 정렬, 행 높이 38px.
  * 행 동작이 있으면 행 하나만 Tab 순서에 들어가고(roving tabindex) ↑↓·Home·End로 옮긴다.
  * 행 안의 버튼·링크·입력은 제 동작만 하고 행을 열지 않는다.
  */
@@ -79,7 +84,10 @@ export function DataTable<Row>({
   }
 
   return (
-    <table className={cx(styles.table, className)}>
+    <table
+      className={cx(styles.table, className)}
+      data-empty={rows.length === 0 ? 'true' : undefined}
+    >
       <caption className={styles.caption} data-hidden={captionVisible ? 'false' : 'true'}>
         {caption}
       </caption>
@@ -96,6 +104,7 @@ export function DataTable<Row>({
               scope="col"
               className={styles.th}
               data-align={column.numeric ? 'end' : 'start'}
+              data-truncate={column.truncate ? 'true' : undefined}
             >
               {column.header}
             </th>
@@ -105,7 +114,7 @@ export function DataTable<Row>({
       <tbody>
         {rows.length === 0 ? (
           <tr>
-            <td className={styles.empty} colSpan={columns.length}>
+            <td className={cx(styles.td, styles.empty)} colSpan={columns.length}>
               {empty}
             </td>
           </tr>
@@ -123,15 +132,20 @@ export function DataTable<Row>({
               onKeyDown={focusable ? (event) => onKeyDown(event, index, row) : undefined}
               onClick={focusable ? (event) => onClick(event, row) : undefined}
             >
-              {columns.map((column) => (
-                <td
-                  key={column.key}
-                  className={cx(styles.td, column.numeric && 'vt-num')}
-                  data-align={column.numeric ? 'end' : 'start'}
-                >
-                  {column.cell(row)}
-                </td>
-              ))}
+              {columns.map((column) => {
+                const content = column.cell(row);
+                return (
+                  <td
+                    key={column.key}
+                    className={cx(styles.td, column.numeric && 'vt-num')}
+                    data-align={column.numeric ? 'end' : 'start'}
+                    data-truncate={column.truncate ? 'true' : undefined}
+                    title={column.truncate && typeof content === 'string' ? content : undefined}
+                  >
+                    {content}
+                  </td>
+                );
+              })}
             </tr>
           ))
         )}

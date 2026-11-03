@@ -73,7 +73,7 @@ export function SidebarFoot({ offline = false }: { offline?: boolean }) {
 }
 
 /**
- * 창 틀 견본(#shell). 최소 창 1024×700과 Windows 배율에서 레이아웃이 깨지지 않는지 보려는
+ * 창 틀 견본(#shell). 최소 창 1024×600과 Windows 배율에서 레이아웃이 깨지지 않는지 보려는
  * 조합이다. 실제 홈 화면은 ui/screens에서 만든다.
  */
 export function ShellPreview({ offline }: { offline: boolean }) {

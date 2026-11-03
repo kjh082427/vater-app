@@ -1,39 +1,42 @@
 /*
- * AI가 쓴 문장만 명조(Hahmlet). 데이터에서 나온 숫자는 이 글꼴로 쓰지 않는다.
- * 함렛 한글은 대비가 낮아 1배율에서 고딕과 비슷해 보이므로, 왼쪽 1px 선과 들여쓰기로
- * "AI의 말"을 한 번 더 표시한다(리서치 노트의 해설 단락처럼).
+ * AI가 쓴 문장. 글꼴은 다른 글자와 같은 Pretendard이고, 왼쪽 2px 옅은 강조선과
+ * "AI 해석" 꼬리표로 데이터에서 나온 숫자와 구분한다.
  */
 .ai {
   padding-left: var(--space-3);
-  border-left: var(--rule-hair) solid var(--color-control);
-  font-family: var(--font-serif);
+  border-left: var(--rule-section) solid var(--color-accent-line);
   font-weight: var(--weight-regular);
 }
 
 .ai[data-size='lead'] {
-  font-size: var(--text-2xl);
-  line-height: var(--leading-2xl);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
   color: var(--color-ink);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .ai[data-size='body'] {
   max-width: var(--size-prose);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   line-height: var(--leading-lg);
   color: var(--color-ink-2);
   text-wrap: pretty;
 }
 
-/* 출처 꼬리표는 고딕: 앱이 붙인 말이지 AI가 쓴 말이 아니다 */
+/* 출처 꼬리표: 앱이 붙인 말. 옅은 강조 바탕의 작은 표지 */
 .attribution {
+  display: inline-block;
   margin-left: var(--space-1);
-  font-family: var(--font-sans);
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-weak);
+  color: var(--color-accent-strong);
   font-size: var(--text-xs);
-  font-weight: var(--weight-regular);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
   letter-spacing: normal;
-  color: var(--color-ink-3);
+  vertical-align: 0.0625rem;
   white-space: nowrap;
 }

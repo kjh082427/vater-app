@@ -1,0 +1,47 @@
+/* 옅은 회색 홈 안의 버튼들. 고른 것만 흰 바탕 + 먹 글자 + 옅은 그림자 */
+.group {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-0-5);
+  padding: var(--space-0-5);
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-row-alt);
+}
+
+.segment {
+  height: 1.5rem;
+  padding: 0 var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.group[data-size='md'] .segment {
+  height: 1.75rem;
+  font-size: var(--text-sm);
+}
+
+.segment:hover:enabled {
+  color: var(--color-ink);
+}
+
+.segment[aria-checked='true'] {
+  background: var(--color-card);
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+  box-shadow: var(--shadow-card);
+}
+
+.segment:disabled {
+  cursor: not-allowed;
+  color: var(--color-control-strong);
+}

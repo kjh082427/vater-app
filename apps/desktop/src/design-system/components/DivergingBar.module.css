@@ -1,0 +1,78 @@
+/* 수급 막대: 이름 | 막대 칸(가운데 0 기준선) | 값 */
+.chart {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(2.5rem, auto) minmax(3rem, 1fr) minmax(4.5rem, auto);
+  align-items: center;
+  column-gap: var(--space-2);
+  min-height: 1.375rem;
+}
+
+.label {
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  height: 0.625rem;
+}
+
+/* 0 기준선 */
+.track::before {
+  position: absolute;
+  top: calc(var(--space-1) * -1);
+  bottom: calc(var(--space-1) * -1);
+  left: 50%;
+  width: 1px;
+  background: var(--color-control-strong);
+  content: '';
+}
+
+.bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+}
+
+.bar[data-side='right'] {
+  left: 50%;
+}
+
+.bar[data-side='left'] {
+  right: 50%;
+}
+
+.bar[data-direction='up'] {
+  background: var(--color-up);
+}
+
+.bar[data-direction='down'] {
+  background: var(--color-down);
+}
+
+.value[data-direction='up'] {
+  color: var(--color-up);
+}
+
+.value[data-direction='down'] {
+  color: var(--color-down);
+}
+
+.value {
+  font-weight: var(--weight-semibold);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.value[data-direction='flat'] {
+  color: var(--color-ink-3);
+}

@@ -1,0 +1,116 @@
+.select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+/* 버튼: "이름표 | 지금 값 ⌄" (시안의 슬라이서) */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: var(--size-control);
+  padding: 0 var(--space-2) 0 var(--space-2-5);
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.button:hover,
+.button[aria-expanded='true'] {
+  border-color: var(--color-ink-3);
+}
+
+.label {
+  flex: none;
+  padding-right: var(--space-2);
+  border-right: var(--rule-hair) solid var(--color-line);
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  margin-left: auto;
+  color: var(--color-ink-3);
+}
+
+/* 떠 있는 목록: 창 기준 자리(usePopoverPosition), 진한 그림자 */
+.list {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  gap: var(--space-0-5);
+  max-width: 24rem;
+  max-height: 20rem;
+  padding: var(--space-1);
+  overflow-y: auto;
+  border: var(--rule-hair) solid var(--color-line);
+  border-radius: var(--radius-pop);
+  background: var(--color-card);
+  box-shadow: var(--shadow-pop);
+}
+
+.list:focus-visible {
+  outline: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-control);
+  padding: var(--space-1) var(--space-2-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.option[data-active='true'] {
+  background: var(--color-hover);
+}
+
+/* 키보드로 고르는 중인 항목은 강조 테두리로도 보인다(목록에 초점이 있을 때) */
+.list:focus-visible .option[data-active='true'] {
+  box-shadow: inset 0 0 0 var(--rule-focus) var(--color-focus);
+}
+
+.option[aria-selected='true'] {
+  color: var(--color-accent-strong);
+  font-weight: var(--weight-semibold);
+}
+
+.option[aria-disabled='true'] {
+  color: var(--color-ink-3);
+  cursor: not-allowed;
+}
+
+.optionText {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.reason {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-3);
+}
+
+.check {
+  flex: none;
+  color: var(--color-accent);
+}

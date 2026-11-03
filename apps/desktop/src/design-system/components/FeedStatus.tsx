@@ -2,10 +2,10 @@ import { cx } from '../internal/cx';
 import styles from './FeedStatus.module.css';
 import { StatusDot, type DotTone } from './StatusDot';
 
-export type FeedState = 'live' | 'polling' | 'disconnected' | 'closed';
+export type FeedState = 'live' | 'polling' | 'disconnected' | 'closed' | 'idle';
 
 export interface FeedStatusProps {
-  /** 실시간(WebSocket) / 폴링 / 끊김(재연결 중) / 장 마감. */
+  /** 실시간(WebSocket) / 폴링 / 끊김(재연결 중) / 장 마감 / 감시 안 함(알림 감시를 멈춤). */
   state: FeedState;
   /** 폴링 간격(초). 스펙 기본값은 30초. */
   intervalSeconds?: number;
@@ -17,6 +17,7 @@ const DOT: Record<FeedState, DotTone> = {
   polling: 'caution',
   disconnected: 'caution-strong',
   closed: 'off',
+  idle: 'off',
 };
 
 function label(state: FeedState, intervalSeconds?: number): string {
@@ -29,6 +30,8 @@ function label(state: FeedState, intervalSeconds?: number): string {
       return '끊김 · 재연결 중';
     case 'closed':
       return '장 마감';
+    case 'idle':
+      return '감시 안 함';
   }
 }
 

@@ -1,7 +1,15 @@
-/* 표. 양 끝 칸은 안쪽 여백 없이 구역 먹선 끝에 맞춘다(선과 글자가 같은 끝에서 시작) */
+/* 표: 짙은 남색 머리줄(위 양 끝 둥글게), 교차 행 바탕, 숫자 열은 오른쪽 정렬 */
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-md);
+}
+
+/* 빈 표: 열 너비를 머리 글자에 맡기지 않고 고르게(안내 문장 길이에 머리가 끌려가지 않게) */
+.table[data-empty='true'] {
+  table-layout: fixed;
 }
 
 .caption[data-hidden='true'] {
@@ -22,29 +30,42 @@
 
 .th,
 .td {
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-2-5);
   text-align: left;
   vertical-align: middle;
 }
 
 .th:first-child,
 .td:first-child {
-  padding-left: 0;
+  padding-left: var(--space-3);
 }
 
 .th:last-child,
 .td:last-child {
-  padding-right: 0;
+  padding-right: var(--space-3);
 }
 
 .th {
   height: var(--size-row-head);
-  border-bottom: var(--rule-hair) solid var(--color-line);
+  background: var(--color-table-head);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
-  font-weight: var(--weight-regular);
-  color: var(--color-ink-3);
+  font-weight: var(--weight-semibold);
+  color: var(--color-on-table-head);
   white-space: nowrap;
+}
+
+/* 배율 1.5에서 칸 사이에 생기는 머리카락 틈을 오른쪽 1px 그림자로 메운다 */
+.th:not(:last-child) {
+  box-shadow: var(--rule-hair) 0 0 var(--color-table-head);
+}
+
+.th:first-child {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.th:last-child {
+  border-top-right-radius: var(--radius-sm);
 }
 
 .td {
@@ -58,22 +79,45 @@
   white-space: nowrap;
 }
 
+.row:nth-child(even) .td {
+  background: var(--color-row-alt);
+}
+
 .row[tabindex] {
   cursor: pointer;
+}
+
+.row[tabindex] .td {
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 
-.row[tabindex]:hover {
+.row[tabindex]:hover .td {
   background: var(--color-hover);
 }
 
 .row:focus-visible {
   outline: var(--rule-focus) solid var(--color-focus);
-  outline-offset: 0;
+  outline-offset: calc(var(--rule-focus) * -1);
+}
+
+.row:focus-visible .td {
   background: var(--color-hover);
 }
 
 .empty {
-  padding: var(--space-4) 0;
+  height: auto;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
   color: var(--color-ink-3);
+  white-space: normal;
+}
+
+/* 남는 너비를 차지하고 넘치면 말줄임(max-width: 0 + width: 100%는 자동 표 배치에서 쓰는 방법) */
+.th[data-truncate='true'],
+.td[data-truncate='true'] {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

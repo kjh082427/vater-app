@@ -106,6 +106,15 @@ export function formatEokChange(won: MaybeNumber): string {
   return `${signOf(won, true)}${body}억`;
 }
 
+/**
+ * 부호 없는 억 표기(금액 자체: 거래대금, 시가총액 등). 입력은 원이다.
+ * 자릿수 규칙은 formatEokChange와 같고, 양수에 `+`를 붙이지 않는다. 음수만 `−`.
+ */
+export function formatEok(won: MaybeNumber): string {
+  if (!isPresent(won)) return MISSING;
+  return formatEokChange(won).replace(/^\+/, '');
+}
+
 /** 통화에 맞는 가격 표기. */
 export function formatPrice(value: MaybeNumber, currency: Currency): string {
   return currency === 'KRW' ? formatWon(value) : formatUsd(value);

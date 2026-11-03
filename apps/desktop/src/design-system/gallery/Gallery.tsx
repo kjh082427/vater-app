@@ -3,18 +3,28 @@ import { AiText } from '../components/AiText';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/Button';
 import { DataTable, type Column } from '../components/DataTable';
+import { Dialog } from '../components/Dialog';
 import { DECISION_LABEL, DecisionScale, type Decision } from '../components/DecisionScale';
 import { Disclaimer } from '../components/Disclaimer';
+import { DivergingBar } from '../components/DivergingBar';
 import { FeedStatus } from '../components/FeedStatus';
 import { Icon } from '../components/Icon';
+import { LineChart } from '../components/LineChart';
 import { MarketState } from '../components/MarketState';
+import { Menu } from '../components/Menu';
+import { ProgressBar } from '../components/ProgressBar';
 import { Section } from '../components/Section';
+import { SegmentedControl } from '../components/SegmentedControl';
+import { Select } from '../components/Select';
 import { SidebarNav } from '../components/SidebarNav';
 import { PriceChange, SignedNumber } from '../components/SignedNumber';
 import { Sparkline } from '../components/Sparkline';
 import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs';
+import { TextField } from '../components/TextField';
+import { Toggle } from '../components/Toggle';
 import {
   formatEokChange,
+  formatEok,
   formatNumber,
   formatPercent,
   formatSigned,
@@ -26,7 +36,7 @@ import {
 } from '../format/money';
 import styles from './gallery.module.css';
 import { FlowsLine, IndexTable, WatchTable } from './parts';
-import { analysisSummary, brief, watchlist } from './sample';
+import { analysisSummary, brief, flows, indices, watchlist } from './sample';
 import { navItems, SidebarFoot, StatusBarSample } from './ShellPreview';
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -40,37 +50,53 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 
 /* ---------- 색 ---------- */
 
-const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
+/** [토큰, 역할, 대비를 잴 바탕(없으면 흰 카드, 'bg'면 바탕 색이라 재지 않음)] */
+const COLOR_GROUPS: { name: string; tokens: [string, string, string?][] }[] = [
   {
     name: '바탕',
     tokens: [
-      ['--color-paper', '종이: 본문 바탕'],
-      ['--color-chrome', '사이드바, 상태 표시줄'],
+      ['--color-canvas', '캔버스: 본문 바탕'],
+      ['--color-card', '칸 카드, 사이드바, 상태 표시줄'],
+      ['--color-row-alt', '표 교차 행, 막힌 버튼'],
       ['--color-hover', '호버'],
-      ['--color-selected', '사이드바 현재 위치'],
       ['--color-selection', '글자 선택'],
     ],
   },
   {
-    name: '선',
+    name: '강조(하나)',
     tokens: [
-      ['--color-rule-section', '구역 위 2px 먹선'],
-      ['--color-line', '표 머리 아래선, 경계'],
+      ['--color-accent', '주 버튼, 활성 탭, 링크, 포커스'],
+      ['--color-accent-strong', '주 버튼 호버, 선택 글자'],
+      ['--color-accent-weak', '선택 바탕', 'bg'],
+    ],
+  },
+  {
+    name: '표 머리줄',
+    tokens: [
+      ['--color-table-head', '머리줄 바탕'],
+      ['--color-on-table-head', '머리줄 글자', '--color-table-head'],
+    ],
+  },
+  {
+    name: '선과 중립 표지',
+    tokens: [
+      ['--color-line', '칸막이, 경계'],
       ['--color-rule', '행 구분선'],
-      ['--color-control', '버튼 테두리'],
+      ['--color-control', '버튼·입력 테두리'],
+      ['--color-control-strong', '꺼진 스위치, 빈 원'],
+      ['--color-tag', '분류 표지, 메뉴 아이콘'],
     ],
   },
   {
     name: '글자(먹)',
     tokens: [
-      ['--color-ink', '글자, 주 버튼'],
+      ['--color-ink', '글자'],
       ['--color-ink-2', '보조 글자'],
       ['--color-ink-3', '셋째 글자, 이름표'],
-      ['--color-ink-hover', '주 버튼 호버'],
     ],
   },
   {
-    name: '시세 방향(전용)',
+    name: '값의 방향(전용)',
     tokens: [
       ['--color-up', '상승 숫자, 선'],
       ['--color-down', '하락 숫자, 선'],
@@ -111,19 +137,20 @@ function ratio(rawA: string, rawB: string): string {
 function readTokenValues(): Map<string, string> {
   const style = getComputedStyle(document.documentElement);
   const names = COLOR_GROUPS.flatMap((g) => g.tokens.map(([name]) => name));
+  names.push('--color-card');
   return new Map(names.map((name) => [name, style.getPropertyValue(name).trim()]));
 }
 
 function Colors() {
   const [values] = useState(readTokenValues);
-  const paper = values.get('--color-paper') ?? '';
+  const paper = values.get('--color-card') ?? '';
   return (
-    <Section title="색" meta="역할 이름의 토큰. 대비는 흰 종이 위에서 잰 값">
+    <Section title="색" meta="역할 이름의 토큰. 대비는 흰 카드 위에서 잰 값">
       {COLOR_GROUPS.map((group) => (
         <div key={group.name} className={styles.swatchGroup}>
           <h3 className={styles.groupName}>{group.name}</h3>
           <div className={styles.swatches}>
-            {group.tokens.map(([name, role]) => (
+            {group.tokens.map(([name, role, against]) => (
               <div key={name} className={styles.swatch}>
                 <div className={styles.chip} style={{ background: `var(${name})` }} />
                 <div className={styles.swatchText}>
@@ -131,9 +158,9 @@ function Colors() {
                   <code>{name}</code>
                   <span className="vt-num">
                     {hex6(values.get(name) ?? '') || MISSING} ·{' '}
-                    {group.name === '바탕' || name.endsWith('-bg')
+                    {group.name === '바탕' || name.endsWith('-bg') || against === 'bg'
                       ? '바탕'
-                      : ratio(values.get(name) ?? '', paper)}
+                      : ratio(values.get(name) ?? '', values.get(against ?? '') ?? paper)}
                   </span>
                 </div>
               </div>
@@ -149,12 +176,12 @@ function Colors() {
 
 function Typography() {
   return (
-    <Section title="글자" meta="화면과 숫자는 Pretendard, AI가 쓴 문장만 Hahmlet">
+    <Section title="글자" meta="Pretendard 하나. 굵기와 크기로 위계를 만든다">
       <div className={styles.rows}>
         <Row label="화면 제목 · 22/28 굵게">
           <p className={styles.screenTitle}>감시·알림</p>
         </Row>
-        <Row label="구역 제목 · 15/24 굵게">
+        <Row label="카드 제목 · 16/24 반굵게">
           <p className={styles.sectionTitle}>최근 브리핑</p>
         </Row>
         <Row label="본문 · 14/20">
@@ -183,13 +210,13 @@ function Typography() {
             <span>$1,135.40</span>
           </div>
         </Row>
-        <Row label="AI 첫 문장 · 명조 20/30">
+        <Row label="AI 첫 문장 · 16/24 반굵게 + 꼬리표">
           <AiText size="lead">{brief.lead}</AiText>
         </Row>
-        <Row label="AI 본문 · 명조 15/24">
+        <Row label="AI 본문 · 14/22">
           <AiText attribution="AI 해석">{brief.more}</AiText>
         </Row>
-        <Row label="워드마크 · 명조 22">
+        <Row label="워드마크 · 20 굵게">
           <span className={styles.wordmark}>Vater</span>
         </Row>
       </div>
@@ -215,15 +242,19 @@ function SpacingAndRules() {
             ))}
           </div>
         </Row>
-        <Row label="선: 구역 2px 먹 / 표 머리 1px / 행 1px">
+        <Row label="선: 경계 1px(line) / 행 1px(rule)">
           <div className={styles.ruleDemo}>
-            <div className={styles.ruleSection} />
             <div className={styles.ruleLine} />
             <div className={styles.ruleRow} />
           </div>
         </Row>
-        <Row label="모서리 4px (버튼, 칩)">
-          <div className={styles.radiusDemo} />
+        <Row label="모서리: 칩 4 · 버튼·입력 6 · 칸 카드 8 · 메뉴·대화 상자 10">
+          <div className={styles.radiusRow}>
+            <div className={styles.radiusDemo} data-r="sm" />
+            <div className={styles.radiusDemo} data-r="control" />
+            <div className={styles.radiusDemo} data-r="md" />
+            <div className={styles.radiusDemo} data-r="pop" />
+          </div>
         </Row>
         <Row label="움직임">
           <p className={styles.small}>
@@ -360,6 +391,7 @@ function States() {
             <FeedStatus state="polling" intervalSeconds={30} />
             <FeedStatus state="disconnected" />
             <FeedStatus state="closed" />
+            <FeedStatus state="idle" />
           </div>
         </Row>
         <Row label="MarketState 칩">
@@ -427,6 +459,188 @@ const AGENT_TABS: [string, string, string][] = [
   ['risk', '리스크', '환율이 크게 움직이면 결론을 다시 봐야 한다고 정리했습니다.'],
 ];
 
+const kospiCloses = indices[0]?.closes ?? [];
+const dayLabels = kospiCloses.map((_, i) => `D-${kospiCloses.length - 1 - i}`);
+const fmt2 = (n: number) => formatNumber(n, 2);
+
+function Charts() {
+  return (
+    <Section title="차트" meta="직접 그린 SVG. 방향 색은 옆 숫자와 같은 자료, 축 눈금 12px">
+      <div className={styles.rows}>
+        <Row label="LineChart: 영역 + 선, 전일 종가 점선, 마지막 값 표지">
+          <div className={styles.chartBox}>
+            <LineChart
+              values={kospiCloses}
+              labels={dayLabels}
+              baseline={kospiCloses[kospiCloses.length - 2]}
+              direction="up"
+              format={fmt2}
+              aria-label="코스피 최근 30거래일 종가"
+            />
+          </div>
+        </Row>
+        <Row label="빈 자료 · 값 1개 · 모두 같음 · null 섞임">
+          <div className={styles.chartEdges}>
+            <LineChart
+              values={[]}
+              direction="flat"
+              format={fmt2}
+              height={96}
+              aria-label="자료 없음 견본"
+            />
+            <LineChart
+              values={[742.15]}
+              direction="down"
+              format={fmt2}
+              height={96}
+              aria-label="값 1개 견본"
+            />
+            <LineChart
+              values={[100, 100, 100, 100]}
+              direction="flat"
+              format={fmt2}
+              height={96}
+              aria-label="보합 견본"
+            />
+            <LineChart
+              values={[5, 6, null, 7, 8, null, 6, 9]}
+              direction="up"
+              format={fmt2}
+              height={96}
+              aria-label="끊긴 선 견본"
+            />
+          </div>
+        </Row>
+        <Row label="DivergingBar: 수급(순매수 오른쪽 빨강, 순매도 왼쪽 파랑, 0은 막대 없음)">
+          <div className={styles.barBox}>
+            <DivergingBar
+              aria-label="코스피 투자자별 순매수"
+              format={formatEokChange}
+              rows={[
+                { label: '외국인', value: flows.foreign },
+                { label: '기관', value: flows.institution },
+                { label: '개인', value: flows.individual },
+                { label: '기타', value: 0 },
+              ]}
+            />
+          </div>
+        </Row>
+        <Row label="억 금액(부호 없음)">
+          <p className="vt-num">
+            거래대금 {formatEok(9_812_300_000_000)} · 시가총액 {formatEok(426_000_000_000_000)}
+          </p>
+        </Row>
+      </div>
+    </Section>
+  );
+}
+
+function InputsDemo() {
+  const [market, setMarket] = useState<'all' | 'kr' | 'us' | 'jp'>('kr');
+  const [range, setRange] = useState<'1d' | '5d' | '1m' | '1y'>('1d');
+  const [kpiRow, setKpiRow] = useState(true);
+  const [name, setName] = useState('국내 장중');
+  const [dialog, setDialog] = useState(false);
+  return (
+    <Section
+      title="입력과 메뉴"
+      meta="키보드만으로 열기·이동·선택·Esc. 막힌 항목은 숨기지 않고 이유를 보인다"
+    >
+      <div className={styles.rows}>
+        <Row label="Select: 막힌 항목은 건너뛰고 이유를 보인다">
+          <Select
+            label="시장"
+            value={market}
+            onChange={setMarket}
+            options={[
+              { value: 'all', label: '전체' },
+              { value: 'kr', label: '국내 전체' },
+              { value: 'jp', label: '일본', disabled: true, reason: '이 버전에서 지원하지 않음' },
+              { value: 'us', label: '미국' },
+            ]}
+          />
+        </Row>
+        <Row label="Menu: 칸 머리의 ⋯">
+          <Menu
+            align="start"
+            trigger={<Button variant="icon" aria-label="칸 메뉴" icon={<Icon name="more" />} />}
+            items={[
+              { id: 'change', label: '내용 바꾸기', onSelect: () => undefined },
+              { id: 'refresh', label: '새로 고침', onSelect: () => undefined },
+              {
+                id: 'remove',
+                label: '칸 지우기',
+                onSelect: () => undefined,
+                disabled: true,
+                reason: '칸이 하나뿐이라 지울 수 없음',
+              },
+            ]}
+          />
+        </Row>
+        <Row label="SegmentedControl: ←→로 바로 선택">
+          <SegmentedControl
+            label="기간"
+            value={range}
+            onChange={setRange}
+            options={[
+              { value: '1d', label: '1일' },
+              { value: '5d', label: '5일' },
+              { value: '1m', label: '1개월', disabled: true },
+              { value: '1y', label: '1년' },
+            ]}
+          />
+        </Row>
+        <Row label="Toggle: Space·Enter">
+          <div className={styles.toggles}>
+            <Toggle label="맨 위 숫자 줄 보이기" checked={kpiRow} onChange={setKpiRow} />
+            <Toggle label="막힌 스위치" checked={false} onChange={() => undefined} disabled />
+          </div>
+        </Row>
+        <Row label="TextField: 도움말 · 글자 수 · 오류(황토)">
+          <div className={styles.fields}>
+            <TextField
+              label="탭 이름"
+              value={name}
+              onChange={setName}
+              hint="1~20자"
+              maxLength={20}
+            />
+            <TextField
+              label="탭 이름"
+              value=""
+              onChange={() => undefined}
+              error="이름을 1자 이상 쓰세요."
+            />
+          </div>
+        </Row>
+        <Row label="ProgressBar">
+          <div className={styles.progressDemo}>
+            <ProgressBar value={60} label="분석 진행 60%" />
+          </div>
+        </Row>
+        <Row label="Dialog: 초점 가둠, Esc, 닫히면 연 버튼으로">
+          <Button onClick={() => setDialog(true)}>탭 삭제…</Button>
+          <Dialog
+            open={dialog}
+            title="‘미국’ 탭을 삭제할까요?"
+            onClose={() => setDialog(false)}
+            footer={
+              <>
+                <Button onClick={() => setDialog(false)}>취소</Button>
+                <Button variant="primary" onClick={() => setDialog(false)}>
+                  삭제
+                </Button>
+              </>
+            }
+          >
+            탭 안의 칸 배치도 함께 사라집니다. 마지막 남은 탭은 삭제할 수 없습니다.
+          </Dialog>
+        </Row>
+      </div>
+    </Section>
+  );
+}
+
 function TabsDemo() {
   return (
     <Section title="탭" meta="←→ 이동과 동시에 선택, Home·End">
@@ -473,7 +687,10 @@ function TabsDemo() {
 function SectionsAndTables() {
   const [opened, setOpened] = useState('');
   return (
-    <Section title="구역과 표" meta="칸막이 상자 대신 2px 먹선. 숫자 열은 오른쪽 정렬">
+    <Section
+      title="구역과 표"
+      meta="칸 카드 안의 묶음은 선으로(카드 안 카드 금지). 짙은 머리줄, 숫자 열은 오른쪽 정렬"
+    >
       <div className={styles.twoUp}>
         <div className={styles.twoUpGrid}>
           <Section
@@ -581,7 +798,7 @@ function Notices() {
 
 function AiProse() {
   return (
-    <Section title="AI 문장" meta="AI가 쓴 문장은 명조, 데이터는 고딕. 설명 없이 눈으로 구분된다">
+    <Section title="AI 문장" meta="왼쪽 옅은 강조선과 꼬리표로 데이터와 구분한다">
       <div className={styles.rows}>
         <Row label="브리핑: 첫 문장 + 이어지는 문장">
           <div className={styles.stack}>
@@ -617,7 +834,7 @@ function Chrome() {
   return (
     <Section
       title="사이드바와 상태 표시줄"
-      meta="크롬에는 색이 없다"
+      meta="흰 바탕, 현재 화면만 강조색"
       actions={
         <a className={styles.inlineLink} href="#shell">
           창 틀 전체 보기
@@ -650,11 +867,10 @@ export function Gallery() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Vater 디자인 시스템</h1>
-          <p className={styles.lede}>
-            방향 B 리서치 노트. 시세, 문장, 알림은 모두 예시 데이터입니다.
-          </p>
+          <p className={styles.lede}>대시보드 라이트. 시세, 문장, 알림은 모두 예시 데이터입니다.</p>
         </div>
         <nav className={styles.links} aria-label="견본 보기">
+          <a href="#dashboard">대시보드 견본</a>
           <a href="#shell">창 틀 견본</a>
           <a href="#shell-offline">오프라인 창 틀</a>
         </nav>
@@ -667,8 +883,10 @@ export function Gallery() {
       <States />
       <Buttons />
       <TabsDemo />
+      <InputsDemo />
       <SectionsAndTables />
       <Sparklines />
+      <Charts />
       <Notices />
       <AiProse />
       <Chrome />

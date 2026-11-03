@@ -20,7 +20,7 @@
 
 .banner[data-tone='info'] {
   border-top-color: var(--color-control);
-  background: var(--color-chrome);
+  background: var(--color-card);
   color: var(--color-ink-2);
 }
 
