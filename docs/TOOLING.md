@@ -18,6 +18,8 @@
 | 2026-11-03 | Rust stable (rustup, cargo, rustc) | 1.99.1 | `~/.cargo`, `~/.rustup` (사용자 범위) | `shell/tauri`: 사이드카 관리 크레이트(`apps/desktop/src-tauri/crates/vater-sidecar`) 빌드·테스트 | 공식 `rustup-init`을 sha256 검증 후 `--no-modify-path`로 설치. PATH에 넣지 않았으므로 `~/.cargo/bin/cargo`로 직접 부른다 |
 | 2026-11-03 | rustup 구성 요소 `rustfmt`, `clippy` | 1.99.1 | `~/.rustup` | `cargo fmt --check`, `cargo clippy -- -D warnings` | `rustup component add rustfmt clippy` (공식 배포) |
 | 2026-11-03 | rustup 대상 `x86_64-pc-windows-msvc` (표준 라이브러리만) | 1.99.1 | `~/.rustup` | WSL에서 Windows 전용 코드(`CREATE_NO_WINDOW`)를 `cargo check`/`clippy --target`으로 타입 검사 | `rustup target add x86_64-pc-windows-msvc`. 링크(MSVC 링커)는 하지 않으므로 실행 파일은 만들지 못함 |
+| 2026-11-03 | fonttools + brotli (`uvx`로 실행) | fonttools 4.68.0 | uv 캐시 (설치하지 않음) | Hahmlet 글꼴 서브셋, woff2 변환 (`pyftsubset`, `varLib.instancer`) | `ui/design-system`. 명령은 `apps/desktop/src/design-system/fonts/make-fonts.sh` |
+| 2026-11-03 | 프런트엔드 npm 의존성 | `apps/desktop/package.json`에 정확한 버전 고정 | `apps/desktop/node_modules` (git 제외) | Vite, React 18, TypeScript, Vitest, ESLint, Prettier | `npm install --before=2026-10-20`으로 2주 이상 지난 버전만 받음. `package-lock.json` 커밋 |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |

@@ -1,0 +1,24 @@
+/* 상태 점 7px. 모양으로도 구분한다: 채운 점(켜짐), 빈 원(꺼짐), 황토 점(주의), 굵은 황토 원(끊김) */
+.dot {
+  display: inline-block;
+  flex: none;
+  width: var(--size-dot);
+  height: var(--size-dot);
+  border-radius: var(--radius-round);
+}
+
+.dot[data-dot='on'] {
+  background: var(--color-ink);
+}
+
+.dot[data-dot='off'] {
+  border: 1.5px solid var(--color-ink-3);
+}
+
+.dot[data-dot='caution'] {
+  background: var(--color-caution);
+}
+
+.dot[data-dot='caution-strong'] {
+  border: 2px solid var(--color-caution-ink);
+}

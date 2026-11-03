@@ -1,0 +1,4 @@
+/* 디자인 시스템 전역 스타일. 앱 진입점에서 한 번만 불러온다: import './design-system/styles.css' */
+@import './fonts.css';
+@import './tokens.css';
+@import './base.css';

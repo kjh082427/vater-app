@@ -335,7 +335,7 @@
 
 - **개발 환경 (WSL2)**
   - 사이드카: Python 3.13 + uv. Python 3.14는 의존성 호환이 불확실해 3.13으로 고정한다.
-  - UI: Node 24 + pnpm, Vite 개발 서버. 브라우저에서 사이드카와 붙여 개발한다.
+  - UI: Node 24 + npm(`package-lock.json` 커밋), Vite 개발 서버. 브라우저에서 사이드카와 붙여 개발한다. (처음에는 pnpm으로 정했으나 `ui/design-system`에서 npm으로 시작했다. 기능 차이가 없어 npm을 유지한다.)
   - Tauri 셸: WSL에서 GUI 빌드에 필요한 시스템 라이브러리 설치가 부담이라, 컴파일 검증은 Windows CI에서 한다.
 - **사이드카 패키징:** PyInstaller **onedir** 형식으로 `vater-core\` 폴더를 만들어 Tauri `resources`로 포함한다. Rust가 실행 경로를 계산해 직접 실행한다.
 - **설치 파일:** Tauri NSIS를 쓰고 `installMode: currentUser`로 관리자 권한 없이 설치되게 한다. WebView2는 부트스트래퍼를 포함해 없으면 자동 설치한다.

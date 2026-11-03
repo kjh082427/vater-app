@@ -1,0 +1,39 @@
+/* 화면 위 띠. 구역과 같은 2px 위 선으로 말하고, 오류·오프라인도 빨강이 아닌 황토 */
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-2-5);
+  row-gap: var(--space-1);
+  min-height: var(--size-section-head);
+  padding: var(--space-1) var(--space-3);
+  border-top: var(--rule-section) solid;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.banner[data-tone='caution'] {
+  border-top-color: var(--color-caution);
+  background: var(--color-caution-bg);
+  color: var(--color-caution-ink);
+}
+
+.banner[data-tone='info'] {
+  border-top-color: var(--color-control);
+  background: var(--color-chrome);
+  color: var(--color-ink-2);
+}
+
+.title {
+  font-weight: var(--weight-bold);
+}
+
+.banner[data-tone='info'] .title {
+  color: var(--color-ink);
+}
+
+.action {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}

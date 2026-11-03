@@ -1,0 +1,45 @@
+/* 칸막이 상자 대신 구역 위 2px 먹선. 구역 사이는 여백으로 띄운다 */
+.section {
+  border-top: var(--rule-section) solid var(--color-rule-section);
+  padding-top: var(--space-1);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-2-5);
+  min-height: var(--size-section-head);
+}
+
+.title {
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-bold);
+}
+
+.meta {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  margin-left: auto;
+}
+
+/* 구역 안의 구역(h3, h4): 1px 먹선과 한 단계 작은 제목 */
+.section[data-level='3'],
+.section[data-level='4'] {
+  border-top-width: var(--rule-hair);
+}
+
+.section[data-level='3'] .title,
+.section[data-level='4'] .title {
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-semibold);
+}

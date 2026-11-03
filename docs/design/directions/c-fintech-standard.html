@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Vater 시안 C · 금융 앱 표준</title>
+<!-- 시안 미리보기 전용: 글꼴을 CDN에서 받는다. 실제 앱은 같은 글꼴 파일을 앱에 포함한다(오프라인). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root {
+  --ground: #f2f4f6;
+  --card: #ffffff;
+  --well: #f7f8fa;
+  --line: #e5e8eb;
+  --ink: #191f28;
+  --ink-2: #4e5968;
+  --ink-3: #5f6b7a;
+  --primary: #191f28;
+  /* 시세 방향: 상승 빨강, 하락 파랑 (국내 관례) */
+  --up: #d42f3c;    --up-bg: #fdeced;   --up-ink: #a1202b;
+  --down: #2862d6;  --down-bg: #eaf1fd; --down-ink: #1c48a0;
+  --warn: #c58411;  --warn-bg: #fff5dc; --warn-ink: #7a4f00;
+  --live: #1f8a5b;
+
+  --font: "Pretendard Variable", Pretendard, "Malgun Gothic", system-ui, sans-serif;
+  --r-card: 20px; --r-inner: 14px; --r-ctl: 10px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #dfe3e8; font-family: var(--font); color: var(--ink); font-size: 14px; line-height: 20px; word-break: keep-all; -webkit-font-smoothing: antialiased; }
+::selection { background: #dfe6f0; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--ink-3); }
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* 창 1280×800: 사이드바 216 + 본문 1064, 하단 상태 표시줄 32 */
+.app { width: 1280px; height: 800px; margin: 0 auto; display: grid; grid-template-columns: 216px 1fr; grid-template-rows: 1fr 32px; background: var(--ground); overflow: hidden; }
+
+.side { display: flex; flex-direction: column; padding: 22px 14px 16px; background: var(--card); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 24px; }
+.brand svg { width: 30px; height: 30px; }
+.brand b { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+.nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.nav a { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 12px; color: var(--ink-2); text-decoration: none; font-size: 15px; font-weight: 500; }
+.nav a:hover { background: var(--well); }
+.nav a[aria-current="page"] { background: var(--ground); color: var(--ink); font-weight: 700; }
+.nav .count { margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; }
+.side-foot { margin-top: auto; background: var(--well); border-radius: var(--r-inner); padding: 14px; display: grid; gap: 10px; }
+.watching { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.watching i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+.watching span { font-weight: 400; color: var(--ink-3); }
+.btn { height: 36px; padding: 0 14px; border-radius: var(--r-ctl); border: 0; background: var(--ground); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn:hover { background: #e8ebee; }
+.btn.primary { background: var(--primary); color: #fff; height: 40px; padding: 0 18px; }
+.btn.primary:hover { background: #333d4b; }
+.btn.ghost { background: transparent; color: var(--ink-2); padding: 0 8px; height: 32px; font-weight: 500; }
+.btn.ghost:hover { background: var(--well); }
+
+.main { padding: 24px 32px 0; display: flex; flex-direction: column; min-height: 0; }
+.title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 18px; }
+.title h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 800; letter-spacing: -0.02em; }
+.title p { margin: 2px 0 0; font-size: 15px; color: var(--ink-2); }
+.title p b { color: var(--ink); font-weight: 700; }
+.title .right { display: flex; align-items: center; gap: 14px; }
+.stamp { font-size: 13px; color: var(--ink-3); }
+
+/* 584 + 16 + 400 = 1000 = 1064 - 32 - 32 */
+.grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 584px 400px; gap: 16px; }
+.col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.card { background: var(--card); border-radius: var(--r-card); padding: 18px 20px; }
+.card-h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-h h2 { margin: 0; font-size: 17px; line-height: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.card-h .meta { font-size: 13px; color: var(--ink-3); }
+.card-h .end { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--ground); }
+.seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); }
+
+.brief .lead { margin: 0 0 12px; font-size: 18px; line-height: 27px; font-weight: 700; letter-spacing: -0.01em; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: var(--well); border-radius: var(--r-inner); padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; align-items: end; }
+.tile .k { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.tile .v { font-size: 21px; line-height: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.tile .d { font-size: 13px; font-weight: 600; }
+.tile svg { display: block; }
+.brief-foot { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+.brief-foot .k { color: var(--ink-3); margin-right: 4px; }
+.brief-foot .end { margin-left: auto; }
+
+.watch { flex: 1; min-height: 0; padding-bottom: 8px; }
+.list { list-style: none; margin: 0 -8px; padding: 0; }
+.list li { display: grid; grid-template-columns: 1fr 96px 132px; align-items: center; height: 52px; padding: 0 8px; border-radius: 12px; }
+.list li:hover { background: var(--well); }
+.list .nm b { display: block; font-size: 15px; font-weight: 700; line-height: 20px; }
+.list .nm span { font-size: 12px; color: var(--ink-3); line-height: 16px; }
+.list .px { text-align: right; }
+.list .px b { display: block; font-size: 15px; font-weight: 700; line-height: 20px; }
+.list .px span { font-size: 13px; font-weight: 600; line-height: 16px; }
+.list .sub { font-size: 12px; font-weight: 700; color: var(--ink-3); padding: 10px 8px 2px; height: auto; }
+.pill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 12px; font-size: 12px; font-weight: 600; background: var(--ground); color: var(--ink-2); white-space: nowrap; justify-self: start; }
+.pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.pill.live { background: #e6f4ed; color: #17663f; } .pill.live i { background: var(--live); }
+.pill.poll { background: var(--warn-bg); color: var(--warn-ink); } .pill.poll i { background: var(--warn); }
+
+.run-obj { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; }
+.run-obj b { font-size: 18px; font-weight: 800; }
+.run-obj .sub { display: block; font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+.run-obj .elapsed { text-align: right; font-size: 13px; color: var(--ink-3); }
+.run-obj .elapsed b { display: block; font-size: 20px; color: var(--ink); }
+.track { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 10px; }
+.track i { height: 6px; border-radius: 3px; background: var(--line); }
+.track i.done { background: var(--ink); }
+.track i.now { position: relative; overflow: hidden; }
+.track i.now::after { content: ""; position: absolute; inset: 0 45% 0 0; border-radius: 3px; background: var(--ink); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; font-size: 13px; }
+.steps li { display: flex; justify-content: space-between; height: 24px; align-items: center; color: var(--ink-2); }
+.steps li.now { color: var(--ink); font-weight: 700; }
+.steps li.wait { color: var(--ink-3); }
+.run-foot { display: flex; gap: 8px; margin-top: 10px; }
+.run-foot .cancel { margin-left: auto; }
+
+.alerts { flex: 1; min-height: 0; padding-bottom: 6px; }
+.feed { list-style: none; margin: 0 -8px; padding: 0; }
+.feed li { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; padding: 5px 8px; border-radius: 12px; }
+.feed li .msg { font-size: 14px; line-height: 20px; }
+.feed li .msg small { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); line-height: 18px; margin-top: 1px; }
+.feed li .time { font-size: 12px; color: var(--ink-3); }
+.feed li.new .msg { font-weight: 700; }
+.feed li.new .time { color: var(--ink); font-weight: 700; }
+.dec { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.dec.buy, .dec.over { background: var(--up-bg); color: var(--up-ink); }
+.dec.hold { background: var(--ground); color: var(--ink); }
+.dec.under, .dec.sell { background: var(--down-bg); color: var(--down-ink); }
+.dec.review { background: var(--warn-bg); color: var(--warn-ink); }
+
+.disclaimer { margin: 0; padding: 9px 4px; font-size: 12px; line-height: 16px; color: var(--ink-3); }
+
+.status { grid-column: 1 / -1; display: flex; align-items: center; gap: 20px; padding: 0 22px; background: var(--card); border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.status .s { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.status .s b { color: var(--ink); font-weight: 700; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+.status i.off { background: #b0b8c1; }
+.status i.warn { background: var(--warn); }
+.status .push { margin-left: auto; }
+
+.notes { width: 1280px; margin: 0 auto; padding: 32px 40px 48px; background: #f7f8fa; }
+.notes h2 { margin: 0 0 4px; font-size: 20px; }
+.notes > p { margin: 0 0 24px; color: var(--ink-2); }
+.notes h3 { margin: 28px 0 10px; font-size: 14px; }
+.chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.chip { border-radius: 14px; overflow: hidden; background: #fff; font-size: 12px; }
+.chip div { height: 44px; }
+.chip p { margin: 0; padding: 6px 10px 10px; line-height: 16px; }
+.chip code { font-family: ui-monospace, monospace; color: var(--ink-2); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.specimen { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; align-items: baseline; font-size: 13px; }
+.specimen > span { color: var(--ink-2); }
+.banner { display: flex; align-items: center; gap: 10px; width: 760px; height: 44px; padding: 0 8px 0 16px; border-radius: 14px; background: var(--warn-bg); color: var(--warn-ink); font-size: 14px; }
+.banner b { font-weight: 700; }
+.banner .btn { margin-left: auto; height: 30px; background: #fff; font-size: 13px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8.5L19 7.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M8.5 12.5h7M8.5 16.5h4.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-paper" viewBox="0 0 24 24"><path d="M4 5h12.5v13.5a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M16.5 9H20v9.5a2 2 0 0 1-2 2M7.5 9h5.5M7.5 13h5.5M7.5 17h3.5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h8M17 7h3M4 17h3M12 17h8"/><circle cx="14.5" cy="7" r="2.5"/><circle cx="9.5" cy="17" r="2.5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side" aria-label="주 메뉴">
+    <div class="brand">
+      <svg viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="9" fill="#191f28"/><path d="M9 10l6 11 6-11" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <b>Vater</b>
+    </div>
+    <ul class="nav">
+      <li><a href="#" aria-current="page"><svg class="i"><use href="#i-home"/></svg>홈</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-report"/></svg>분석</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-bell"/></svg>감시·알림<span class="count" aria-label="새 알림 2건">2</span></a></li>
+      <li><a href="#"><svg class="i"><use href="#i-paper"/></svg>브리핑</a></li>
+      <li><a href="#"><svg class="i"><use href="#i-sliders"/></svg>설정</a></li>
+    </ul>
+    <div class="side-foot">
+      <div class="watching"><i aria-hidden="true"></i>알림 감시 중 <span>규칙 7개</span></div>
+      <button class="btn" type="button">감시 일시 중지</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="title">
+      <div>
+        <h1>홈</h1>
+        <p><b>삼성전자 목표가 도달</b> · 71,000원 이상, 14:21</p>
+      </div>
+      <div class="right">
+        <span class="stamp num">14:32:05 기준</span>
+        <button class="btn primary" type="button">새 분석</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="col">
+        <section class="card brief" aria-labelledby="h-brief">
+          <div class="card-h">
+            <h2 id="h-brief">최근 브리핑</h2>
+            <span class="meta">11월 2일(월) 국내 마감</span>
+            <div class="end"><div class="seg" role="group" aria-label="시장"><button type="button" aria-pressed="true">국내</button><button type="button" aria-pressed="false">미국</button></div></div>
+          </div>
+          <p class="lead">반도체 대형주가 지수를 끌어올렸지만, 코스닥은 2차전지 약세에 밀렸어요.</p>
+          <div class="tiles">
+            <div class="tile">
+              <div><div class="k">코스피</div><div class="v num">2,583.27</div><div class="d num up">+21.48 (+0.84%)</div></div>
+              <svg width="96" height="40" viewBox="0 0 88 24" preserveAspectRatio="none" role="img" aria-label="코스피 최근 30일 종가, 상승"><polyline fill="none" stroke="var(--up)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" points="2.0,19.7 4.9,20.1 7.8,18.0 10.7,18.3 13.6,19.0 16.5,21.7 19.4,22.0 22.3,17.8 25.2,15.9 28.1,12.0 31.0,10.7 33.9,9.0 36.8,7.9 39.7,13.2 42.6,9.8 45.4,7.7 48.3,5.6 51.2,10.9 54.1,16.4 57.0,19.0 59.9,20.2 62.8,18.7 65.7,18.5 68.6,16.3 71.5,18.0 74.4,16.6 77.3,14.8 80.2,16.6 83.1,7.9 86.0,2.0"/></svg>
+            </div>
+            <div class="tile">
+              <div><div class="k">코스닥</div><div class="v num">742.15</div><div class="d num down">−2.76 (−0.37%)</div></div>
+              <svg width="96" height="40" viewBox="0 0 88 24" preserveAspectRatio="none" role="img" aria-label="코스닥 최근 30일 종가, 하락"><polyline fill="none" stroke="var(--down)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" points="2.0,3.6 4.9,8.5 7.8,7.8 10.7,4.8 13.6,7.2 16.5,12.5 19.4,13.3 22.3,12.2 25.2,8.8 28.1,13.7 31.0,18.9 33.9,16.9 36.8,15.8 39.7,11.0 42.6,8.1 45.4,9.0 48.3,10.5 51.2,2.0 54.1,3.6 57.0,6.9 59.9,11.5 62.8,11.8 65.7,11.8 68.6,13.6 71.5,14.4 74.4,14.0 77.3,12.1 80.2,8.8 83.1,19.6 86.0,22.0"/></svg>
+            </div>
+          </div>
+          <div class="brief-foot">
+            <span><span class="k">코스피 수급</span>외국인 <b class="num up">+3,124억</b> · 기관 <b class="num down">−987억</b> · 개인 <b class="num down">−2,013억</b></span>
+            <button class="btn ghost end" type="button">브리핑 보기</button>
+          </div>
+        </section>
+
+        <section class="card watch" aria-labelledby="h-watch">
+          <div class="card-h">
+            <h2 id="h-watch">감시 종목</h2>
+            <span class="meta">5개</span>
+            <div class="end"><button class="btn ghost" type="button">추가</button></div>
+          </div>
+          <ul class="list">
+            <li><div class="nm"><b>삼성전자</b><span class="num">005930 · 국내</span></div><span class="pill live"><i></i>실시간</span><div class="px num"><b>71,400원</b><span class="up">+1,200 (+1.71%)</span></div></li>
+            <li><div class="nm"><b>SK하이닉스</b><span class="num">000660 · 국내</span></div><span class="pill poll"><i></i>폴링</span><div class="px num"><b>198,700원</b><span class="down">−3,300 (−1.63%)</span></div></li>
+            <li><div class="nm"><b>NAVER</b><span class="num">035420 · 국내</span></div><span class="pill live"><i></i>실시간</span><div class="px num"><b>172,300원</b><span class="flat">0 (0.00%)</span></div></li>
+            <li><div class="nm"><b>애플</b><span>AAPL · 미국 11/2 종가</span></div><span class="pill"><i></i>장 마감</span><div class="px num"><b>$227.48</b><span class="up">+$2.13 (+0.95%)</span></div></li>
+            <li><div class="nm"><b>엔비디아</b><span>NVDA · 미국 11/2 종가</span></div><span class="pill"><i></i>장 마감</span><div class="px num"><b>$135.40</b><span class="down">−$1.87 (−1.36%)</span></div></li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card run" aria-labelledby="h-run">
+          <div class="card-h">
+            <h2 id="h-run">진행 중인 분석</h2>
+            <div class="end"><span class="meta">대기 0건</span></div>
+          </div>
+          <div class="run-obj">
+            <div><b>SK하이닉스</b><span class="sub">기준일 11월 2일 · 클라우드 전용</span></div>
+            <div class="elapsed"><b class="num">8분 12초</b>14:24 시작</div>
+          </div>
+          <div class="track" role="img" aria-label="5단계 중 3단계 진행 중"><i class="done"></i><i class="done"></i><i class="now"></i><i></i><i></i></div>
+          <ol class="steps">
+            <li><span>애널리스트 · 시장 · 뉴스 · 재무</span><span class="num">3분 41초</span></li>
+            <li><span>강세·약세 토론</span><span class="num">2분 5초</span></li>
+            <li class="now"><span>트레이더 진행 중</span><span class="num">2분 26초</span></li>
+            <li class="wait"><span>리스크 토론</span><span>대기</span></li>
+            <li class="wait"><span>포트폴리오 매니저</span><span>대기</span></li>
+          </ol>
+          <div class="run-foot">
+            <button class="btn" type="button">진행 보기</button>
+            <button class="btn ghost cancel" type="button">분석 취소</button>
+          </div>
+        </section>
+
+        <section class="card alerts" aria-labelledby="h-alerts">
+          <div class="card-h">
+            <h2 id="h-alerts">최근 알림</h2>
+            <span class="meta">새 알림 2건</span>
+            <div class="end"><button class="btn ghost" type="button">전체 보기</button></div>
+          </div>
+          <ul class="feed">
+            <li class="new"><span class="msg">삼성전자 현재가 71,000 — 목표가 71,000 이상<small>가격 · 장중 실시간</small></span><span class="time num">14:21</span></li>
+            <li class="new"><span class="msg">AI 분석 완료: 삼성전자 — 비중확대<small><span class="dec over">비중확대</span>기준일 11월 2일</small></span><span class="time num">13:05</span></li>
+            <li><span class="msg">SK하이닉스 거래량이 20일 평균의 3.2배<small>거래량 급증 · 장중 실시간</small></span><span class="time num">11:47</span></li>
+            <li><span class="msg">시장 브리핑 도착: 미국 2026-11-02<small>일일 브리핑</small></span><span class="time num">07:02</span></li>
+            <li><span class="msg">NAVER RSI(14) 29.4 — 과매도 진입<small>RSI · 장 마감 후 확인</small></span><span class="time num">어제</span></li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    <p class="disclaimer">투자 판단 보조용이며 투자 권유가 아닙니다. Vater는 주문 기능이 없습니다.</p>
+  </main>
+
+  <footer class="status" aria-label="상태">
+    <div class="s"><i></i><b>국내 장중</b>15:30 마감</div>
+    <div class="s"><i class="off"></i><b>미국 마감</b>23:30 개장</div>
+    <div class="s"><i class="warn"></i><b>한투</b>실시간 2 · 폴링 1</div>
+    <div class="s"><i></i><b>AI 엔진</b>클라우드 전용 · 분석 1건 진행 중</div>
+    <div class="s push">알림 감시 중</div>
+  </footer>
+</div>
+
+<section class="notes" aria-label="시안 설명">
+  <h2>C · 금융 앱 표준</h2>
+  <p>시안용 예시 데이터입니다. 장면: 2026-11-03(화) 14:32, 국내 장중. 시세, 브리핑 문장, 알림은 모두 지어낸 값입니다.</p>
+
+  <h3>팔레트</h3>
+  <div class="chips">
+    <div class="chip"><div style="background:#f2f4f6"></div><p>바탕<br><code>#f2f4f6</code></p></div>
+    <div class="chip"><div style="background:#ffffff;border-bottom:1px solid #e5e8eb"></div><p>카드<br><code>#ffffff</code></p></div>
+    <div class="chip"><div style="background:#191f28"></div><p>글자 · 주 버튼<br><code>#191f28</code></p></div>
+    <div class="chip"><div style="background:#1f8a5b"></div><p>실시간 · 감시 중<br><code>#1f8a5b</code></p></div>
+    <div class="chip"><div style="background:#d42f3c"></div><p>상승<br><code>#d42f3c</code> · 4.9:1</p></div>
+    <div class="chip"><div style="background:#2862d6"></div><p>하락<br><code>#2862d6</code> · 5.5:1</p></div>
+  </div>
+
+  <h3>글꼴</h3>
+  <div class="specimen">
+    <span>Pretendard 한 가지 (굵기로 위계)</span><div style="font-size:18px;font-weight:700">반도체 대형주가 지수를 끌어올렸어요</div>
+    <span>숫자 (고정폭 숫자, 굵게)</span><div class="num" style="font-size:21px;font-weight:800">2,583.27 <span class="up" style="font-size:14px">+21.48 (+0.84%)</span></div>
+  </div>
+
+  <h3>결정 배지</h3>
+  <div class="row"><span class="dec buy">매수</span><span class="dec over">비중확대</span><span class="dec hold">보유</span><span class="dec under">비중축소</span><span class="dec sell">매도</span><span class="dec review">검토 필요</span></div>
+
+  <h3>수신 상태와 오프라인 배너</h3>
+  <div class="row" style="margin-bottom:12px"><span class="pill live"><i></i>실시간</span><span class="pill poll"><i></i>폴링</span><span class="pill"><i></i>장 마감</span><span class="pill" style="background:var(--warn-bg);color:var(--warn-ink)"><i style="background:transparent;border:2px solid var(--warn-ink)"></i>끊김 · 재연결 중</span></div>
+  <div class="banner" role="status"><b>오프라인: 알림 감시 일시 중지</b>30초마다 다시 확인해요. 마지막 수신 14:32:05<button class="btn" type="button">지금 다시 확인</button></div>
+</section>
+</body>
+</html>
