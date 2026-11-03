@@ -24,7 +24,7 @@ def _xnys() -> Any:
     return xcals.get_calendar("XNYS")
 
 
-def _open(market: BriefingMarket, day: date) -> datetime:
+def session_open(market: BriefingMarket, day: date) -> datetime:
     if market == "KR":
         return datetime.combine(day, KR_OPEN, tzinfo=KST)
     opened: datetime = _xnys().session_open(day.isoformat()).to_pydatetime()
@@ -49,9 +49,9 @@ async def next_open(market: BriefingMarket, session: date, clock: MarketClock) -
     day = session + timedelta(days=1)
     for _ in range(LOOKBACK_DAYS):
         if await clock.is_session_day(market, day):
-            return _open(market, day)
+            return session_open(market, day)
         day += timedelta(days=1)
-    return _open(market, day)
+    return session_open(market, day)
 
 
 async def due_session(
