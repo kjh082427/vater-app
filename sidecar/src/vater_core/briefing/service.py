@@ -5,7 +5,8 @@
   `missing`에 `interpretation`을 남긴다.
 - 일정: 1분마다 시장별로 지금 만들어야 할 세션을 확인한다.
   이미 있으면 건너뛰고, 실패하면 5분 뒤 다시.
-- DB 쓰기는 이벤트 루프에서만 한다(LLM 호출만 `asyncio.to_thread`).
+- DB 쓰기는 이벤트 루프에서만 한다. LLM 호출만 daemon 스레드에서 돌리고 시간 제한을 둔다
+  (응답이 멈춰도 앱 종료와 다음 브리핑을 막지 않는다).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import asyncio
 import contextlib
 import logging
 import sqlite3
+import threading
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any
@@ -23,7 +25,7 @@ from vater_core.alerts.store import EventRepo
 from vater_core.api.errors import VaterError
 from vater_core.briefing.collect import Collected, Feeds, KisFeeds, collect
 from vater_core.briefing.interpret import interpret
-from vater_core.briefing.schedule import BriefingMarket, due_session
+from vater_core.briefing.schedule import BriefingMarket, due_session, next_open
 from vater_core.briefing.store import BriefingRepo
 from vater_core.llm.presets import LlmRun
 from vater_core.stdout_events import notify
@@ -38,6 +40,8 @@ MARKETS: tuple[BriefingMarket, ...] = ("KR", "US")
 LABEL = {"KR": "국내", "US": "미국"}
 LOOP_SEC = 60.0
 RETRY = timedelta(minutes=5)
+LLM_TIMEOUT_SEC = 900.0  # Gemini 무료 등급 실측 약 6분
+LLM_THREAD = "vater-briefing-llm"
 
 CollectFn = Callable[..., Awaitable[Collected]]
 InterpretFn = Callable[[str, dict[str, Any], LlmRun], dict[str, str]]
@@ -46,6 +50,33 @@ NotifyFn = Callable[[str, str, str | None], None]
 
 def _now_default() -> datetime:
     return datetime.now(UTC)
+
+
+def _in_daemon_thread(fn: Callable[[], Any]) -> asyncio.Future[Any]:
+    """`fn`을 daemon 스레드에서 돌린다. 기다리다 그만둬도 스레드가 앱 종료를 막지 않는다."""
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[Any] = loop.create_future()
+
+    def settle(ok: bool, value: Any) -> None:
+        if future.done():  # 시간 초과로 이미 포기했다
+            return
+        if ok:
+            future.set_result(value)
+        else:
+            future.set_exception(value)
+
+    def target() -> None:
+        try:
+            value = fn()
+        except BaseException as e:
+            if not loop.is_closed():
+                loop.call_soon_threadsafe(settle, False, e)
+            return
+        if not loop.is_closed():
+            loop.call_soon_threadsafe(settle, True, value)
+
+    threading.Thread(target=target, name=LLM_THREAD, daemon=True).start()
+    return future
 
 
 def _busy() -> VaterError:
@@ -67,6 +98,7 @@ class BriefingService:
         notify_fn: NotifyFn = notify,
         now: Callable[[], datetime] = _now_default,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        llm_timeout: float = LLM_TIMEOUT_SEC,
     ) -> None:
         self._deps = deps
         self._clock = clock
@@ -77,6 +109,7 @@ class BriefingService:
         self._notify = notify_fn
         self._now = now
         self._sleep = sleep
+        self._llm_timeout = llm_timeout
         self._lock = asyncio.Lock()
         self._retry_at: dict[tuple[str, date], datetime] = {}
         self._loop_task: asyncio.Task[None] | None = None
@@ -100,11 +133,12 @@ class BriefingService:
         if self._lock.locked():
             raise _busy()
         async with self._lock:
+            feeds = self._feeds_fn()  # 한투 키가 없으면 여기서 멈춘다: 진행 이벤트를 보내지 않는다
             base = {"market": market, "date": session.isoformat()}
             self._publish({**base, "status": "running"})
             try:
                 got = await self._collect(
-                    market, session, self._feeds_fn(), self._db(), alerts_until=self._now()
+                    market, session, feeds, self._db(), alerts_until=self._now()
                 )
             except Exception as e:
                 code = e.code if isinstance(e, VaterError) else "BRIEFING_FAILED"
@@ -117,9 +151,13 @@ class BriefingService:
             text: dict[str, str] | None = None
             try:
                 run = self._run_fn()
-                text = await asyncio.to_thread(self._interpret, market, got.data, run)
-            except Exception:  # LLM 문제는 브리핑을 막지 않는다 (사용자 규칙)
-                logger.warning("briefing %s %s: saved without interpretation", market, session)
+                call = _in_daemon_thread(lambda: self._interpret(market, got.data, run))
+                text = await asyncio.wait_for(call, self._llm_timeout)
+            except Exception as e:  # LLM 문제는 브리핑을 막지 않는다 (사용자 규칙)
+                cause = e.code if isinstance(e, VaterError) else type(e).__name__
+                logger.warning(
+                    "briefing %s %s: saved without interpretation (%s)", market, session, cause
+                )
                 missing.append("interpretation")
             db = self._db()
             bid = BriefingRepo(db).save(market, session, got.data, text, missing)
@@ -143,6 +181,14 @@ class BriefingService:
         if session is None:
             raise VaterError(
                 "BRIEFING_NO_SESSION", "브리핑을 만들 최근 거래일이 없습니다.", status=409
+            )
+        if self._now() >= await next_open(market, session, self._clock):
+            # 지수·순위는 '지금' 값만 받을 수 있어서, 다음 장이 열린 뒤에는 지난 세션을 만들 수 없다
+            raise VaterError(
+                "BRIEFING_NO_SESSION",
+                "지금은 지난 거래일 브리핑을 만들 수 없습니다.",
+                "다음 장이 열려 있어 데이터가 섞입니다. 오늘 장 마감 10분 뒤에 다시 시도하세요.",
+                status=409,
             )
         if self.busy():
             raise _busy()

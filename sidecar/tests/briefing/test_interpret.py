@@ -127,3 +127,56 @@ def test_deep_model_wires_the_key_into_a_real_client(monkeypatch: pytest.MonkeyP
     model = deep_model(LlmRun("cloud", tier, tier, overrides, {"GOOGLE_API_KEY": "g-key"}))
     assert model.google_api_key.get_secret_value() == "g-key"  # type: ignore[attr-defined]
     assert "GOOGLE_API_KEY" not in os.environ
+
+
+ALL_KEY_ENVS = (
+    "GOOGLE_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "OPENAI_COMPATIBLE_API_KEY",
+)
+
+
+@pytest.mark.filterwarnings("ignore:Model .* is not in the known model list")
+@pytest.mark.parametrize(
+    ("provider", "model", "base_url", "env_name", "attr"),
+    [
+        ("google", "gemini-3.8-flash", None, "GOOGLE_API_KEY", "google_api_key"),
+        ("anthropic", "claude-sonnet-5-5", None, "ANTHROPIC_API_KEY", "anthropic_api_key"),
+        ("openai", "gpt-6-sol", None, "OPENAI_API_KEY", "openai_api_key"),
+        (
+            "openai_compatible",
+            "my-model",
+            "http://localhost:8000/v1",
+            "OPENAI_COMPATIBLE_API_KEY",
+            "openai_api_key",
+        ),
+    ],
+)
+def test_every_catalog_provider_gets_the_key_without_env(
+    monkeypatch: pytest.MonkeyPatch,
+    provider: str,
+    model: str,
+    base_url: str | None,
+    env_name: str,
+    attr: str,
+) -> None:
+    from vater_core.briefing.interpret import deep_model
+
+    for name in ALL_KEY_ENVS:
+        monkeypatch.delenv(name, raising=False)
+    overrides = {
+        "llm_provider": provider,
+        "deep_think_llm": model,
+        "quick_think_llm": model,
+        "backend_url": base_url,
+    }
+    tier = TierChoice(provider, model, base_url)
+    llm = deep_model(LlmRun("cloud", tier, tier, overrides, {env_name: "the-key"}))
+    assert getattr(llm, attr).get_secret_value() == "the-key"
+    assert not any(name in os.environ for name in ALL_KEY_ENVS)
+
+
+def test_null_for_a_section_means_empty() -> None:
+    got = parse_text('{"headline": "오늘은 조용했다.", "sectors": null, "flows": null}')
+    assert got["headline"] == "오늘은 조용했다." and got["sectors"] == "" and got["flows"] == ""

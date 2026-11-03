@@ -1,5 +1,6 @@
 import asyncio
 import sqlite3
+import threading
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -33,7 +34,7 @@ class Clock:
 
 
 class Rig:
-    def __init__(self, db: sqlite3.Connection, at: datetime) -> None:
+    def __init__(self, db: sqlite3.Connection, at: datetime, llm_timeout: float = 5.0) -> None:
         self.db = db
         self.clock = Clock(at)
         self.bus = EventBus()
@@ -45,6 +46,8 @@ class Rig:
         self.gate: asyncio.Event | None = None
         self.interpret_error: Exception | None = None
         self.run_error: Exception | None = None
+        self.feeds_error: Exception | None = None
+        self.interpret_block: threading.Event | None = None
 
         async def weekdays(day: date) -> bool:
             return day.weekday() < 5
@@ -60,6 +63,8 @@ class Rig:
             return Collected({"market": market, "session": session.isoformat()}, list(self.missing))
 
         def interpret(market: str, data: dict[str, Any], run: LlmRun) -> dict[str, str]:
+            if self.interpret_block is not None:
+                self.interpret_block.wait()  # 응답이 오지 않는 LLM
             if self.interpret_error is not None:
                 raise self.interpret_error
             return dict(TEXT)
@@ -72,19 +77,25 @@ class Rig:
         async def sleep(_: float) -> None:
             await asyncio.sleep(0)
 
+        def feeds() -> Feeds:
+            if self.feeds_error is not None:
+                raise self.feeds_error
+            return cast(Feeds, None)  # 수집 함수를 바꿨으므로 쓰이지 않는다
+
         def note(title: str, body: str, route: str | None = None) -> None:
             self.notes.append((title, body, route))
 
         self.service = BriefingService(
             self.deps,
             clock=MarketClock(weekdays, now=self.clock),
-            feeds_fn=lambda: cast(Feeds, None),  # 수집 함수를 바꿨으므로 쓰이지 않는다
+            feeds_fn=feeds,
             run_fn=run_fn,
             collect_fn=collect,
             interpret_fn=interpret,
             notify_fn=note,
             now=self.clock,
             sleep=sleep,
+            llm_timeout=llm_timeout,
         )
 
 
@@ -260,3 +271,49 @@ async def test_get_briefing_without_keys_does_not_raise(db: sqlite3.Connection) 
     assert get_briefing(deps) is service and deps.briefing is service
     await service.tick_once()  # 한투 키가 없으면 만들지 못하고 나중에 다시 시도한다
     await service.stop()
+
+
+@pytest.mark.parametrize(
+    ("at", "expected"),
+    [
+        (
+            datetime(2026, 11, 3, 2, 0, tzinfo=UTC),
+            None,
+        ),  # 화 11:00 KST: 월 세션은 다음 장이 열려 만들 수 없다
+        (datetime(2026, 11, 3, 6, 40, tzinfo=UTC), TUE),  # 화 15:40 KST: 화 세션
+        (datetime(2026, 11, 2, 23, 0, tzinfo=UTC), MON),  # 화 08:00 KST: 개장 전이면 월 세션
+    ],
+)
+async def test_manual_run_never_mixes_in_the_next_sessions_data(
+    db: sqlite3.Connection, at: datetime, expected: date | None
+) -> None:
+    rig = Rig(db, at)
+    if expected is None:
+        with pytest.raises(VaterError) as e:
+            await rig.service.run_latest("KR")
+        assert (e.value.code, e.value.status) == ("BRIEFING_NO_SESSION", 409)
+    else:
+        assert await rig.service.run_latest("KR") == expected
+        await rig.service.stop()
+
+
+async def test_a_hung_llm_call_times_out_in_a_daemon_thread(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT, llm_timeout=0.2)
+    rig.interpret_block = threading.Event()
+    try:
+        bid = await asyncio.wait_for(rig.service.generate("KR", TUE), 5)
+        b = BriefingRepo(db).get(bid)
+        assert (b.status, b.text, b.missing) == ("partial", None, ["interpretation"])
+        hung = [t for t in threading.enumerate() if t.name == "vater-briefing-llm"]
+        assert hung and all(t.daemon for t in hung)  # 앱 종료를 막지 않는다
+    finally:
+        rig.interpret_block.set()
+
+
+async def test_missing_kis_keys_stay_quiet(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    rig.feeds_error = VaterError("KIS_NOT_CONFIGURED", "키 없음", status=409)
+    sub = rig.bus.subscribe()
+    await rig.service.tick_once()
+    assert await drain(sub) == []  # 첫 실행 마법사 중에 '브리핑 실패'를 보내지 않는다
+    assert BriefingRepo(db).list() == []

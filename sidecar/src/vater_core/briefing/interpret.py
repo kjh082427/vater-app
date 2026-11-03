@@ -81,7 +81,7 @@ def parse_text(raw: str) -> dict[str, str]:
         raise _failed("AI 해석 결과 형식이 다릅니다.")
     out: dict[str, str] = {}
     for key in SECTIONS:
-        value = obj.get(key, "")
+        value = obj.get(key) or ""  # 해당 없는 항목을 null로 주는 모델도 있다
         if not isinstance(value, str):
             raise _failed(f"AI 해석 결과의 '{key}'가 문장이 아닙니다.")
         out[key] = _without_numbers(value)
@@ -108,10 +108,21 @@ def _key_kwargs(run: LlmRun) -> dict[str, str]:
 
 def deep_model(run: LlmRun) -> ChatModel:
     from tradingagents.default_config import DEFAULT_CONFIG
-    from tradingagents.llm_clients.factory import create_tier_client
+    from tradingagents.llm_clients.factory import build_llm_kwargs, create_tier_client
 
     config: dict[str, Any] = {**DEFAULT_CONFIG, **run.overrides}
-    llm: ChatModel = create_tier_client(config, "deep", **_key_kwargs(run)).get_llm()
+    keys = _key_kwargs(run)
+    if run.deep.provider == "openai" and not config.get("backend_url"):
+        # TradingAgents의 OpenAI 클라이언트는 키를 인자로 줘도 환경변수부터 확인하고 실패한다.
+        # 같은 모델 클래스를 직접 만들어 키를 인자로만 넘긴다(공식 OpenAI는 Responses API).
+        from tradingagents.llm_clients.openai_client import NormalizedChatOpenAI
+
+        options = build_llm_kwargs({**config, "llm_provider": "openai"})
+        openai: ChatModel = NormalizedChatOpenAI(
+            model=config["deep_think_llm"], use_responses_api=True, **options, **keys
+        )
+        return openai
+    llm: ChatModel = create_tier_client(config, "deep", **keys).get_llm()
     return llm
 
 
