@@ -9,7 +9,7 @@ import { AnalysesScreen } from '../screens/analysis/AnalysesScreen';
 import { AnalysisDetailScreen } from '../screens/analysis/AnalysisDetailScreen';
 import { BriefingDetailScreen } from '../screens/briefing/BriefingDetailScreen';
 import { BriefingsScreen } from '../screens/briefing/BriefingsScreen';
-import { HomeScreen } from '../screens/home/HomeScreen';
+import { HomeScreen } from '../dashboard/HomeScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { WelcomeScreen } from '../screens/welcome/WelcomeScreen';
 import { formatClock } from '../screens/common/time';
@@ -149,7 +149,7 @@ function NotFound() {
 function screenFor(route: Route): ReactNode {
   switch (route.name) {
     case 'home':
-      return <HomeScreen />;
+      return <HomeScreen tab={route.tab} />;
     case 'analyses':
       return <AnalysesScreen />;
     case 'analysis':

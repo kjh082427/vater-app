@@ -38,6 +38,7 @@ export interface MockDb {
   symbols: SymbolOut[];
   /** 대시보드 문서(GET·PUT /ui/dashboards). 처음엔 사이드카처럼 빈 문서. */
   dashboards: unknown;
+  indices: (typeof fx.marketIndices)[number][];
   nextId: number;
 }
 
@@ -58,6 +59,7 @@ export function createMockDb(): MockDb {
     hardware: clone(fx.hardware),
     symbols: clone(fx.symbols),
     dashboards: { version: 1, dashboards: [] },
+    indices: clone(fx.marketIndices),
     nextId: 100,
   };
 }
@@ -108,6 +110,7 @@ export function createHandlers(db: MockDb) {
       db.dashboards = body;
       return HttpResponse.json(body as object);
     }),
+    http.get('*/market/indices', () => HttpResponse.json(db.indices)),
     http.get('*/health', () => HttpResponse.json({ status: 'ok', version: '0.1.0' })),
     http.get('*/secrets', () => HttpResponse.json(db.secrets)),
     http.put('*/secrets/:name', async ({ params, request }) => {

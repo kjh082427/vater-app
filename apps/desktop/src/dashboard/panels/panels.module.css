@@ -1,0 +1,141 @@
+/* 칸 내용 공통. 칸 본문은 카드 안을 채우고, 넘치면 그 안에서 스크롤한다. */
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: auto;
+}
+
+.fill {
+  flex: 1;
+  min-height: 0;
+}
+
+.empty {
+  margin: auto 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  text-align: center;
+}
+
+.empty a,
+.foot a,
+.link {
+  color: var(--color-accent);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.empty a:hover,
+.foot a:hover,
+.link:hover {
+  text-decoration: underline;
+}
+
+.foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.big {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.change {
+  display: inline-flex;
+  gap: var(--space-1-5);
+  font-size: var(--text-sm);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-2) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.list li:last-child {
+  border-bottom: 0;
+}
+
+.itemText {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.itemText {
+  text-decoration: none;
+}
+
+a.itemText:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.itemMeta {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-gap);
+}
+
+.unit {
+  margin-left: var(--space-0-5);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.muted {
+  color: var(--color-ink-3);
+  font-weight: var(--weight-regular);
+}
+
+.progressTile {
+  width: 3rem;
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.summary {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}

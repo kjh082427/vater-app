@@ -18,6 +18,7 @@ import type {
   WatchItem,
   WatchQuote,
 } from '../api/types';
+import type { components } from '../api/schema';
 
 export const watchItems: WatchItem[] = [
   {
@@ -598,3 +599,52 @@ export const ollamaStatus: OllamaStatus = {
   models: [{ name: 'qwen3.5:4b-16k', size: 3_320_000_000 }],
   loaded: [],
 };
+
+/** GET /market/indices: 최근 30거래일 종가 + 오늘 값(장중). 마지막 종가가 전일 종가다. */
+function closesFrom(start: number, step: number, wobble: number): number[] {
+  return Array.from({ length: 30 }, (_, i) =>
+    Number((start + step * i + Math.sin(i * 1.3) * wobble).toFixed(2)),
+  );
+}
+export const marketIndices: components['schemas']['IndexOut'][] = [
+  {
+    code: 'KOSPI',
+    name: '코스피',
+    market: 'KR',
+    value: 2583.27,
+    change: 21.48,
+    change_pct: 0.84,
+    at: '2026-11-03T14:06:42+09:00',
+    closes: [...closesFrom(2490, 2.6, 14).slice(0, 29), 2561.79],
+  },
+  {
+    code: 'KOSDAQ',
+    name: '코스닥',
+    market: 'KR',
+    value: 742.15,
+    change: -4.12,
+    change_pct: -0.55,
+    at: '2026-11-03T14:06:42+09:00',
+    closes: [...closesFrom(760, -0.4, 6).slice(0, 29), 746.27],
+  },
+  {
+    code: 'SPX',
+    name: 'S&P 500',
+    market: 'US',
+    value: 5912.4,
+    change: 18.2,
+    change_pct: 0.31,
+    at: '2026-11-03T06:00:00+09:00',
+    closes: [...closesFrom(5800, 3.2, 20).slice(0, 29), 5912.4],
+  },
+  {
+    code: 'COMP',
+    name: '나스닥',
+    market: 'US',
+    value: null,
+    change: null,
+    change_pct: null,
+    at: null,
+    closes: [],
+  },
+];

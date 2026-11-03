@@ -50,3 +50,45 @@
   outline: var(--rule-focus) solid var(--color-focus);
   outline-offset: 2px;
 }
+
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-gap);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 칸 배치 영역: 남는 높이를 다 쓰고, 최소 합보다 작으면 가로·세로로 스크롤한다 */
+.area {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.area:focus-visible {
+  outline: var(--rule-focus) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.canvas {
+  position: relative;
+}
+
+.cell {
+  position: absolute;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.panel {
+  flex: 1;
+  overflow: hidden;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  margin-bottom: auto;
+}
