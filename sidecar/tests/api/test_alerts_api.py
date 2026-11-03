@@ -228,3 +228,19 @@ async def test_status_includes_markets_and_feeds(client: httpx.AsyncClient) -> N
     body = (await client.get("/alerts/status")).json()
     assert set(body) == {"state", "realtime", "polling", "markets", "feeds"}
     assert body["feeds"] == [] and isinstance(body["markets"], dict)
+
+
+async def test_rule_preview_route(client: httpx.AsyncClient) -> None:
+    wid = await add(client)
+    r = await client.post(
+        "/alerts/rules/preview", json={"watchlist_id": wid, "kind": "rsi", "timing": "close"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"state", "value", "message"}
+    assert body["state"] is None  # 일봉이 없고 한투 키도 없다: 계산 불가
+
+    bad = await client.post("/alerts/rules/preview", json={"watchlist_id": wid, "kind": "moon"})
+    assert (bad.status_code, bad.json()["code"]) == (422, "ALERT_RULE_INVALID")
+    missing = await client.post("/alerts/rules/preview", json={"watchlist_id": 99, "kind": "rsi"})
+    assert (missing.status_code, missing.json()["code"]) == (404, "WATCHLIST_NOT_FOUND")

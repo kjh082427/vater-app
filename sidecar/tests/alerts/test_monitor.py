@@ -817,6 +817,55 @@ async def test_realtime_change_uses_the_previous_daily_close(db: sqlite3.Connect
     assert len(rig.market.price_calls) == 0  # 한투를 더 부르지 않는다
 
 
+async def test_preview_close_rule_on_stored_bars(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    item, _ = rig.watch("005930")
+    closes = [10, 10, 10, 20]
+    days = [DAY - timedelta(days=3 - i) for i in range(4)]  # 마지막이 오늘(확정)
+    BarRepo(db).upsert(
+        "KR", "005930", [Bar(d, c, c, c, c, 1000) for d, c in zip(days, closes, strict=True)]
+    )
+
+    got = await rig.monitor.preview(item, "ma_break", {"period": 3}, "close")
+
+    assert (got.state, round(got.value or 0, 2)) == (True, 6.67)  # 20 - 13.33
+    assert got.message.startswith("3일 이동평균")
+    assert rig.market.price_calls == []  # 종가 규칙은 현재가가 필요 없다
+
+
+async def test_preview_fetches_missing_bars_first(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    item, _ = rig.watch("005930")  # 방금 추가: 일봉이 없다
+    rig.market.closes[("005930", DAY)] = 70000
+
+    got = await rig.monitor.preview(item, "ma_break", {"period": 3}, "close")
+
+    assert ("005930", DAY) in rig.market.bar_calls
+    assert got.state is None  # 하루치뿐: 계산 불가라고 정직하게 말한다
+    assert "부족" in got.message
+
+
+async def test_preview_realtime_rule_uses_the_live_price_during_the_session(
+    db: sqlite3.Connection,
+) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    rig.market.prices["005930"] = 71000.0
+
+    got = await rig.monitor.preview(item, "price_above", {"price": 70000}, "realtime")
+
+    assert (got.state, got.value) == (True, 71000.0)
+    assert got.message == "현재가 71,000 — 목표가 70,000 이상"
+
+
+async def test_preview_rejects_bad_params(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_OPEN)
+    item, _ = rig.watch("005930")
+    with pytest.raises(VaterError) as e:
+        await rig.monitor.preview(item, "ma_cross", {"fast": 20, "slow": 5}, "close")
+    assert (e.value.code, e.value.status) == ("ALERT_RULE_INVALID", 422)
+
+
 async def test_previous_close_waits_for_the_last_sessions_bar(db: sqlite3.Connection) -> None:
     # 직전 세션 일봉 받기가 실패한 동안은 더 오래된 일봉으로 전일 대비를 지어내지 않는다
     rig = Rig(db, KR_OPEN)

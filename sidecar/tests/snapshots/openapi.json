@@ -1453,6 +1453,88 @@
         "title": "RulePatch",
         "type": "object"
       },
+      "RulePreviewIn": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "realtime",
+                  "close"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timing"
+          },
+          "watchlist_id": {
+            "title": "Watchlist Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "watchlist_id",
+          "kind"
+        ],
+        "title": "RulePreviewIn",
+        "type": "object"
+      },
+      "RulePreviewOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "state",
+          "value",
+          "message"
+        ],
+        "title": "RulePreviewOut",
+        "type": "object"
+      },
       "RunningOut": {
         "properties": {
           "running": {
@@ -2159,6 +2241,68 @@
           }
         },
         "summary": "Create Rule",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/alerts/rules/preview": {
+      "post": {
+        "description": "규칙을 저장하지 않고 지금 조건과 값을 계산한다(규칙 편집기의 미리보기).",
+        "operationId": "preview_rule_alerts_rules_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulePreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulePreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Preview Rule",
         "tags": [
           "alerts"
         ]
