@@ -2,6 +2,7 @@
  * 숫자 표기 (스펙 9-1).
  *
  * - 원화: 천 단위 구분자 + "원" (`71,400원`). 변화량은 표 안에서 "원" 없이 부호만 (`+1,200`).
+ * - 수급: 억 단위. 10억 미만 소수 1자리(`+0.4억`), 10억부터 정수(`+3,124억`).
  * - 달러: `$` + 소수점 2자리 (`$227.48`). 변화량은 부호를 `$` 앞에 (`+$2.13`).
  * - 등락률: 부호 + 소수점 2자리 (`+1.71%`). 입력은 퍼센트 값이다(1.71 = 1.71%).
  * - 음수 부호는 하이픈이 아니라 빼기 기호 `−`(U+2212)다. 고정폭 숫자에서 `+`와 너비가 같다.
@@ -91,12 +92,18 @@ export function formatPercent(value: MaybeNumber): string {
   return `${formatSigned(value, 2)}%`;
 }
 
-/** 수급처럼 큰 원화 변화량을 억 단위로: `+3,124억`. 입력은 원이다. */
+/**
+ * 수급처럼 큰 원화 변화량을 억 단위로. 입력은 원이다.
+ * 10억 미만은 소수 1자리(`+0.4억`, `−3.2억`), 10억부터는 정수와 천 단위 구분(`+3,124억`).
+ * 반올림해 소수 1자리가 10.0이 되면(9.96억) 정수 표기 `+10억`으로 올린다.
+ * formatSigned와 같이 0이 아니면 반올림해 0이어도 부호를 남긴다(`+0.0억`), 0은 `0.0억`.
+ */
 export function formatEokChange(won: MaybeNumber): string {
   if (!isPresent(won)) return MISSING;
-  const eok = Math.round(Math.abs(won) / 1e8);
-  if (eok === 0) return '0억';
-  return `${signOf(won, true)}${grouped(eok, 0)}억`;
+  const eok = Math.abs(won) / 1e8;
+  const oneDecimal = grouped(eok, 1);
+  const body = Number(oneDecimal.replace(/,/g, '')) < 10 ? oneDecimal : grouped(eok, 0);
+  return `${signOf(won, true)}${body}억`;
 }
 
 /** 통화에 맞는 가격 표기. */
