@@ -3,7 +3,7 @@ import { toApiError, type ApiError } from '../../api/errors';
 import { useApi, useServices } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { CatalogOut, HardwareOut, WatchItem } from '../../api/types';
-import { Button, Disclaimer } from '../../design-system';
+import { Button, Disclaimer, SegmentedControl, Toggle } from '../../design-system';
 import { navigate } from '../../app/router';
 import { PRESET_LABEL } from '../../app/status';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -136,21 +136,17 @@ function AiStep({
           {`이 PC(${hw.tier_label})에는 ${withObjectParticle(PRESET_LABEL[hw.default_preset] ?? hw.default_preset)} 권합니다.`}
         </p>
       ) : null}
-      <fieldset className={form.choices}>
-        <legend className={form.legend}>어떻게 할까요?</legend>
-        {options.map((o) => (
-          <label key={o.value} className={form.choice}>
-            <input
-              type="radio"
-              name="ai-choice"
-              value={o.value}
-              checked={choice === o.value}
-              onChange={() => onChoice(o.value)}
-            />
-            {o.label}
-          </label>
-        ))}
-      </fieldset>
+      <div className={form.choices}>
+        <span className={form.legend} aria-hidden="true">
+          어떻게 할까요?
+        </span>
+        <SegmentedControl
+          label="어떻게 할까요?"
+          value={choice}
+          options={options}
+          onChange={onChoice}
+        />
+      </div>
       {choice === 'cloud' ? (
         <CloudSettings
           catalog={catalog}
@@ -243,14 +239,7 @@ function DoneStep({
       <p className={styles.text}>
         시작하기를 누르면 홈으로 갑니다. 창을 닫아도 Vater는 트레이에서 감시를 계속합니다.
       </p>
-      <label className={form.choice}>
-        <input
-          type="checkbox"
-          checked={autostart}
-          onChange={(e) => onAutostart(e.target.checked)}
-        />
-        부팅 시 자동 실행
-      </label>
+      <Toggle label="부팅 시 자동 실행" checked={autostart} onChange={onAutostart} />
       <span className={styles.hint}>
         {browser
           ? '설치한 앱에서 적용됩니다(지금은 개발용 브라우저 화면).'

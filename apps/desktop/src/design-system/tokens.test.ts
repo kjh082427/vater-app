@@ -41,7 +41,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// 예전 이름은 다른 브랜치의 화면 CSS가 쓰므로 남긴다. 값은 새 역할 토큰을 가리키는 별칭(var)이다.
+// 다른 토큰을 그대로 가리키는 토큰(var(--x) 하나)은 따로 쓰임을 세지 않는다.
 function isAlias(name: string): boolean {
   return /^var\(--[\w-]+\)$/.test(tokens.get(name) ?? '');
 }
@@ -103,35 +103,27 @@ describe('색 토큰', () => {
       '--color-ink',
       '--color-ink-2',
       '--color-ink-3',
-      '--color-ink-hover',
-      '--color-on-ink',
       '--color-up',
       '--color-down',
       '--color-caution',
       '--color-caution-bg',
       '--color-caution-ink',
       '--color-focus',
-      // 예전 이름(별칭)
-      '--color-paper',
-      '--color-chrome',
-      '--color-selected',
-      '--color-rule-section',
     ];
     expect(required.filter((name) => !tokens.has(name))).toEqual([]);
   });
 
-  it('예전 이름은 새 역할을 가리키는 별칭이다', () => {
+  it('예전 이름(별칭)은 화면을 새 토큰으로 옮긴 뒤 지웠다(ui/dashboard)', () => {
     for (const name of [
       '--color-paper',
       '--color-chrome',
       '--color-selected',
       '--color-rule-section',
       '--color-ink-hover',
+      '--color-on-ink',
+      '--font-serif',
     ]) {
-      expect(isAlias(name), name).toBe(true);
-      expect(tokens.has(/var\((--[\w-]+)\)/.exec(tokens.get(name) ?? '')?.[1] ?? ''), name).toBe(
-        true,
-      );
+      expect(tokens.has(name), name).toBe(false);
     }
   });
 
@@ -169,8 +161,6 @@ describe('색 토큰', () => {
     ['--color-on-accent', '--color-accent'],
     ['--color-on-accent', '--color-accent-strong'],
     ['--color-on-table-head', '--color-table-head'],
-    ['--color-on-ink', '--color-ink'],
-    ['--color-on-ink', '--color-ink-hover'],
     ['--color-on-accent', '--color-up'],
     ['--color-on-accent', '--color-down'],
     ['--color-caution-ink', '--color-caution-bg'],

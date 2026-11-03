@@ -178,7 +178,7 @@ describe('첫 실행 마법사', () => {
     for (let i = 0; i < 2; i += 1) await userEvent.click(next());
     await userEvent.click(next());
     await waitFor(() => expect(step()).toHaveTextContent('준비가 끝났습니다'));
-    const auto = screen.getByRole('checkbox', { name: '부팅 시 자동 실행' });
+    const auto = screen.getByRole('switch', { name: '부팅 시 자동 실행' });
     expect(auto).toBeChecked();
     await userEvent.click(auto);
     await userEvent.click(screen.getByRole('button', { name: '시작하기' }));

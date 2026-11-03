@@ -36,6 +36,9 @@ export interface MockDb {
   ollama: OllamaStatus;
   hardware: HardwareOut;
   symbols: SymbolOut[];
+  /** 대시보드 문서(GET·PUT /ui/dashboards). 처음엔 사이드카처럼 빈 문서. */
+  dashboards: unknown;
+  indices: (typeof fx.marketIndices)[number][];
   nextId: number;
 }
 
@@ -55,6 +58,8 @@ export function createMockDb(): MockDb {
     ollama: clone(fx.ollamaStatus),
     hardware: clone(fx.hardware),
     symbols: clone(fx.symbols),
+    dashboards: { version: 1, dashboards: [] },
+    indices: clone(fx.marketIndices),
     nextId: 100,
   };
 }
@@ -64,10 +69,48 @@ export function errorResponse(status: number, code: string, message: string, hin
   return HttpResponse.json(body, { status });
 }
 
+/** 사이드카 store/dashboards.py와 같은 모양 확인(뜻은 화면이 본다). 틀리면 이유, 맞으면 null. */
+function dashboardProblem(doc: unknown): string | null {
+  const rec = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+  if (!rec(doc) || doc.version !== 1) return 'version은 1이어야 합니다';
+  const boards = doc.dashboards;
+  if (!Array.isArray(boards) || boards.length < 1 || boards.length > 8) {
+    return '화면은 1~8장이어야 합니다';
+  }
+  for (const [i, b] of boards.entries()) {
+    const where = `${i + 1}번째 화면`;
+    if (!rec(b)) return `${where}이 객체가 아닙니다`;
+    if (typeof b.name !== 'string' || b.name.trim().length < 1 || b.name.length > 20) {
+      return `${where}의 이름은 1~20자여야 합니다`;
+    }
+    if (!Array.isArray(b.panels) || b.panels.length < 1 || b.panels.length > 6) {
+      return `${where}의 칸은 1~6개여야 합니다`;
+    }
+  }
+  return null;
+}
+
 const notFound = () => errorResponse(404, 'NOT_FOUND', '요청한 경로가 없습니다.');
 
 export function createHandlers(db: MockDb) {
   return [
+    http.get('*/ui/dashboards', () => HttpResponse.json(db.dashboards as object)),
+    http.put('*/ui/dashboards', async ({ request }) => {
+      const body: unknown = await request.json();
+      const problem = dashboardProblem(body);
+      if (problem) {
+        return errorResponse(
+          422,
+          'DASHBOARD_INVALID',
+          `화면 배치를 저장하지 못했습니다: ${problem}`,
+          '화면을 다시 불러온 뒤 다시 시도하세요.',
+        );
+      }
+      db.dashboards = body;
+      return HttpResponse.json(body as object);
+    }),
+    http.get('*/market/indices', () => HttpResponse.json(db.indices)),
     http.get('*/health', () => HttpResponse.json({ status: 'ok', version: '0.1.0' })),
     http.get('*/secrets', () => HttpResponse.json(db.secrets)),
     http.put('*/secrets/:name', async ({ params, request }) => {

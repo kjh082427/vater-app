@@ -18,7 +18,7 @@
 }
 
 .wordmark {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--text-3xl);
   line-height: var(--leading-3xl);
   font-weight: var(--weight-semibold);
@@ -66,9 +66,9 @@
 }
 
 .step[aria-current='step'] .num {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-on-ink);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .step[data-done='true'] .num {
@@ -136,10 +136,9 @@
 
 .help summary {
   cursor: pointer;
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-decoration-color: var(--color-control);
-  text-underline-offset: 4px;
+  color: var(--color-accent);
+  text-decoration: none;
+  text-underline-offset: 3px;
 }
 
 .help p {

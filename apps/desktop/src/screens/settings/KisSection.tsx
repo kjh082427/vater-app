@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import type { KisTestResult } from '../../api/types';
-import { Button, formatWon } from '../../design-system';
+import { Button, formatWon, SegmentedControl } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import form from '../common/form.module.css';
 import { SecretForm, type SecretField } from './SecretForm';
@@ -27,22 +27,21 @@ export function KisServerChoice({
 }) {
   const server = settings?.['kis.server'] === 'vps' ? 'vps' : 'prod';
   return (
-    <fieldset className={form.choices}>
-      <legend className={form.legend}>서버</legend>
-      {(['prod', 'vps'] as const).map((value) => (
-        <label key={value} className={form.choice}>
-          <input
-            type="radio"
-            name="kis-server"
-            value={value}
-            checked={settings !== undefined && server === value}
-            disabled={settings === undefined}
-            onChange={() => void save({ 'kis.server': value })}
-          />
-          {SERVER_LABEL[value]}
-        </label>
-      ))}
-    </fieldset>
+    <div className={form.choices}>
+      <span className={form.legend} aria-hidden="true">
+        서버
+      </span>
+      <SegmentedControl
+        label="서버"
+        value={settings === undefined ? ('' as 'prod') : server}
+        options={(['prod', 'vps'] as const).map((value) => ({
+          value,
+          label: SERVER_LABEL[value] ?? value,
+          disabled: settings === undefined,
+        }))}
+        onChange={(value) => void save({ 'kis.server': value })}
+      />
+    </div>
   );
 }
 

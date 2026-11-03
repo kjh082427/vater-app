@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AlertEvent, AlertKindInfo, WatchItem } from '../../api/types';
-import { DataTable, Section, type Column } from '../../design-system';
+import { Card, DataTable, type Column } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
-import { Field } from '../common/Field';
-import form from '../common/form.module.css';
 import common from '../common/screen.module.css';
 import { formatDayTime } from '../common/time';
 import styles from './alerts.module.css';
 import { kindLabel } from './kinds';
+import { SelectField } from '../common/SelectField';
 
 /** 이력은 최근 이만큼을 받아 화면에서 거른다(API에는 limit만 있다). */
 const LIMIT = 200;
@@ -65,44 +64,28 @@ export function AlertHistory({ watchItems, kinds, focusKey }: AlertHistoryProps)
   );
 
   return (
-    <Section title="알림 이력" meta={list ? `${filtered.length}건` : undefined}>
+    <Card title="알림 이력" description={list ? `${filtered.length}건` : undefined}>
       {list && list.length > 0 ? (
         <div className={styles.filters}>
-          <Field label="종목">
-            {(control) => (
-              <select
-                {...control}
-                className={form.control}
-                value={symbol}
-                onChange={(e) => setSymbolChoice(e.target.value)}
-              >
-                <option value="">전체 종목</option>
-                {[...symbolOptions].map(([value, name]) => (
-                  <option key={value} value={value}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label="종류">
-            {(control) => (
-              <select
-                {...control}
-                className={form.control}
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-              >
-                <option value="">전체 종류</option>
-                {(kinds ?? []).map((k) => (
-                  <option key={k.kind} value={k.kind}>
-                    {kindLabel(k.kind)}
-                  </option>
-                ))}
-                <option value={EVENT_KIND}>분석 완료·실패</option>
-              </select>
-            )}
-          </Field>
+          <SelectField
+            label="종목"
+            value={symbol}
+            onChange={setSymbolChoice}
+            options={[
+              { value: '', label: '전체 종목' },
+              ...[...symbolOptions].map(([value, name]) => ({ value, label: name })),
+            ]}
+          />
+          <SelectField
+            label="종류"
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: '', label: '전체 종류' },
+              ...(kinds ?? []).map((k) => ({ value: k.kind, label: kindLabel(k.kind) })),
+              { value: EVENT_KIND, label: '분석 완료·실패' },
+            ]}
+          />
         </div>
       ) : null}
       {events.error ? (
@@ -134,6 +117,6 @@ export function AlertHistory({ watchItems, kinds, focusKey }: AlertHistoryProps)
           }}
         />
       ) : null}
-    </Section>
+    </Card>
   );
 }

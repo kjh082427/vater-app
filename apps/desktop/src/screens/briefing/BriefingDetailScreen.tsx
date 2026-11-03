@@ -4,6 +4,7 @@ import { useResource } from '../../api/useResource';
 import type { BriefingDetail } from '../../api/types';
 import {
   AiText,
+  Card,
   Disclaimer,
   formatNumber,
   Section,
@@ -50,12 +51,12 @@ function Part({
   children: ReactNode;
 }) {
   return (
-    <Section title={title}>
+    <Card title={title}>
       <div className={styles.body}>
         <Interpretation text={text} />
         {missing ? <NotReceived label={title} /> : children}
       </div>
-    </Section>
+    </Card>
   );
 }
 

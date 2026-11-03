@@ -58,8 +58,8 @@ describe('규칙 편집 폼', () => {
 
   it('종류 이름과 확인 시점 이름', () => {
     expect(kindLabel('rsi')).toBe('RSI 과매수·과매도');
-    expect(TIMING_LABEL.realtime).toBe('장중 실시간(잠정)');
-    expect(TIMING_LABEL.close).toBe('장 마감 후(확정 일봉)');
+    expect(TIMING_LABEL.realtime).toBe('장중 실시간');
+    expect(TIMING_LABEL.close).toBe('장 마감 후(그날 종가)');
   });
 
   it('필수 값(목표가)은 빈 칸, 나머지는 기본값으로 채운다', () => {

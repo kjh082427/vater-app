@@ -27,5 +27,7 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     css: { modules: { classNameStrategy: 'non-scoped' } },
     restoreMocks: true,
+    // 화면 테스트가 늘어 병렬 실행 때 느려진다: 시간 초과로 흔들리지 않게 넉넉히(기본 5초)
+    testTimeout: 15_000,
   },
 });

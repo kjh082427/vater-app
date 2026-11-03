@@ -8,6 +8,8 @@
  *   ?empty=1       감시 종목·알림·분석·브리핑이 없는 빈 상태
  *   ?nokey=1       한투 앱키 없음(마법사로 보냄)
  *   ?running=1     실행 중인 분석(#/analyses/40)과 진행 이벤트
+ *   ?six=1         홈에 6칸 대시보드 탭("6칸")을 더한다
+ *   ?broken=1      저장된 대시보드 문서가 깨짐(기본 배치 + 배너)
  */
 import { getResponse, type RequestHandler } from 'msw';
 import { StrictMode } from 'react';
@@ -18,6 +20,8 @@ import type { EventMap, EventType } from '../api/types';
 import { App } from '../app/App';
 import '../design-system/styles.css';
 import type { Platform } from '../platform';
+import { defaultDashboard } from '../dashboard/layout/defaults';
+import { templateRoot } from '../dashboard/layout/templates';
 import { createHandlers, createMockDb, type MockDb } from './handlers';
 
 const params = new URLSearchParams(window.location.search);
@@ -43,6 +47,30 @@ if (params.get('offline') === '1') {
   db.watchQuotes = db.watchQuotes.map((q) => ({ ...q, feed: 'offline' }));
 }
 if (params.get('nokey') === '1') db.secrets.KIS_APP_KEY = false;
+if (params.get('broken') === '1') db.dashboards = { version: 1, dashboards: [{ id: 'x' }] };
+if (params.get('six') === '1') {
+  const home = defaultDashboard('home');
+  db.dashboards = {
+    version: 1,
+    dashboards: [
+      home,
+      {
+        id: 'six',
+        name: '6칸',
+        kpi: { enabled: false, items: [] },
+        layout: { template: 'grid-2x3', root: templateRoot('grid-2x3') },
+        panels: [
+          { type: 'index-chart', options: { index: 'KOSDAQ' } },
+          { type: 'kpi', options: { metrics: ['kospi', 'spx'] } },
+          { type: 'running-analyses', options: {} },
+          { type: 'briefing', options: { market: 'US' } },
+          { type: 'recent-alerts', options: {} },
+          { type: 'index-chart', options: { index: 'SPX' } },
+        ],
+      },
+    ],
+  };
+}
 const running = params.get('running') === '1';
 if (running) {
   const base = db.analyses[0];
@@ -77,6 +105,7 @@ const platform: Platform = {
   onNavigate: () => () => undefined,
   getAutostart: async () => true,
   setAutostart: async () => undefined,
+  openLogFolder: async () => undefined,
 };
 
 /** 열리면 감시 상태를 한 번 보내는 흉내 EventSource. */

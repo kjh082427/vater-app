@@ -9,6 +9,8 @@ export function fakePlatform(
 ) {
   let info = initial;
   let autostart = true;
+  let opened = 0;
+  let openError: Error | null = null;
   const stateListeners = new Set<() => void>();
   const navListeners = new Set<(route: string) => void>();
   const platform: Platform = {
@@ -26,8 +28,20 @@ export function fakePlatform(
     setAutostart: async (enabled) => {
       autostart = enabled;
     },
+    openLogFolder: async () => {
+      opened += 1;
+      if (openError) throw openError;
+    },
   };
   return {
+    /** 로그 폴더 열기 횟수. */
+    get logFolderOpened() {
+      return opened;
+    },
+    /** 다음 로그 폴더 열기를 실패시킨다. */
+    failLogFolder(error: Error) {
+      openError = error;
+    },
     platform,
     /** 사이드카가 다시 시작되어 정보가 바뀌었다. */
     restart(next: SidecarInfo) {

@@ -10,8 +10,8 @@ import { currencyOf } from '../common/quotes';
 export type Timing = 'realtime' | 'close';
 
 export const TIMING_LABEL: Record<Timing, string> = {
-  realtime: '장중 실시간(잠정)',
-  close: '장 마감 후(확정 일봉)',
+  realtime: '장중 실시간',
+  close: '장 마감 후(그날 종가)',
 };
 
 interface Option {

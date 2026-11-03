@@ -3,7 +3,7 @@ import { toApiError, type ApiError } from '../../api/errors';
 import { useApi, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { BriefingItem, EventMap, MarketCode } from '../../api/types';
-import { AiText, Banner, Button, Section, Tab, TabList, TabPanel, Tabs } from '../../design-system';
+import { AiText, Banner, Button, Card, Tab, TabList, TabPanel, Tabs } from '../../design-system';
 import { hrefOf } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
@@ -173,7 +173,7 @@ export function BriefingsScreen() {
         </div>
       ) : null}
       <Tabs value={filter} onValueChange={(v) => setFilter(v === 'KR' || v === 'US' ? v : 'all')}>
-        <Section
+        <Card
           title="브리핑 목록"
           actions={
             <TabList label="시장" variant="segment">
@@ -188,7 +188,7 @@ export function BriefingsScreen() {
               {filter === f ? <BriefingList filter={f} settings={settings.data} /> : null}
             </TabPanel>
           ))}
-        </Section>
+        </Card>
       </Tabs>
     </>
   );
