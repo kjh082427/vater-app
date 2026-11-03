@@ -5,13 +5,16 @@
 //! - 이벤트 `sidecar-state`: 상태가 바뀔 때마다 `{ state, port? }`(토큰 없음). 받으면 `get_sidecar_info`를 다시 부른다
 //!   (재시작하면 포트와 토큰이 바뀐다). UI는 이 이벤트를 **먼저 구독하고** 그다음 `get_sidecar_info`를 부른다.
 //! - 이벤트 `navigate`: `{ route: string }`, 알림을 눌렀을 때.
+//! - `get_app_version` → 버전 문자열, `check_update` → `{ state: "disabled"|"up_to_date"|"available", version?, notes? }`,
+//!   `install_update` → 설치가 시작되면 앱이 끝난다. 이벤트 `update-available`은 `check_update`와 같은 내용이다.
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use vater_sidecar::process::{SidecarInfo, SidecarState};
 
 use crate::Shell;
+use crate::updater::{self, UpdateInfoDto};
 
 /// `sidecar-state` 이벤트 이름.
 pub const SIDECAR_STATE_EVENT: &str = "sidecar-state";
@@ -91,6 +94,27 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
     };
     result.map_err(|e| e.to_string())?;
     autolaunch.is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// [업데이트 확인] 버튼. 연결 실패는 오류로 돌려준다(자동 확인과 달리 사람이 눌렀으므로).
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> Result<UpdateInfoDto, String> {
+    let enabled = app.state::<Shell>().updater_enabled;
+    updater::check(&app, enabled).await.map(UpdateInfoDto::from)
+}
+
+/// [지금 설치] 버튼. 성공하면 앱이 끝나고 새 버전이 뜬다.
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    if !app.state::<Shell>().updater_enabled {
+        return Err("이 빌드에서는 업데이트를 쓸 수 없습니다.".to_string());
+    }
+    updater::install(app).await
 }
 
 /// 사이드카 로그 폴더: `%APPDATA%\Vater\logs` (스펙 8장 로그). APPDATA가 없으면 None.

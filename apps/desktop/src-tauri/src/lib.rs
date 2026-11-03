@@ -7,6 +7,7 @@ pub mod commands;
 pub mod notify;
 pub mod startup;
 pub mod tray;
+pub mod updater;
 
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -32,6 +33,8 @@ pub struct Shell {
     /// 트레이가 알고 있는 감시 일시 중지 여부. 새 사이드카는 감시 중으로 시작한다.
     alerts_paused: Mutex<bool>,
     toggle_item: MenuItem<Wry>,
+    /// 공개 키가 있어 업데이터 플러그인을 켰는가.
+    updater_enabled: bool,
 }
 
 pub fn run() {
@@ -50,6 +53,9 @@ pub fn run() {
             commands::get_autostart,
             commands::set_autostart,
             commands::open_log_folder,
+            commands::get_app_version,
+            commands::check_update,
+            commands::install_update,
         ])
         .on_window_event(|window, event| {
             // 창을 닫으면 트레이로 숨긴다. 처음 한 번은 안내 알림 (스펙 2-1)
@@ -76,12 +82,15 @@ pub fn run() {
             listen_notification_clicks(&handle)?;
             let sidecar = start_sidecar(&handle)?;
             let toggle_item = build_tray(&handle)?;
+            let updater_enabled = updater::register(&handle);
             app.manage(Shell {
                 sidecar,
                 alerts_paused: Mutex::new(false),
                 toggle_item,
+                updater_enabled,
             });
             forward_sidecar_state(handle.clone());
+            updater::check_in_background(handle.clone(), updater_enabled);
             // 자동 실행(부팅 시)이면 트레이에서만 시작한다
             if !startup::started_by_autostart(std::env::args()) {
                 show_main_window(&handle);
