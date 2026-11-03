@@ -5,4 +5,5 @@
 
 pub mod events;
 pub mod launch;
+pub mod process;
 pub mod restart;
