@@ -1,0 +1,104 @@
+# 5단계 확인 R3~R5: 임시 서명 키로 구버전·신버전을 만들어 실제 업데이트를 확인한다.
+# 실제 서명 키·토큰은 쓰지 않는다. 임시 키는 이 실행 안에서만 있고 어디에도 저장하지 않는다.
+name: release-acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["infra/release*"]
+    paths:
+      - ".github/workflows/release-acceptance.yml"
+      - "apps/desktop/src-tauri/packaging/acceptance-update.ps1"
+      - "apps/desktop/src-tauri/src/updater.rs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  TAURI_CLI: "@tauri-apps/cli@2.12.3"
+  OLD_VERSION: "0.1.1"
+  NEW_VERSION: "0.1.2"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          version: "0.13.6"
+      - run: uv python install 3.13.18
+      - name: Sidecar PyInstaller onedir
+        run: ./apps/desktop/src-tauri/packaging/build-sidecar.ps1
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: npm ci
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: 임시 서명 키와 테스트 설정
+        working-directory: apps/desktop
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'update-key'
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          $password = [Guid]::NewGuid().ToString('N')
+          "::add-mask::$password"
+          npx --yes $env:TAURI_CLI signer generate --ci -p $password -w (Join-Path $dir 'key')
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $pub = (Get-Content (Join-Path $dir 'key.pub') -Raw).Trim()
+          @{
+            bundle  = @{ createUpdaterArtifacts = $true }
+            plugins = @{ updater = @{
+                pubkey = $pub
+                endpoints = @('http://127.0.0.1:8765/latest.json')
+                dangerousInsecureTransportProtocol = $true
+                windows = @{ installMode = 'passive' }
+            } }
+          } | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $dir 'test.conf.json') -Encoding utf8NoBOM
+          "UPDATE_DIR=$dir" >> $env:GITHUB_ENV
+          "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$password" >> $env:GITHUB_ENV
+
+      - name: 구버전과 신버전 빌드 (e2e-auto-update)
+        run: |
+          $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content (Join-Path $env:UPDATE_DIR 'key') -Raw).Trim()
+          $conf = Join-Path $env:UPDATE_DIR 'test.conf.json'
+          foreach ($pair in @(@('old', $env:OLD_VERSION), @('new', $env:NEW_VERSION))) {
+            python apps/desktop/src-tauri/packaging/check-versions.py --set $pair[1]
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            Push-Location apps/desktop
+            npx --yes $env:TAURI_CLI build --bundles nsis --features e2e-auto-update --config $conf -- --locked
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            Pop-Location
+            $out = Join-Path $env:UPDATE_DIR $pair[0]
+            New-Item -ItemType Directory -Path $out | Out-Null
+            Copy-Item apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe* $out
+            Get-ChildItem $out | ForEach-Object Name
+            Remove-Item apps/desktop/src-tauri/target/release/bundle/nsis/* -Recurse -Force
+          }
+
+      - name: R3 R4 R5
+        run: >
+          ./apps/desktop/src-tauri/packaging/acceptance-update.ps1
+          -OldDir (Join-Path $env:UPDATE_DIR 'old')
+          -NewDir (Join-Path $env:UPDATE_DIR 'new')
+          -OldVersion $env:OLD_VERSION
+          -NewVersion $env:NEW_VERSION
