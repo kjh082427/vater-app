@@ -9,6 +9,7 @@ from vater_core.kis.client import KisClient
 from vater_core.kis.config import REST_HOST, KisServer
 from vater_core.kis.market import (
     fluctuation_rank,
+    index_daily,
     index_quote,
     investor_flows,
     overseas_index,
@@ -107,3 +108,23 @@ async def test_overseas_index(kis: KisClient, fixture: Fx) -> None:
     assert ix.quote.name == "S&P500" and ix.quote.value == 7614.92 and ix.quote.change == 34.85
     assert ix.bars[-1].day == date(2026, 11, 2) and ix.bars[-1].close == 7614.92
     assert route.calls[0].request.url.params["FID_COND_MRKT_DIV_CODE"] == "N"
+
+
+@respx.mock
+async def test_index_daily_is_oldest_first(kis: KisClient, fixture: Fx) -> None:
+    # 실제 응답(2026-11-03 장중): 최신 날짜부터 오고, 오늘의 미확정 행도 들어 있다
+    route = respx.get(f"{HOST}{Q}/inquire-daily-indexchartprice").mock(
+        return_value=ok(fixture("index_daily"))
+    )
+    bars = await index_daily(kis, "KOSPI", date(2026, 9, 1), date(2026, 11, 3))
+    assert [b.day for b in bars] == sorted(b.day for b in bars)
+    assert bars[-1].day == date(2026, 11, 3) and bars[-1].close == 5695.99
+    assert (bars[-1].open, bars[-1].high, bars[-1].low) == (5715.19, 5735.92, 5638.06)
+    assert dict(route.calls[0].request.url.params) == {
+        "FID_COND_MRKT_DIV_CODE": "U",
+        "FID_INPUT_ISCD": "0001",
+        "FID_INPUT_DATE_1": "20260901",
+        "FID_INPUT_DATE_2": "20261103",
+        "FID_PERIOD_DIV_CODE": "D",
+    }
+    assert route.calls[0].request.headers["tr_id"] == "FHKUP03500100"

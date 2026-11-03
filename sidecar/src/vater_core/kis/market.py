@@ -86,6 +86,38 @@ async def index_quote(c: KisClient, market: DomesticMarket) -> IndexQuote:
     return _index(code, market, body["output"])
 
 
+async def index_daily(c: KisClient, market: DomesticMarket, start: date, end: date) -> list[Bar]:
+    """국내 지수 일봉(오래된 것부터). 장중에는 오늘의 미확정 봉도 들어 있다(호출자가 거른다).
+
+    한투는 최신 날짜부터 주고, 한 번에 수십 행(2026-11-03 실측: 두 달 치 42행)을 준다.
+    """
+    params = {
+        "FID_COND_MRKT_DIV_CODE": "U",
+        "FID_INPUT_ISCD": _INDEX_CODE[market],
+        "FID_INPUT_DATE_1": start.strftime("%Y%m%d"),
+        "FID_INPUT_DATE_2": end.strftime("%Y%m%d"),
+        "FID_PERIOD_DIV_CODE": "D",
+    }
+    body = await c.get(
+        f"{Q}/inquire-daily-indexchartprice", "FHKUP03500100", params, Priority.BRIEFING
+    )
+    return sorted(
+        (
+            Bar(
+                day=ymd(r["stck_bsop_date"]),
+                open=num(r["bstp_nmix_oprc"]),
+                high=num(r["bstp_nmix_hgpr"]),
+                low=num(r["bstp_nmix_lwpr"]),
+                close=num(r["bstp_nmix_prpr"]),
+                volume=int(num(r.get("acml_vol"))),
+            )
+            for r in body.get("output2", [])
+            if r.get("stck_bsop_date")
+        ),
+        key=lambda b: b.day,
+    )
+
+
 async def sector_board(c: KisClient, market: DomesticMarket) -> SectorBoard:
     code = _INDEX_CODE[market]
     params = {
