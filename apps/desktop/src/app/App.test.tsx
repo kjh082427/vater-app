@@ -6,6 +6,7 @@ import { errorResponse } from '../mocks/handlers';
 import { FakeEventSource } from '../test/FakeEventSource';
 import { emit, renderWithServices } from '../test/render';
 import { mock, server } from '../test/server';
+import { TEST_BASE, TEST_TOKEN } from '../test/fakePlatform';
 import { App } from './App';
 
 function renderApp(hash = '#/home', retryDelaysMs?: number[]) {
@@ -73,6 +74,18 @@ describe('셸 navigate 이벤트(알림 클릭)', () => {
     await waitFor(() => expect(window.location.hash).toBe('#/symbols/US/AAPL'));
   });
 
+  it('마법사 중에 온 알림 클릭은 미뤘다가 마법사가 끝나면 그 화면으로 간다', async () => {
+    const { shell } = renderApp('#/welcome');
+    await screen.findByRole('heading', { level: 1, name: 'Vater 시작하기' });
+    act(() => shell.navigate('/analyses/7'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(window.location.hash).toBe('#/welcome');
+    act(() => {
+      window.location.hash = '#/home'; // 마법사 완료
+    });
+    await waitFor(() => expect(window.location.hash).toBe('#/analyses/7'));
+  });
+
   it('모르는 경로는 무시한다', async () => {
     const { shell } = renderApp('#/home');
     act(() => shell.navigate('/evil/../x'));
@@ -100,6 +113,45 @@ describe('첫 실행 마법사로 보내기', () => {
     renderApp('#/home');
     await new Promise((r) => setTimeout(r, 30));
     expect(window.location.hash).toBe('#/home');
+  });
+});
+
+describe('사이드카 시작·재시작(셸 계약: sidecar-state 먼저 구독, 그다음 get_sidecar_info)', () => {
+  const READY = { state: 'ready' as const, baseUrl: TEST_BASE, token: TEST_TOKEN };
+
+  it('시작 중이면 "시작하는 중" 안내, 준비되면 사라진다', async () => {
+    window.location.hash = '#/home';
+    const { shell } = renderWithServices(<App />, { sidecar: { state: 'starting' } });
+    expect(
+      await screen.findByText('Vater 백그라운드 서비스를 시작하는 중입니다'),
+    ).toBeInTheDocument();
+    act(() => shell.restart(READY));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Vater 백그라운드 서비스를 시작하는 중입니다'),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('처음에 연결하지 못해도 사이드카가 준비되면 키를 다시 확인해 마법사로 보낸다', async () => {
+    mock.db.secrets.KIS_APP_KEY = false;
+    window.location.hash = '#/home';
+    const { shell } = renderWithServices(<App />, { sidecar: { state: 'failed' } });
+    await screen.findByText('Vater 백그라운드 서비스를 실행하지 못했습니다');
+    expect(window.location.hash).toBe('#/home');
+    act(() => shell.restart(READY));
+    await waitFor(() => expect(window.location.hash).toBe('#/welcome'));
+  });
+
+  it('sidecar-state(starting)가 EventSource error보다 먼저 와도 연결 끊김 배너가 뜬다', async () => {
+    const { stream, shell } = renderApp('#/home', [60_000]);
+    await stream();
+    expect(screen.queryByText(/연결 끊김/)).not.toBeInTheDocument();
+    act(() => shell.restart({ state: 'starting' }));
+    expect(await screen.findByText(/연결 끊김/)).toBeInTheDocument();
+    expect(
+      await within(screen.getByRole('complementary')).findByText('감시 상태 확인 불가'),
+    ).toBeInTheDocument();
   });
 });
 

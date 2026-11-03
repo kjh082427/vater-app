@@ -84,6 +84,24 @@ describe('한국투자증권', () => {
     expect(within(part).queryByText('저장됨')).not.toBeInTheDocument();
   });
 
+  it('두 번째 키 저장이 실패하면 저장된 첫 값은 칸에서 지우고, 실패한 칸만 남긴다', async () => {
+    server.use(
+      http.put('*/secrets/KIS_APP_SECRET', () =>
+        errorResponse(503, 'SECRETS_UNAVAILABLE', '비밀키 저장소가 준비되지 않았습니다.'),
+      ),
+    );
+    renderSettings();
+    const part = await waitFor(() => region('한국투자증권'));
+    await userEvent.type(within(part).getByLabelText('앱키'), FAKE_KEY);
+    await userEvent.type(within(part).getByLabelText('앱시크릿'), FAKE_SECRET);
+    await userEvent.click(within(part).getByRole('button', { name: '키 저장' }));
+    expect(
+      await within(part).findByText('비밀키 저장소가 준비되지 않았습니다.'),
+    ).toBeInTheDocument();
+    expect(within(part).getByLabelText('앱키')).toHaveValue('');
+    expect(within(part).getByLabelText('앱시크릿')).toHaveValue(FAKE_SECRET);
+  });
+
   it('실전/모의 서버', async () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
@@ -249,6 +267,21 @@ describe('AI 엔진', () => {
       .closest('li') as HTMLElement;
     expect(await within(big).findByText('설치됨')).toBeInTheDocument();
     expect(within(part).queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('진행률은 정수 %로 보인다(사이드카가 소수를 보내도)', async () => {
+    const { stream } = renderSettings();
+    const part = await waitFor(() => region('로컬 AI'));
+    await userEvent.click(await within(part).findByRole('button', { name: 'Qwen 3.5 9B 받기' }));
+    const source = await stream();
+    emit(source, 'llm.pull', {
+      tag: 'qwen3.5:9b',
+      status: 'pulling',
+      completed: 1_000_000_000,
+      total: 2_000_000_000,
+      percent: 45.6,
+    });
+    expect(await within(part).findByText('46% · 1.0 / 2.0GB')).toBeInTheDocument();
   });
 
   it('모델 받기 실패(SSE error)는 원인', async () => {

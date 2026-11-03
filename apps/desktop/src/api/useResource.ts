@@ -75,9 +75,10 @@ export function useResource<T = unknown>(
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   // SSE가 다시 열리면(끊김 뒤, 사이드카 재시작 뒤) 다시 불러온다: 그 사이의 변경을 놓쳤을 수 있다.
-  // 앱이 처음 연결될 때의 open은 빼고, 그 뒤의 open마다 부른다.
+  // 앱이 처음 연결될 때(connecting)의 open만 빼고 그 뒤의 open마다 부른다. 끊긴 동안 열린 화면은
+  // 처음 불러오기가 실패했을 수 있으므로 다음 open을 다시 연결로 본다.
   useEffect(() => {
-    let openedBefore = events.status === 'open';
+    let openedBefore = events.status !== 'connecting';
     return events.onStatus((status) => {
       if (status !== 'open') return;
       if (openedBefore) reload();

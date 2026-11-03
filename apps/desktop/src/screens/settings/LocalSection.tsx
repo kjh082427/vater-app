@@ -108,7 +108,7 @@ function ModelRow({
           />
           <span className={`${common.meta} vt-num`}>
             {typeof progress?.percent === 'number'
-              ? `${progress.percent}% · ${gb(progress.completed)} / ${gb(progress.total)}GB`
+              ? `${formatNumber(progress.percent, 0)}% · ${gb(progress.completed)} / ${gb(progress.total)}GB`
               : '받기를 시작했습니다.'}
           </span>
         </span>

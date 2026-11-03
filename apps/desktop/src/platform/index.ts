@@ -56,6 +56,11 @@ function subscribe<T>(
     .then((off) => {
       if (active) unlisten = off;
       else off();
+    })
+    .catch((e: unknown) => {
+      // 이벤트 이름과 짧은 문구만 남긴다(페이로드·토큰은 남기지 않는다)
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn(`셸 이벤트 구독 실패: ${event}`, message.slice(0, 200));
     });
   return () => {
     active = false;

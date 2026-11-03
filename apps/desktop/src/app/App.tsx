@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useApi, useEvent, useServices, useStreamStatus } from '../api/services';
+import { useEvent, useServices, useStreamStatus } from '../api/services';
 import { useResource } from '../api/useResource';
 import type { CheckOut } from '../api/types';
 import { AppShell, Banner, Button, Icon, SidebarNav, type NavItem } from '../design-system';
@@ -46,34 +46,67 @@ function navOf(route: Route): string {
 
 const isAlertsRoute = (route: Route) => route.name === 'alerts' || route.name === 'symbol';
 
-/** 셸이 보낸 알림 클릭 경로로 이동한다. 모르는 경로는 무시한다. */
-function useShellNavigation() {
+/**
+ * 셸이 보낸 알림 클릭 경로로 이동한다. 모르는 경로는 무시한다.
+ * 첫 실행 마법사 중이면 마법사를 벗어나지 않게 미뤘다가, 마법사가 끝나 다른 화면으로 가면 그때 이동한다.
+ */
+function useShellNavigation(route: Route) {
   const { platform } = useServices();
+  const onWelcome = useRef(route.name === 'welcome');
+  const pending = useRef<string | null>(null);
+  useEffect(() => {
+    onWelcome.current = route.name === 'welcome';
+    if (!onWelcome.current && pending.current) {
+      const target = pending.current;
+      pending.current = null;
+      navigate(target);
+    }
+  });
   useEffect(
     () =>
-      platform.onNavigate((route) => {
-        if (parseHash(route).name !== 'notFound') navigate(route);
+      platform.onNavigate((target) => {
+        if (parseHash(target).name === 'notFound') return;
+        if (onWelcome.current) pending.current = target;
+        else navigate(target);
       }),
     [platform],
   );
 }
 
-/** 한투 앱키가 없으면 첫 실행 마법사로 보낸다(앱을 열 때 한 번). 상태를 못 읽으면 보내지 않는다. */
+/**
+ * 한투 앱키가 없으면 첫 실행 마법사로 보낸다. 앱을 열 때 확인하고, 그때 사이드카에 닿지 못했으면
+ * (시작 중·실패·재시작) 사이드카가 준비될 때 다시 확인한다. 한 번 확인되면 더 묻지 않는다.
+ */
 function useWizardRedirect() {
-  const api = useApi();
+  const { api, connection } = useServices();
   useEffect(() => {
     let alive = true;
-    api.request<Record<string, boolean>>('/secrets').then(
-      (secrets) => {
-        if (!alive || secrets.KIS_APP_KEY === true) return;
-        if (parseHash(window.location.hash).name !== 'welcome') navigate({ name: 'welcome' });
-      },
-      () => undefined,
-    );
+    let checked = false;
+    let checking = false;
+    const check = () => {
+      if (checked || checking) return;
+      checking = true;
+      api.request<Record<string, boolean>>('/secrets').then(
+        (secrets) => {
+          checking = false;
+          checked = true;
+          if (!alive || secrets.KIS_APP_KEY === true) return;
+          if (parseHash(window.location.hash).name !== 'welcome') navigate({ name: 'welcome' });
+        },
+        () => {
+          checking = false; // 닿지 못함: 다음 준비 때 다시
+        },
+      );
+    };
+    check();
+    const off = connection.onChange((info) => {
+      if (info.state === 'ready') check();
+    });
     return () => {
       alive = false;
+      off();
     };
-  }, [api]);
+  }, [api, connection]);
 }
 
 /** 다른 화면에 있는 동안 온 알림 수. 감시·알림 화면에 가면 지운다. */
@@ -138,7 +171,7 @@ function screenFor(route: Route): ReactNode {
 
 export function App() {
   const route = useRoute();
-  useShellNavigation();
+  useShellNavigation(route);
   useWizardRedirect();
   if (route.name === 'welcome') return <WelcomeScreen />;
   return <Shell route={route} />;
@@ -185,6 +218,12 @@ function Shell({ route }: { route: Route }) {
         }
       >
         {`Vater 백그라운드 서비스에 다시 연결하는 중입니다.${lastSeen}`}
+      </Banner>
+    );
+  } else if (sidecar === 'starting') {
+    banner = (
+      <Banner tone="info" title="Vater 백그라운드 서비스를 시작하는 중입니다">
+        준비되면 화면을 다시 불러옵니다.
       </Banner>
     );
   } else if (monitor.data?.state === 'offline') {

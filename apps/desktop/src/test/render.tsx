@@ -3,6 +3,7 @@ import { act, type ReactElement } from 'react';
 import { vi } from 'vitest';
 import { createServices, ServicesProvider, startServices } from '../api/services';
 import type { EventMap, EventType } from '../api/types';
+import type { SidecarInfo } from '../platform';
 import { FakeEventSource } from './FakeEventSource';
 import { fakePlatform } from './fakePlatform';
 
@@ -12,10 +13,10 @@ import { fakePlatform } from './fakePlatform';
  */
 export function renderWithServices(
   ui: ReactElement,
-  options: RenderOptions & { retryDelaysMs?: number[] } = {},
+  options: RenderOptions & { retryDelaysMs?: number[]; sidecar?: SidecarInfo } = {},
 ) {
-  const { retryDelaysMs = [50], ...renderOptions } = options;
-  const shell = fakePlatform();
+  const { retryDelaysMs = [50], sidecar, ...renderOptions } = options;
+  const shell = fakePlatform(sidecar);
   const services = createServices(shell.platform, {
     createSource: (url) => new FakeEventSource(url),
     retryDelaysMs,

@@ -63,8 +63,9 @@ export function SecretForm({
     try {
       for (const [name, value] of entries) {
         await api.request(`/secrets/${name}`, { method: 'PUT', body: { value } });
+        // 저장된 값은 바로 지운다: 다음 항목이 실패해도 키가 칸(메모리·DOM)에 남지 않게
+        setValues((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== name)));
       }
-      setValues({});
       if (entries.length > 0) setSaved(true);
       await onSaved();
     } catch (e) {

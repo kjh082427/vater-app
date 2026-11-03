@@ -39,6 +39,8 @@ export class EventHub {
   /** 연결 시도마다 늘린다. 늦게 끝난 옛 시도가 새 연결을 덮지 않게 한다. */
   private attempt = 0;
   private offConnection: (() => void) | null = null;
+  /** 한 번이라도 열렸는지. */
+  private everOpened = false;
   /** open()이 접속 정보를 읽는 중. */
   private resolving = false;
   private readonly createSource: (url: string) => EventSourceLike;
@@ -66,7 +68,11 @@ export class EventHub {
     this.running = true;
     // 사이드카가 다시 시작되면 포트·토큰이 바뀐다: 기다리지 않고 새 정보로 다시 연다.
     // 연결 준비 중(주소를 읽는 중)이면 그 시도가 새 정보를 읽으므로 따로 다시 열지 않는다.
-    this.offConnection = this.connection.onChange(() => {
+    this.offConnection = this.connection.onChange((info) => {
+      // 사이드카가 내려갔거나 다시 시작 중이면, EventSource의 error보다 먼저 와도 바로 끊김으로 둔다
+      // (배너와 "확인 불가" 표시가 켜지고, 열릴 때까지 유지된다).
+      // 앱을 처음 켤 때의 starting은 끊김이 아니다(한 번이라도 열렸던 연결만 끊김으로 본다).
+      if (info.state !== 'ready' && this.everOpened) this.markDown();
       if (!this.resolving) this.reconnect();
     });
     void this.open();
@@ -108,6 +114,12 @@ export class EventHub {
     return () => this.statusListeners.delete(listener);
   }
 
+  /** 끊김으로 표시하고, 다음 open까지 유지되게 실패로 센다. */
+  private markDown() {
+    if (this.failures === 0) this.failures = 1;
+    this.setStatus('disconnected');
+  }
+
   private setStatus(next: StreamStatus) {
     if (next === this.currentStatus) return;
     this.currentStatus = next;
@@ -140,6 +152,7 @@ export class EventHub {
     source.addEventListener('open', () => {
       if (this.source !== source) return;
       this.failures = 0;
+      this.everOpened = true;
       this.setStatus('open');
     });
     source.addEventListener('error', () => {

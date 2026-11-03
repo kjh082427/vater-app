@@ -143,6 +143,24 @@ describe('useResource', () => {
     await waitFor(() => expect(counter.n).toBe(2));
   });
 
+  it('disconnected 중 마운트 → open 때 다시 불러온다', async () => {
+    const counter = countRequests('/watchlist/quotes');
+    const { Wrapper } = wrapper();
+    // 먼저 연결을 열었다가 끊는다(사이드카가 죽은 상태)
+    const probe = renderHook(() => useResource(null), { wrapper: Wrapper });
+    await waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
+    act(() => FakeEventSource.latest.open());
+    act(() => FakeEventSource.latest.fail());
+    probe.unmount();
+    // 끊긴 동안 새 화면이 열린다
+    const { result } = renderHook(() => useResource('/watchlist/quotes'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(counter.n).toBe(1);
+    await waitFor(() => expect(FakeEventSource.all).toHaveLength(2));
+    act(() => FakeEventSource.latest.open());
+    await waitFor(() => expect(counter.n).toBe(2));
+  });
+
   it('처음 연결이 열릴 때는 다시 부르지 않는다', async () => {
     const counter = countRequests('/watchlist/quotes');
     const { Wrapper } = wrapper();

@@ -81,6 +81,24 @@ describe('Tauri 플랫폼', () => {
     expect(handlers.get('navigate')?.size ?? 0).toBe(0);
   });
 
+  it('셸 이벤트 구독(listen)이 실패해도 처리되지 않은 rejection이 없고 짧게 기록한다', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const bridge: TauriBridge = {
+      invoke: (async () => null) as TauriBridge['invoke'],
+      listen: async () => {
+        throw new Error('event plugin unavailable');
+      },
+    };
+    const platform = createTauriPlatform(bridge);
+    const off = platform.onSidecarState(vi.fn());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warn).toHaveBeenCalledWith(
+      '셸 이벤트 구독 실패: sidecar-state',
+      'event plugin unavailable',
+    );
+    off();
+  });
+
   it('navigate 이벤트의 route를 넘긴다', async () => {
     const { bridge, emit } = fakeTauri({});
     const platform = createTauriPlatform(bridge);

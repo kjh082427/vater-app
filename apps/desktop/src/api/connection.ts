@@ -10,8 +10,12 @@ export interface Endpoint {
   token: string;
 }
 
-/** 사이드카가 "시작 중"일 때 요청이 기다리는 최대 시간. */
-const START_WAIT_MS = 20_000;
+/**
+ * 사이드카가 "시작 중"일 때 요청이 기다리는 최대 시간.
+ * 셸(shell/tauri)은 사이드카의 ready를 60초까지 기다린다(첫 실행의 백신 검사 등으로 늦을 수 있다).
+ * 그보다 먼저 포기하면 마법사·화면이 "시작 중" 오류로 끝나므로, 셸 대기 60초 + 여유 10초.
+ */
+export const START_WAIT_MS = 70_000;
 
 function same(a: SidecarInfo | null, b: SidecarInfo | null): boolean {
   return a?.state === b?.state && a?.baseUrl === b?.baseUrl && a?.token === b?.token;
@@ -37,6 +41,8 @@ function unavailable(info: SidecarInfo): ApiError {
 export class SidecarConnection {
   private info: SidecarInfo | null = null;
   private pending: Promise<SidecarInfo> | null = null;
+  /** 다시 읽기마다 늘린다. 늦게 끝난 옛 읽기가 새 정보를 덮지 않게 가장 최근 것만 반영한다. */
+  private seq = 0;
   private listeners = new Set<(info: SidecarInfo) => void>();
   private unsubscribe: (() => void) | null = null;
 
@@ -60,13 +66,15 @@ export class SidecarConnection {
     return this.info;
   }
 
-  /** 정보를 다시 읽는다. 바뀌었으면 구독자에게 알린다. */
+  /** 정보를 다시 읽는다. 바뀌었으면 구독자에게 알린다. 겹치면 가장 최근 읽기만 반영한다. */
   refresh(): Promise<SidecarInfo> {
+    const seq = ++this.seq;
     const read = this.platform
       .getSidecarInfo()
       .catch((): SidecarInfo => ({ state: 'failed' }))
       .then((next) => {
-        if (this.pending === read) this.pending = null;
+        if (seq !== this.seq) return this.info ?? next; // 더 새 읽기가 있다
+        this.pending = null;
         if (!same(this.info, next)) {
           this.info = next;
           for (const listener of this.listeners) listener(next);
@@ -87,7 +95,7 @@ export class SidecarConnection {
     return () => this.listeners.delete(listener);
   }
 
-  /** 요청에 쓸 주소와 토큰. 시작 중이면 준비될 때까지(최대 20초) 기다린다. */
+  /** 요청에 쓸 주소와 토큰. 시작 중이면 준비될 때까지(최대 START_WAIT_MS) 기다린다. */
   async current(): Promise<Endpoint> {
     if (!this.info && !this.pending) await this.refresh();
     await this.settled();

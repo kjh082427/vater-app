@@ -148,6 +148,36 @@ describe('EventHub', () => {
     expect(hub.status).toBe('open');
   });
 
+  it('sidecar-state(starting)가 EventSource error보다 먼저 와도 바로 disconnected', async () => {
+    const { shell, hub } = await setup();
+    FakeEventSource.latest.open();
+    expect(hub.status).toBe('open');
+    shell.restart({ state: 'starting' });
+    await vi.waitFor(() => expect(hub.status).toBe('disconnected'));
+    // 새 사이드카가 준비되면 새 주소로 열리고 그때 open
+    shell.restart({ state: 'ready', baseUrl: NEW_BASE, token: 'tok-2' });
+    await vi.waitFor(() =>
+      expect(FakeEventSource.latest.url).toBe(`${NEW_BASE}/events?token=tok-2`),
+    );
+    expect(hub.status).toBe('disconnected');
+    FakeEventSource.latest.open();
+    expect(hub.status).toBe('open');
+  });
+
+  it('앱을 처음 켤 때 사이드카가 시작 중이면 끊김이 아니라 연결 중', async () => {
+    const shell = fakePlatform({ state: 'starting' });
+    const connection = new SidecarConnection(shell.platform);
+    connection.start();
+    const hub = new EventHub(connection, { createSource: (url) => new FakeEventSource(url) });
+    hub.start();
+    await connection.settled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(hub.status).toBe('connecting');
+    shell.restart({ state: 'ready', baseUrl: TEST_BASE, token: 't' });
+    await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
+    hub.stop();
+  });
+
   it('사이드카가 실패 상태면 연결하지 않고 disconnected', async () => {
     const { shell, hub } = await setup();
     FakeEventSource.latest.open();
