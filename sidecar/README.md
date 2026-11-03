@@ -111,6 +111,8 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run`
 
+대시보드: `GET/PUT /ui/dashboards`(홈 대시보드 배치 문서. 모양만 검사, 64KB·화면 1~8장·칸 1~6개, 틀리면 422 `DASHBOARD_INVALID`) · `GET /market/indices`(코스피·코스닥·S&P 500·나스닥 현재값과 최근 30거래일 종가, 30초 캐시, 실패한 지수만 null)
+
 LLM: `GET /llm/hardware` · `GET /llm/catalog` · `GET /llm/ollama/status` · `POST /llm/ollama/start` · `POST /llm/ollama/install` · `POST /llm/models/{tag}/pull` · `DELETE /llm/models/{tag}` · `GET /llm/check?preset=` · `POST /settings/llm/test?provider=`
 
 ## 테스트와 검사
