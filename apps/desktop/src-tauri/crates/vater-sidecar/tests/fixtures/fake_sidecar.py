@@ -83,7 +83,8 @@ def serve(honor_shutdown: bool, after_ready=None) -> None:
     emit("ready", port=server.server_address[1])
     if after_ready is not None:
         after_ready()
-    server.serve_forever(poll_interval=0.05)  # 기본 0.5초면 종료가 테스트의 유예 시간(0.5초)을 넘는다
+    # 기본 0.5초 간격이면 종료가 테스트의 유예 시간(0.5초)을 넘는다
+    server.serve_forever(poll_interval=0.05)
     server.server_close()
     sys.exit(0)
 
