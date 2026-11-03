@@ -1,0 +1,16 @@
+/* 시세 방향 색은 숫자 글자에만. 부호(+, −)가 늘 함께 있어 색만으로 구분하지 않는다 */
+.signed {
+  white-space: nowrap;
+}
+
+.signed[data-direction='up'] {
+  color: var(--color-up);
+}
+
+.signed[data-direction='down'] {
+  color: var(--color-down);
+}
+
+.signed[data-direction='flat'] {
+  color: var(--color-ink-3);
+}
