@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          "docs/design/directions/*.html"
+        ],
+        "createdAt": "2026-11-03T03:27:53.923Z",
+        "reason": "Claude: 1단계 방향 탐색 시안(A·B·C) 파일. 고르지 않은 A의 글꼴과 미리보기용 CDN 가변 글꼴 이름이 들어 있으며 앱 코드가 아님"
+      }
+    ]
+  }
+}
