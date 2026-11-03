@@ -782,6 +782,61 @@
         "title": "CloudTestOut",
         "type": "object"
       },
+      "Dashboard": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kpi": {
+            "$ref": "#/components/schemas/KpiStrip"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/Layout"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "panels": {
+            "items": {
+              "$ref": "#/components/schemas/Panel"
+            },
+            "title": "Panels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kpi",
+          "layout",
+          "panels"
+        ],
+        "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardsDoc": {
+        "properties": {
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/Dashboard"
+            },
+            "title": "Dashboards",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "dashboards"
+        ],
+        "title": "DashboardsDoc",
+        "type": "object"
+      },
       "ErrorBody": {
         "description": "모든 오류 응답의 형식. UI는 `code`로 안내 문구를 정한다.",
         "properties": {
@@ -981,6 +1036,90 @@
         "title": "Health",
         "type": "object"
       },
+      "IndexOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "closes": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Closes",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "market": {
+            "enum": [
+              "KR",
+              "US"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "market",
+          "value",
+          "change",
+          "change_pct",
+          "at",
+          "closes"
+        ],
+        "title": "IndexOut",
+        "type": "object"
+      },
       "InstalledOut": {
         "properties": {
           "name": {
@@ -1073,6 +1212,46 @@
           "sample"
         ],
         "title": "KisTestResult",
+        "type": "object"
+      },
+      "KpiStrip": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "items"
+        ],
+        "title": "KpiStrip",
+        "type": "object"
+      },
+      "Layout": {
+        "properties": {
+          "root": {
+            "additionalProperties": true,
+            "title": "Root",
+            "type": "object"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template",
+          "root"
+        ],
+        "title": "Layout",
         "type": "object"
       },
       "LoadedOut": {
@@ -1276,6 +1455,25 @@
           "loaded"
         ],
         "title": "OllamaStatusOut",
+        "type": "object"
+      },
+      "Panel": {
+        "properties": {
+          "options": {
+            "additionalProperties": true,
+            "title": "Options",
+            "type": "object"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "options"
+        ],
+        "title": "Panel",
         "type": "object"
       },
       "PullStartedOut": {
@@ -3606,6 +3804,61 @@
         ]
       }
     },
+    "/market/indices": {
+      "get": {
+        "operationId": "read_indices_market_indices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IndexOut"
+                  },
+                  "title": "Response Read Indices Market Indices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Read Indices",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/secrets": {
       "get": {
         "operationId": "secret_status_secrets_get",
@@ -4160,6 +4413,116 @@
         "summary": "Symbols Search",
         "tags": [
           "kis"
+        ]
+      }
+    },
+    "/ui/dashboards": {
+      "get": {
+        "operationId": "read_dashboards_ui_dashboards_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardsDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Read Dashboards",
+        "tags": [
+          "ui"
+        ]
+      },
+      "put": {
+        "operationId": "write_dashboards_ui_dashboards_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardsDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardsDoc"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Write Dashboards",
+        "tags": [
+          "ui"
         ]
       }
     },

@@ -1,0 +1,156 @@
+/* 화면 공통 배치. 색은 토큰만 쓴다(app/styles.test.ts가 검사). 견본 #shell의 배치를 따른다. */
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-3xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.lede {
+  margin-top: var(--space-0-5);
+  color: var(--color-ink-2);
+}
+
+.headerEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stamp {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+/* 구역을 세로로 쌓는다: 구역 사이 24px 이상 */
+.stack {
+  display: grid;
+  gap: var(--space-8);
+  align-content: start;
+}
+
+/* 두 구역을 나란히(3:2). 본문이 52rem 이하(1024 창)면 한 열 */
+.twoUp {
+  container-type: inline-size;
+}
+
+.twoUpGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+@container (max-width: 52rem) {
+  .twoUpGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column {
+  display: grid;
+  gap: var(--space-8);
+  align-content: start;
+  min-width: 0;
+}
+
+/* 구역 안의 요소 사이(구역 사이보다 좁게) */
+.inner {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+/* 빈 상태와 안내: 무엇을 하면 되는지 한 줄 */
+.empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+  color: var(--color-ink-2);
+}
+
+.meta {
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-3);
+}
+
+/* 종목 이름 칸: 시장 · 이름 · 코드 */
+.stock {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.stock b {
+  font-weight: var(--weight-semibold);
+}
+
+.stockMeta {
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+/* 표의 숫자 열 다음에 오는 글자 열은 왼쪽으로 띄운다 */
+.afterNumeric {
+  display: block;
+  padding-left: var(--space-4);
+}
+
+/* FeedStatus와 같은 모양(점 + 12px 글자). idle 상태 전용 */
+.feedIdle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  color: var(--color-ink-2);
+  white-space: nowrap;
+}
+
+/* 본문 안의 글자 링크 */
+.textLink {
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--color-control);
+  text-underline-offset: 4px;
+}
+
+.textLink:hover {
+  text-decoration-color: var(--color-ink);
+}
+
+/* 종목 검색 결과 */
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--rule-hair) solid var(--color-line);
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--size-row);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.resultAction {
+  margin-left: auto;
+}
