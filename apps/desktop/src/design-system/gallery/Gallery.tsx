@@ -44,33 +44,48 @@ const COLOR_GROUPS: { name: string; tokens: [string, string][] }[] = [
   {
     name: '바탕',
     tokens: [
-      ['--color-paper', '종이: 본문 바탕'],
-      ['--color-chrome', '사이드바, 상태 표시줄'],
+      ['--color-canvas', '캔버스: 본문 바탕'],
+      ['--color-card', '칸 카드, 사이드바, 상태 표시줄'],
+      ['--color-row-alt', '표 교차 행, 막힌 버튼'],
       ['--color-hover', '호버'],
-      ['--color-selected', '사이드바 현재 위치'],
       ['--color-selection', '글자 선택'],
     ],
   },
   {
-    name: '선',
+    name: '강조(하나)',
     tokens: [
-      ['--color-rule-section', '구역 위 2px 먹선'],
-      ['--color-line', '표 머리 아래선, 경계'],
+      ['--color-accent', '주 버튼, 활성 탭, 링크, 포커스'],
+      ['--color-accent-strong', '주 버튼 호버, 선택 글자'],
+      ['--color-accent-weak', '선택 바탕'],
+    ],
+  },
+  {
+    name: '표 머리줄',
+    tokens: [
+      ['--color-table-head', '머리줄 바탕'],
+      ['--color-on-table-head', '머리줄 글자'],
+    ],
+  },
+  {
+    name: '선과 중립 표지',
+    tokens: [
+      ['--color-line', '칸막이, 경계'],
       ['--color-rule', '행 구분선'],
-      ['--color-control', '버튼 테두리'],
+      ['--color-control', '버튼·입력 테두리'],
+      ['--color-control-strong', '꺼진 스위치, 빈 원'],
+      ['--color-tag', '분류 표지, 메뉴 아이콘'],
     ],
   },
   {
     name: '글자(먹)',
     tokens: [
-      ['--color-ink', '글자, 주 버튼'],
+      ['--color-ink', '글자'],
       ['--color-ink-2', '보조 글자'],
       ['--color-ink-3', '셋째 글자, 이름표'],
-      ['--color-ink-hover', '주 버튼 호버'],
     ],
   },
   {
-    name: '시세 방향(전용)',
+    name: '값의 방향(전용)',
     tokens: [
       ['--color-up', '상승 숫자, 선'],
       ['--color-down', '하락 숫자, 선'],
@@ -116,9 +131,9 @@ function readTokenValues(): Map<string, string> {
 
 function Colors() {
   const [values] = useState(readTokenValues);
-  const paper = values.get('--color-paper') ?? '';
+  const paper = values.get('--color-card') ?? '';
   return (
-    <Section title="색" meta="역할 이름의 토큰. 대비는 흰 종이 위에서 잰 값">
+    <Section title="색" meta="역할 이름의 토큰. 대비는 흰 카드 위에서 잰 값">
       {COLOR_GROUPS.map((group) => (
         <div key={group.name} className={styles.swatchGroup}>
           <h3 className={styles.groupName}>{group.name}</h3>
@@ -149,12 +164,12 @@ function Colors() {
 
 function Typography() {
   return (
-    <Section title="글자" meta="화면과 숫자는 Pretendard, AI가 쓴 문장만 Hahmlet">
+    <Section title="글자" meta="Pretendard 하나. 굵기와 크기로 위계를 만든다">
       <div className={styles.rows}>
         <Row label="화면 제목 · 22/28 굵게">
           <p className={styles.screenTitle}>감시·알림</p>
         </Row>
-        <Row label="구역 제목 · 15/24 굵게">
+        <Row label="카드 제목 · 16/24 반굵게">
           <p className={styles.sectionTitle}>최근 브리핑</p>
         </Row>
         <Row label="본문 · 14/20">
@@ -183,13 +198,13 @@ function Typography() {
             <span>$1,135.40</span>
           </div>
         </Row>
-        <Row label="AI 첫 문장 · 명조 20/30">
+        <Row label="AI 첫 문장 · 16/24 반굵게 + 꼬리표">
           <AiText size="lead">{brief.lead}</AiText>
         </Row>
-        <Row label="AI 본문 · 명조 15/24">
+        <Row label="AI 본문 · 14/22">
           <AiText attribution="AI 해석">{brief.more}</AiText>
         </Row>
-        <Row label="워드마크 · 명조 22">
+        <Row label="워드마크 · 20 굵게">
           <span className={styles.wordmark}>Vater</span>
         </Row>
       </div>

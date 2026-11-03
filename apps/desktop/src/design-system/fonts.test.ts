@@ -25,15 +25,21 @@ function filesUnder(dir: string, pattern: RegExp): string[] {
 }
 
 describe('글꼴 파일 (fonts.css)', () => {
-  it('Pretendard 4굵기(400·500·600·700)와 Hahmlet 가변(400~700)을 선언한다', () => {
+  it('Pretendard 4굵기(400·500·600·700)만 선언한다(명조 Hahmlet은 쓰지 않는다)', () => {
     const declared = faces(fontsCss).map(({ family, weight }) => `${family} ${weight}`);
     expect(declared).toEqual([
       'Pretendard 400',
       'Pretendard 500',
       'Pretendard 600',
       'Pretendard 700',
-      'Hahmlet 400 700',
     ]);
+    expect(fontsCss).not.toMatch(/Hahmlet/);
+  });
+
+  it('fonts/ 폴더에는 선언한 글꼴 파일만 있다(번들에 남는 글꼴 없음)', () => {
+    const declared = faces(fontsCss).map(({ url }) => url.replace('./fonts/', ''));
+    const onDisk = readdirSync(join(here, 'fonts')).filter((name) => name.endsWith('.woff2'));
+    expect(onDisk.sort()).toEqual(declared.sort());
   });
 
   it.each(faces(fontsCss))('$family $weight: 앱 안의 woff2 파일을 가리킨다', ({ url }) => {
@@ -42,22 +48,22 @@ describe('글꼴 파일 (fonts.css)', () => {
     expect(bytes.subarray(0, 4).toString('latin1')).toBe('wOF2');
   });
 
-  it('용량 예산: Pretendard 1개 300KB 이하, Hahmlet 450KB 이하, 합계 1.6MB 이하', () => {
+  it('용량 예산: Pretendard 1개 300KB 이하, 합계 1.1MB 이하', () => {
     const sizes = faces(fontsCss).map(({ family, url }) => ({
       family,
       bytes: statSync(join(here, url)).size,
     }));
     for (const { family, bytes } of sizes) {
-      expect(bytes).toBeLessThanOrEqual(family === 'Hahmlet' ? 450 * 1024 : 300 * 1024);
+      expect(bytes, family).toBeLessThanOrEqual(300 * 1024);
     }
-    expect(sizes.reduce((sum, s) => sum + s.bytes, 0)).toBeLessThanOrEqual(1.6 * 1024 * 1024);
+    expect(sizes.reduce((sum, s) => sum + s.bytes, 0)).toBeLessThanOrEqual(1.1 * 1024 * 1024);
   });
 
-  it('글꼴마다 OFL 라이선스 파일이 같이 있다', () => {
-    for (const name of ['LICENSE-Pretendard.txt', 'LICENSE-Hahmlet.txt']) {
-      const text = readFileSync(join(here, 'fonts', name), 'utf8');
-      expect(text).toContain('SIL Open Font License, Version 1.1');
-    }
+  it('글꼴마다 OFL 라이선스 파일이 같이 있고, 쓰지 않는 글꼴의 라이선스는 없다', () => {
+    const licenses = readdirSync(join(here, 'fonts')).filter((name) => name.startsWith('LICENSE-'));
+    expect(licenses).toEqual(['LICENSE-Pretendard.txt']);
+    const text = readFileSync(join(here, 'fonts', 'LICENSE-Pretendard.txt'), 'utf8');
+    expect(text).toContain('SIL Open Font License, Version 1.1');
   });
 });
 

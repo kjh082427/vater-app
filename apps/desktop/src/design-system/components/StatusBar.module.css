@@ -4,7 +4,7 @@
   height: 100%;
   min-width: 0;
   overflow: hidden;
-  background: var(--color-chrome);
+  background: var(--color-card);
   border-top: var(--rule-hair) solid var(--color-line);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);

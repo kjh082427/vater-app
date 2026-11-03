@@ -39,11 +39,11 @@
 
 .th {
   height: var(--size-row-head);
-  border-bottom: var(--rule-hair) solid var(--color-line);
+  background: var(--color-table-head);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
-  font-weight: var(--weight-regular);
-  color: var(--color-ink-3);
+  font-weight: var(--weight-semibold);
+  color: var(--color-on-table-head);
   white-space: nowrap;
 }
 
@@ -56,6 +56,10 @@
 .td[data-align='end'] {
   text-align: right;
   white-space: nowrap;
+}
+
+.row:nth-child(even) .td {
+  background: var(--color-row-alt);
 }
 
 .row[tabindex] {

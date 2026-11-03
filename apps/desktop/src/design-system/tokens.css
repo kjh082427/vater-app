@@ -1,68 +1,94 @@
 /*
- * Vater 디자인 토큰 · 방향 B "리서치 노트" (docs/design/directions/b-research-note.html)
+ * Vater 디자인 토큰 · "대시보드 라이트" (스펙 2026-11-03-dashboard-design.md 5장, 시안 1)
  *
  * 색은 모두 "역할" 이름이다. 컴포넌트는 var(--color-*)만 쓰고 색 값을 직접 쓰지 않는다
  * (tokens.test.ts가 검사). 1차 버전은 라이트 테마만 낸다. 다크 테마를 더할 때는
  * 아래 :root 블록과 같은 이름을 [data-theme='dark'] 블록에서 다시 정의하면 되고,
- * 컴포넌트는 고치지 않는다. paper는 "바탕", ink는 "글자"라는 역할이므로 다크에서는 값만 뒤집힌다.
+ * 컴포넌트는 고치지 않는다.
  *
  * 크기는 rem(기준 16px)이다. Windows 배율 125%·150%는 WebView2가 CSS 픽셀 전체를 키우므로
- * 레이아웃이 그대로 커지고, 사용자 글자 크기 설정도 rem을 따라간다. 선 굵기만 px이다.
+ * 레이아웃이 그대로 커지고, 사용자 글자 크기 설정도 rem을 따라간다. 선 굵기와 모서리만 px이다.
  */
 
 :root {
   color-scheme: light;
 
-  /* 바탕: 흰 종이. 크롬(사이드바, 상태 표시줄)만 한 단계 어둡다 */
-  --color-paper: #ffffff;
-  --color-chrome: #f6f6f4;
-  --color-hover: #f1f1ee;
-  --color-selected: #e9e9e5;
-  --color-selection: #e6e1c8;
+  /* 바탕: 밝은 회색 캔버스 위에 흰 칸 카드 */
+  --color-canvas: #f0f2f5;
+  --color-card: #ffffff;
+  --color-card-shadow: rgba(22, 28, 42, 0.07);
+  --color-row-alt: #f6f7f9;
+  --color-hover: #eef0f4;
+  --color-selection: #e3dafa;
 
-  /* 선: 칸막이 상자 대신 구역 위 굵은 먹선과 가는 행 구분선 */
-  --color-rule-section: #141414;
-  --color-line: #e2e2de;
-  --color-rule: #ecece8;
-  --color-control: #c4c4bf;
+  /* 표 머리줄: 짙은 남색 바탕 + 밝은 글자 */
+  --color-table-head: #262d3b;
+  --color-on-table-head: #eef1f6;
 
-  /* 글자(먹): 3단계. 먹은 주 버튼과 선택 상태의 바탕도 된다 */
-  --color-ink: #141414;
-  --color-ink-2: #474745;
-  --color-ink-3: #5f5f5c;
-  --color-ink-hover: #333331;
+  /* 선: 칸막이(line), 행 구분(rule), 입력 테두리(control), 꺼진 스위치·빈 원(control-strong) */
+  --color-line: #e1e4ea;
+  --color-rule: #eceef2;
+  --color-control: #cfd3dc;
+  --color-control-strong: #7f8698;
+
+  /* 글자: 3단계. ink는 짙은 남색 먹 */
+  --color-ink: #161c2a;
+  --color-ink-2: #3b4456;
+  --color-ink-3: #5a6275;
   --color-on-ink: #ffffff;
 
-  /* 시세 방향 전용: 상승 빨강, 하락 파랑(미국 종목도 같음). 다른 뜻으로 쓰지 않는다 */
-  --color-up: #c62a2f;
-  --color-down: #1d57bf;
+  /* 강조(인디고-바이올렛) 하나: 선택, 주 버튼, 활성 탭, 링크, 포커스. 빨강·파랑과 색상이 40도 이상 떨어진다 */
+  --color-accent: #7a45d8;
+  --color-accent-strong: #6232c4;
+  --color-accent-weak: #f1ecfd;
+  --color-on-accent: #ffffff;
+
+  /* 분류 표지(지수 이름 옆 네모 등): 중립 회색. 빨강·파랑으로 분류하지 않는다 */
+  --color-tag: #7a8294;
+
+  /* 값의 방향 전용: 상승 빨강, 하락 파랑(미국 종목도 같음). 다른 뜻으로 쓰지 않는다 */
+  --color-up: #d02c2c;
+  --color-down: #1d5cd2;
 
   /* 주의(황토): 폴링, 끊김, 오프라인, 오류, 검토 필요. 오류에 빨강을 쓰지 않는다 */
-  --color-caution: #b7791f;
+  --color-caution: #b8730b;
   --color-caution-bg: #fff4d8;
   --color-caution-ink: #6f4600;
 
-  --color-focus: #141414;
+  --color-focus: var(--color-accent);
 
-  /* 글꼴: 화면과 숫자는 Pretendard, AI가 쓴 문장만 Hahmlet */
+  /* 예전 이름(별칭). 다른 브랜치의 화면 CSS가 쓰므로 남긴다. 새 코드는 오른쪽 이름을 쓴다 */
+  --color-paper: var(--color-card);
+  --color-chrome: var(--color-row-alt);
+  --color-selected: var(--color-accent-weak);
+  --color-rule-section: var(--color-line);
+  --color-ink-hover: var(--color-ink-2);
+
+  /* 그림자: 칸 카드는 아주 옅게 */
+  --shadow-card: 0 1px 2px var(--color-card-shadow), 0 2px 8px var(--color-card-shadow);
+
+  /* 글꼴: Pretendard 하나. --font-serif는 예전 이름이며 같은 고딕을 가리킨다 */
   --font-sans: 'Pretendard', 'Malgun Gothic', '맑은 고딕', system-ui, sans-serif;
-  --font-serif: 'Hahmlet', 'Noto Serif KR', 'Batang', '바탕', serif;
+  --font-serif: var(--font-sans);
 
   /* 글자 크기(기준 16px) · 줄 높이 */
-  --text-xs: 0.75rem; /* 12 보조 정보, 표 머리, 상태 표시줄 */
-  --text-sm: 0.8125rem; /* 13 버튼, 목록 보조 */
-  --text-md: 0.875rem; /* 14 본문, 표 */
-  --text-lg: 0.9375rem; /* 15 구역 제목, AI 본문 */
-  --text-xl: 1rem; /* 16 강조 이름 */
-  --text-2xl: 1.25rem; /* 20 AI 첫 문장, 큰 숫자 */
+  --text-xs: 0.75rem; /* 12 보조 정보, 표 머리, 상태 표시줄, 축 눈금 */
+  --text-sm: 0.8125rem; /* 13 버튼, 카드 설명, 표 */
+  --text-md: 0.875rem; /* 14 본문, 메뉴 */
+  --text-lg: 0.9375rem; /* 15 강조 본문 */
+  --text-xl: 1rem; /* 16 카드 제목, AI 첫 문장 */
+  --text-2xl: 1.25rem; /* 20 큰 숫자 */
   --text-3xl: 1.375rem; /* 22 화면 제목 */
+  --text-card-title: 1rem; /* 16 카드 제목 */
+  --text-kpi: 1.75rem; /* 28 숫자 카드 큰 숫자 */
   --leading-xs: 1rem;
   --leading-sm: 1.125rem;
   --leading-md: 1.25rem;
-  --leading-lg: 1.5rem;
+  --leading-lg: 1.375rem;
   --leading-xl: 1.5rem;
-  --leading-2xl: 1.875rem;
+  --leading-2xl: 1.75rem;
   --leading-3xl: 1.75rem;
+  --leading-kpi: 2.25rem;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -81,28 +107,40 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
   --space-10: 2.5rem;
+  --space-card: 1rem; /* 칸 카드 안쪽 여백 16 */
+  --space-gap: 0.75rem; /* 칸 사이 12 */
 
   /* 정해진 높이와 너비 */
-  --size-control: 2rem; /* 버튼 32 */
+  --size-control: 2rem; /* 버튼·입력 32 */
   --size-control-sm: 1.625rem; /* 작은 버튼, 세그먼트 26 */
-  --size-row: 2.5rem; /* 표 행 40 */
-  --size-row-head: 1.75rem; /* 표 머리 28 */
-  --size-section-head: 2.25rem; /* 구역 머리 36 */
-  --size-nav-item: 2.25rem; /* 사이드바 항목 36 */
-  --size-sidebar: 13.5rem; /* 216 */
-  --size-statusbar: 2rem; /* 32 */
+  --size-row: 2.375rem; /* 표 행 38 */
+  --size-row-head: 1.875rem; /* 표 머리 30 */
+  --size-section-head: 2.25rem; /* 카드 머리 최소 36 */
+  --size-nav-item: 2.375rem; /* 사이드바 항목 38 */
+  --size-sidebar: 12.5rem; /* 200 */
+  --size-statusbar: 1.75rem; /* 28 */
+  --size-topbar: 3.25rem; /* 본문 머리줄 52 */
   --size-icon: 1.125rem; /* 18 */
   --size-icon-sm: 0.875rem; /* 14 */
   --size-dot: 0.4375rem; /* 상태 점 7 */
+  --size-tag: 0.5rem; /* 분류 표지 네모 8 */
   --size-scale-cell: 0.625rem; /* 의견 눈금 한 칸 10 */
   --size-scale-height: 0.5rem; /* 의견 눈금 높이 8 */
-  --size-prose: 40rem; /* AI 긴 글 한 줄 최대 너비(한글 약 40자) */
+  --size-prose: 40rem; /* 긴 글 한 줄 최대 너비(한글 약 40자) */
+  --size-switch-w: 2.25rem; /* 스위치 36 */
+  --size-switch-h: 1.25rem; /* 20 */
+  --size-progress: 0.375rem; /* 진행 막대 6 */
+  --size-menu-min: 10rem; /* 메뉴·목록 최소 너비 160 */
+  --size-dialog: 30rem; /* 대화 상자 너비 480 */
 
   /* 선 굵기와 모서리 */
   --rule-hair: 1px;
   --rule-section: 2px;
   --rule-focus: 2px;
   --radius-sm: 4px;
+  --radius-control: 6px;
+  --radius-md: 8px;
+  --radius-pop: 10px;
   --radius-round: 999px;
 
   /* 움직임: 상태가 바뀔 때만, 짧게 */

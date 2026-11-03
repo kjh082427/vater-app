@@ -1,7 +1,9 @@
-/* 칸막이 상자 대신 구역 위 2px 먹선. 구역 사이는 여백으로 띄운다 */
+/* 칸 카드: 흰 바탕, 모서리 8px, 아주 옅은 그림자, 안쪽 여백 16px */
 .section {
-  border-top: var(--rule-section) solid var(--color-rule-section);
-  padding-top: var(--space-1);
+  padding: var(--space-card);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
 }
 
 .head {

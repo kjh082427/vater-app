@@ -150,9 +150,9 @@ code {
 }
 
 .sectionTitle {
-  font-size: var(--text-lg);
-  line-height: var(--leading-lg);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-card-title);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
 }
 
 .small {
@@ -162,10 +162,10 @@ code {
 }
 
 .wordmark {
-  font-family: var(--font-serif);
-  font-size: var(--text-3xl);
-  line-height: var(--leading-3xl);
-  font-weight: var(--weight-semibold);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  line-height: var(--leading-2xl);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
 }
 

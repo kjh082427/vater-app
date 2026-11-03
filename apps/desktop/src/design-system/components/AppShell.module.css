@@ -11,7 +11,7 @@
   width: 100%;
   height: 100vh;
   min-width: 64rem;
-  background: var(--color-paper);
+  background: var(--color-canvas);
 }
 
 .sidebar {

@@ -6,7 +6,7 @@
 .ai {
   padding-left: var(--space-3);
   border-left: var(--rule-hair) solid var(--color-control);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: var(--weight-regular);
 }
 
