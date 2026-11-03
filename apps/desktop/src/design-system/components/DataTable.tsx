@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { cx } from '../internal/cx';
 import styles from './DataTable.module.css';
 
@@ -26,6 +26,9 @@ export interface DataTableProps<Row> {
   className?: string;
 }
 
+/** 행 안에 둘 수 있는 자기 동작이 있는 요소. 이것을 누르면 행을 열지 않는다. */
+const INTERACTIVE = 'button, a, input, select, textarea, [role="button"]';
+
 const MOVE: Record<string, (index: number, last: number) => number> = {
   ArrowDown: (i, last) => Math.min(i + 1, last),
   ArrowUp: (i) => Math.max(i - 1, 0),
@@ -36,6 +39,7 @@ const MOVE: Record<string, (index: number, last: number) => number> = {
 /**
  * 데이터 표. 숫자 열은 오른쪽 정렬, 행 높이 40px, 행 사이 가는 선.
  * 행 동작이 있으면 행 하나만 Tab 순서에 들어가고(roving tabindex) ↑↓·Home·End로 옮긴다.
+ * 행 안의 버튼·링크·입력은 제 동작만 하고 행을 열지 않는다.
  */
 export function DataTable<Row>({
   caption,
@@ -53,6 +57,8 @@ export function DataTable<Row>({
   const current = Math.min(active, Math.max(rows.length - 1, 0));
 
   function onKeyDown(event: KeyboardEvent<HTMLTableRowElement>, index: number, row: Row) {
+    // 행 안의 버튼·입력에 포커스가 있으면 그 요소가 키를 맡는다
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onRowActivate?.(row);
@@ -64,6 +70,12 @@ export function DataTable<Row>({
     const next = move(index, rows.length - 1);
     setActive(next);
     rowRefs.current[next]?.focus();
+  }
+
+  function onClick(event: MouseEvent<HTMLTableRowElement>, row: Row) {
+    const control = (event.target as Element).closest(INTERACTIVE);
+    if (control && event.currentTarget.contains(control)) return;
+    onRowActivate?.(row);
   }
 
   return (
@@ -109,7 +121,7 @@ export function DataTable<Row>({
               tabIndex={focusable ? (index === current ? 0 : -1) : undefined}
               onFocus={focusable ? () => setActive(index) : undefined}
               onKeyDown={focusable ? (event) => onKeyDown(event, index, row) : undefined}
-              onClick={focusable ? () => onRowActivate?.(row) : undefined}
+              onClick={focusable ? (event) => onClick(event, row) : undefined}
             >
               {columns.map((column) => (
                 <td
