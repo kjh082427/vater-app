@@ -143,6 +143,11 @@ class AlertMonitor:
         self._last_poll: dict[Key, datetime] = {}
         self._close_done: dict[Key, date] = {}  # 종목별로 마감 평가를 마친 세션 날짜
         self._close_retry: dict[Key, tuple[date, datetime]] = {}  # (세션, 다시 받을 시각)
+        self._last_closed: dict[str, date] = {}  # 시장별 일봉이 확정된 마지막 세션
+        self._rest_tried: dict[
+            Key, datetime
+        ] = {}  # 홈 화면 시세를 한투 REST로 마지막에 시도한 시각
+        self._rest_inflight: dict[Key, asyncio.Future[WatchQuote | None]] = {}
         self._last_eval: dict[Key, float] = {}
         self._pending: dict[Key, Tick] = {}
         self._quotes: dict[Key, WatchQuote] = {}
@@ -184,27 +189,49 @@ class AlertMonitor:
         """
         now = self._now()
         feeds = {(f["market"], f["code"]): f["feed"] for f in self._feeds}
-        out: list[dict[str, Any]] = []
-        for item in WatchlistRepo(self._db()).list():
+
+        async def one(item: WatchItem) -> dict[str, Any]:
             key = _key(item)
             quote = self._quotes.get(key)
             if quote is None or now - datetime.fromisoformat(quote.at) >= QUOTE_FRESH:
-                quote = await self._rest_quote(item) or quote
-            out.append(
-                {
-                    "watchlist_id": item.id,
-                    "market": item.market,
-                    "code": item.code,
-                    "name": item.name,
-                    "price": quote.price if quote else None,
-                    "change": quote.change if quote else None,
-                    "change_pct": quote.change_pct if quote else None,
-                    "at": quote.at if quote else None,
-                    "source": quote.source if quote else None,
-                    "feed": feeds.get(key, "idle"),
-                }
-            )
-        return out
+                quote = await self._rest_quote_once(item, now) or quote
+            return {
+                "watchlist_id": item.id,
+                "market": item.market,
+                "code": item.code,
+                "name": item.name,
+                "price": quote.price if quote else None,
+                "change": quote.change if quote else None,
+                "change_pct": quote.change_pct if quote else None,
+                "at": quote.at if quote else None,
+                "source": quote.source if quote else None,
+                "feed": feeds.get(key, "idle"),
+            }
+
+        return list(await asyncio.gather(*(one(i) for i in WatchlistRepo(self._db()).list())))
+
+    async def _rest_quote_once(self, item: WatchItem, now: datetime) -> WatchQuote | None:
+        """종목당 30초에 한 번만 한투를 부른다(실패도 센다). 동시에 온 요청은 같은 호출을 기다린다.
+
+        감시 루프가 끊김(offline)이면 부르지 않는다: 종목마다 연결 제한 시간을 기다리지 않게.
+        """
+        key = _key(item)
+        if self._state == "offline":
+            return None
+        running = self._rest_inflight.get(key)
+        if running is not None:
+            return await asyncio.shield(running)
+        tried = self._rest_tried.get(key)
+        if tried is not None and now - tried < QUOTE_FRESH:
+            return None
+        self._rest_tried[key] = now
+        task = asyncio.ensure_future(self._rest_quote(item))
+        self._rest_inflight[key] = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if self._rest_inflight.get(key) is task:
+                del self._rest_inflight[key]
 
     async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
         try:
@@ -234,7 +261,11 @@ class AlertMonitor:
                 self._prev_close[key] = (day, price - change)
         elif day is not None:
             prev = self._prev_close.get(key)
-            if prev is None or prev[0] != day:  # 받아 둔 일봉의 전 세션 종가(마감 평가가 채운다)
+            done = self._close_done.get(key)
+            # 받아 둔 일봉의 전 세션 종가는 이 종목의 직전 세션 마감 평가(일봉 받기)가 끝났을 때만
+            # 믿는다. 그 전에는 더 오래된 일봉일 수 있어서, 틀린 숫자 대신 null로 둔다.
+            settled = done is not None and done < day and done == self._last_closed.get(item.market)
+            if (prev is None or prev[0] != day) and settled:
                 close = BarRepo(self._db()).close_before(item.market, item.code, day)
                 if close is not None:
                     prev = (day, close)
@@ -421,6 +452,7 @@ class AlertMonitor:
         day = await self._clock.last_closed_session(market)
         if day is None:
             return
+        self._last_closed[market] = day
         now = self._now()
         bars = BarRepo(self._db())
         evaluator = self._evaluator()
