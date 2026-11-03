@@ -17,6 +17,10 @@ export interface SidecarInfo {
   token?: string;
 }
 
+/** 셸의 업데이트 확인 결과(`check_update`, 이벤트 `update-available`). */
+export type UpdateInfo =
+  { state: 'disabled' | 'up_to_date' } | { state: 'available'; version: string; notes?: string };
+
 export interface Platform {
   kind: 'tauri' | 'browser';
   getSidecarInfo(): Promise<SidecarInfo>;
@@ -28,6 +32,14 @@ export interface Platform {
   setAutostart(enabled: boolean): Promise<void>;
   /** 로그 폴더를 탐색기로 연다(셸 open_log_folder). 브라우저에서는 ApiError. */
   openLogFolder(): Promise<void>;
+  /** 설치한 앱의 버전. 브라우저에서는 null(/health를 쓴다). */
+  getAppVersion(): Promise<string | null>;
+  /** 새 버전을 확인한다. 연결 실패 등은 reject. 브라우저에서는 disabled. */
+  checkUpdate(): Promise<UpdateInfo>;
+  /** 내려받아 설치한다. 성공하면 앱이 끝나고 새 버전이 뜬다. */
+  installUpdate(): Promise<void>;
+  /** 셸이 시작 뒤 새 버전을 찾았다. 해제 함수를 돌려준다. */
+  onUpdateAvailable(callback: (info: UpdateInfo) => void): () => void;
 }
 
 /** @tauri-apps/api 중 쓰는 두 함수. 테스트는 흉내를 넘긴다. */
@@ -100,6 +112,14 @@ export function createTauriPlatform(bridge: TauriBridge): Platform {
     async openLogFolder() {
       await bridge.invoke('open_log_folder');
     },
+    getAppVersion: () => bridge.invoke<string>('get_app_version'),
+    checkUpdate: () => bridge.invoke<UpdateInfo>('check_update'),
+    async installUpdate() {
+      await bridge.invoke('install_update');
+    },
+    onUpdateAvailable(callback) {
+      return subscribe<UpdateInfo>(bridge, 'update-available', callback);
+    },
   };
 }
 
@@ -125,6 +145,12 @@ export function createBrowserPlatform(env: BrowserEnv): Platform {
     openLogFolder: async () => {
       throw new ApiError('UI_DESKTOP_ONLY', '설치한 앱에서만 열 수 있습니다', null, 0);
     },
+    getAppVersion: async () => null,
+    checkUpdate: async () => ({ state: 'disabled' }),
+    installUpdate: async () => {
+      throw new ApiError('UI_DESKTOP_ONLY', '설치한 앱에서만 할 수 있습니다', null, 0);
+    },
+    onUpdateAvailable: () => () => undefined,
   };
 }
 

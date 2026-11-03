@@ -133,6 +133,20 @@ describe('사이드카 시작·재시작(셸 계약: sidecar-state 먼저 구독
     );
   });
 
+  it('update-available: 정보 배너와 설정으로 가는 길, 설정 화면에서는 숨긴다', async () => {
+    window.location.hash = '#/alerts';
+    const { shell } = renderWithServices(<App />);
+    await screen.findByRole('heading', { name: '감시·알림', level: 1 });
+    act(() => shell.updateAvailable({ state: 'available', version: '0.3.0' }));
+    expect(await screen.findByText('새 버전 0.3.0이(가) 있습니다')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: '설정에서 설치' });
+    expect(link).toHaveAttribute('href', '#/settings');
+    await userEvent.click(link);
+    await waitFor(() =>
+      expect(screen.queryByText('새 버전 0.3.0이(가) 있습니다')).not.toBeInTheDocument(),
+    );
+  });
+
   it('사이드카 실행 실패: [로그 폴더 열기], 실패하면 그 문구', async () => {
     window.location.hash = '#/settings';
     const { shell } = renderWithServices(<App />, { sidecar: { state: 'failed' } });

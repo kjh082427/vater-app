@@ -414,6 +414,56 @@ describe('분석·브리핑·일반', () => {
     expect(within(part).getByText('0.1.0')).toBeInTheDocument();
   });
 
+  it('버전은 셸이 알면 셸의 값(설치한 앱의 버전)', async () => {
+    window.location.hash = '#/settings';
+    renderWithServices(<App />, { appVersion: '0.9.1' });
+    const part = await waitFor(() => region('일반'));
+    expect(await within(part).findByText('0.9.1')).toBeInTheDocument();
+  });
+
+  it('업데이트 확인: 최신', async () => {
+    renderSettings();
+    const part = await waitFor(() => region('일반'));
+    await userEvent.click(within(part).getByRole('button', { name: '업데이트 확인' }));
+    expect(await within(part).findByText('최신 버전입니다.')).toBeInTheDocument();
+    expect(within(part).queryByRole('button', { name: '지금 설치' })).not.toBeInTheDocument();
+  });
+
+  it('업데이트 확인: 공개 키가 없는 빌드', async () => {
+    const view = renderSettings();
+    view.shell.setUpdate({ state: 'disabled' });
+    const part = await waitFor(() => region('일반'));
+    await userEvent.click(within(part).getByRole('button', { name: '업데이트 확인' }));
+    expect(
+      await within(part).findByText('이 빌드에서는 업데이트를 쓸 수 없습니다.'),
+    ).toBeInTheDocument();
+  });
+
+  it('업데이트 확인: 실패하면 그 문구, 다시 누를 수 있다', async () => {
+    const view = renderSettings();
+    view.shell.setUpdate(new Error('연결할 수 없습니다'));
+    const part = await waitFor(() => region('일반'));
+    const button = within(part).getByRole('button', { name: '업데이트 확인' });
+    await userEvent.click(button);
+    expect(await within(part).findByText(/연결할 수 없습니다/)).toBeInTheDocument();
+    expect(button).toBeEnabled();
+  });
+
+  it('새 버전: [지금 설치]가 설치를 부르고, 설치 중에는 막으며 안내한다. 실패하면 그 문구', async () => {
+    const view = renderSettings();
+    view.shell.setUpdate({ state: 'available', version: '0.3.0', notes: '알림 수정' });
+    const part = await waitFor(() => region('일반'));
+    await userEvent.click(within(part).getByRole('button', { name: '업데이트 확인' }));
+    expect(await within(part).findByText('새 버전 0.3.0이(가) 있습니다.')).toBeInTheDocument();
+    expect(within(part).getByText('알림 수정')).toBeInTheDocument();
+    expect(within(part).getByText('설치하면 앱이 다시 시작됩니다.')).toBeInTheDocument();
+    view.shell.failInstall(new Error('내려받지 못했습니다'));
+    await userEvent.click(within(part).getByRole('button', { name: '지금 설치' }));
+    await waitFor(() => expect(view.shell.updateInstalls).toBe(1));
+    expect(await within(part).findByText(/내려받지 못했습니다/)).toBeInTheDocument();
+    expect(within(part).getByRole('button', { name: '지금 설치' })).toBeEnabled();
+  });
+
   it('창을 닫으면 트레이로', async () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();

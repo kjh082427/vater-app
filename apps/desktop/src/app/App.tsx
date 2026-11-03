@@ -189,6 +189,14 @@ function Shell({ route }: { route: Route }) {
   const badge = useAlertBadge(route);
   const { platform } = useServices();
   const [logError, setLogError] = useState<string | null>(null);
+  const [newVersion, setNewVersion] = useState<string | null>(null);
+  useEffect(
+    () =>
+      platform.onUpdateAvailable((info) => {
+        if (info.state === 'available') setNewVersion(info.version);
+      }),
+    [platform],
+  );
   const openLogs = () => {
     setLogError(null);
     platform.openLogFolder().catch((e: unknown) => {
@@ -269,6 +277,21 @@ function Shell({ route }: { route: Route }) {
         }
       >
         {`인터넷 연결을 30초마다 다시 확인합니다.${lastSeen}`}
+      </Banner>
+    );
+  } else if (newVersion && route.name !== 'settings') {
+    // 문제가 없을 때만 보이는 안내. 설정 화면에는 설치 버튼이 있으므로 숨긴다
+    banner = (
+      <Banner
+        tone="info"
+        title={`새 버전 ${newVersion}이(가) 있습니다`}
+        action={
+          <a className={styles.bannerLink} href="#/settings">
+            설정에서 설치
+          </a>
+        }
+      >
+        설치하면 앱이 다시 시작됩니다.
       </Banner>
     );
   }

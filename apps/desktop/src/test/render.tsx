@@ -13,10 +13,15 @@ import { fakePlatform } from './fakePlatform';
  */
 export function renderWithServices(
   ui: ReactElement,
-  options: RenderOptions & { retryDelaysMs?: number[]; sidecar?: SidecarInfo } = {},
+  options: RenderOptions & {
+    retryDelaysMs?: number[];
+    sidecar?: SidecarInfo;
+    appVersion?: string;
+  } = {},
 ) {
-  const { retryDelaysMs = [50], sidecar, ...renderOptions } = options;
+  const { retryDelaysMs = [50], sidecar, appVersion, ...renderOptions } = options;
   const shell = fakePlatform(sidecar);
+  if (appVersion) shell.setAppVersion(appVersion);
   const services = createServices(shell.platform, {
     createSource: (url) => new FakeEventSource(url),
     retryDelaysMs,

@@ -14,6 +14,7 @@ import { CloudSettings } from './CloudSection';
 import { KisSettings } from './KisSection';
 import { LocalSettings } from './LocalSection';
 import styles from './settings.module.css';
+import { UpdateRow } from './UpdateRow';
 import { str, useSettings, type Settings } from './useSettings';
 import { SelectField } from '../common/SelectField';
 
@@ -107,6 +108,7 @@ function GeneralSettings({
   const { platform } = useServices();
   const health = useResource<Health>('/health');
   const [autostart, setAutostart] = useState<boolean | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const browser = platform.kind === 'browser';
 
@@ -115,6 +117,12 @@ function GeneralSettings({
     platform.getAutostart().then(
       (on) => {
         if (alive) setAutostart(on);
+      },
+      () => undefined,
+    );
+    platform.getAppVersion().then(
+      (version) => {
+        if (alive) setAppVersion(version);
       },
       () => undefined,
     );
@@ -151,8 +159,9 @@ function GeneralSettings({
       {error ? <ApiErrorNotice error={error} /> : null}
       <dl className={styles.facts}>
         <dt>버전</dt>
-        <dd className="vt-num">{health.data?.version ?? '—'}</dd>
+        <dd className="vt-num">{appVersion ?? health.data?.version ?? '—'}</dd>
       </dl>
+      <UpdateRow />
     </div>
   );
 }

@@ -106,6 +106,10 @@ const platform: Platform = {
   getAutostart: async () => true,
   setAutostart: async () => undefined,
   openLogFolder: async () => undefined,
+  getAppVersion: async () => null,
+  checkUpdate: async () => ({ state: 'up_to_date' }),
+  installUpdate: async () => undefined,
+  onUpdateAvailable: () => () => undefined,
 };
 
 /** 열리면 감시 상태를 한 번 보내는 흉내 EventSource. */
