@@ -104,4 +104,21 @@ describe('AppShell: 사이드바 + 본문 + 상태 표시줄', () => {
     expect(skip).toHaveAttribute('href', `#${main.id}`);
     expect(main).toHaveAttribute('tabindex', '-1');
   });
+
+  it('본문으로 건너뛰기는 주소(#)를 바꾸지 않고 본문에 포커스를 옮긴다(해시 라우터와 부딪히지 않게)', async () => {
+    const user = userEvent.setup();
+    window.location.hash = '#/home';
+    render(
+      <AppShell
+        sidebar={<SidebarNav items={items} currentId="home" />}
+        statusBar={<StatusBar>{null}</StatusBar>}
+      >
+        <h1>홈</h1>
+      </AppShell>,
+    );
+    await user.click(screen.getByRole('link', { name: '본문으로 건너뛰기' }));
+    expect(screen.getByRole('main')).toHaveFocus();
+    expect(window.location.hash).toBe('#/home');
+    window.location.hash = '';
+  });
 });

@@ -103,4 +103,16 @@ describe('Tabs (WAI-ARIA 탭 패턴)', () => {
     );
     expect(screen.getByRole('tabpanel', { name: '국내' })).toHaveTextContent('국내 브리핑');
   });
+
+  it('어느 탭도 선택되지 않은 값이면 첫 탭이 Tab 순서에 들어간다(키보드로 닿을 수 있게)', () => {
+    render(
+      <Tabs value="none" onValueChange={() => undefined}>
+        <TabList label="시장">
+          <Tab value="kr">국내</Tab>
+          <Tab value="us">미국</Tab>
+        </TabList>
+      </Tabs>,
+    );
+    expect(screen.getAllByRole('tab').map((t) => t.tabIndex)).toEqual([0, -1]);
+  });
 });

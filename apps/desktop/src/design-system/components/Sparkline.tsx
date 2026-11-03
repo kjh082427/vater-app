@@ -1,4 +1,4 @@
-import { type Direction } from '../format/money';
+import { MISSING, type Direction } from '../format/money';
 import { cx } from '../internal/cx';
 import styles from './Sparkline.module.css';
 import { VisuallyHidden } from './VisuallyHidden';
@@ -38,7 +38,7 @@ export function Sparkline({
   if (data.length === 0) {
     return (
       <span className={cx(styles.empty, className)}>
-        <span aria-hidden="true">—</span>
+        <span aria-hidden="true">{MISSING}</span>
         <VisuallyHidden>{`${label}: 데이터 없음`}</VisuallyHidden>
       </span>
     );

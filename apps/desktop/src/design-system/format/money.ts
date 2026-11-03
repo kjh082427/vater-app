@@ -11,8 +11,8 @@
  * 모두 순수 함수다. 화면 컴포넌트는 이 함수의 결과만 쓰고 직접 숫자를 꾸미지 않는다.
  */
 
-export const MINUS = '−';
-export const MISSING = '—';
+export const MINUS = '\u2212'; // 빼기 기호 −
+export const MISSING = '\u2014'; // 줄표 —
 
 export type Direction = 'up' | 'down' | 'flat';
 export type Currency = 'KRW' | 'USD';

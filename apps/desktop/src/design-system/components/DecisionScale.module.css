@@ -55,8 +55,8 @@
 }
 
 .scale[data-tone='caution'] .cell {
+  border: var(--rule-hair) solid var(--color-caution);
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--color-caution);
 }
 
 /* 큰 크기: 분석 결과 머리. 양 끝에 매도·매수를 적어 눈금의 방향을 알려 준다 */

@@ -23,6 +23,7 @@ import {
   formatUsdChange,
   formatWon,
   formatWonChange,
+  MISSING,
 } from '../format/money';
 import styles from './gallery.module.css';
 import { FlowsLine, IndexTable, WatchTable } from './parts';
@@ -107,7 +108,7 @@ function hex6(value: string): string {
 
 function ratio(rawA: string, rawB: string): string {
   const [a, b] = [hex6(rawA), hex6(rawB)];
-  if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return '—';
+  if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return MISSING;
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
   return `${((hi + 0.05) / (lo + 0.05)).toFixed(2)}:1`;
 }
@@ -135,7 +136,8 @@ function Colors() {
                   <b>{role}</b>
                   <code>{name}</code>
                   <span className="vt-num">
-                    {hex6(values.get(name) ?? '') || '—'} · {ratio(values.get(name) ?? '', paper)}
+                    {hex6(values.get(name) ?? '') || MISSING} ·{' '}
+                    {ratio(values.get(name) ?? '', paper)}
                   </span>
                 </div>
               </div>

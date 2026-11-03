@@ -1,5 +1,7 @@
 import {
+  Children,
   createContext,
+  isValidElement,
   useCallback,
   useContext,
   useId,
@@ -18,6 +20,8 @@ interface TabsState {
 }
 
 const TabsContext = createContext<TabsState | null>(null);
+/** 이 목록에서 Tab 키로 들어갈 탭의 값. 선택된 탭이 목록에 없으면 첫 탭. */
+const FocusableTabContext = createContext<string | undefined>(undefined);
 
 function useTabs(): TabsState {
   const state = useContext(TabsContext);
@@ -70,6 +74,11 @@ export interface TabListProps {
 }
 
 export function TabList({ label, variant = 'line', className, children }: TabListProps) {
+  const { current } = useTabs();
+  const values = Children.toArray(children).flatMap((child) =>
+    isValidElement<{ value: string }>(child) && child.type === Tab ? [child.props.value] : [],
+  );
+  const focusable = values.includes(current) ? current : values[0];
   return (
     <div
       role="tablist"
@@ -78,7 +87,7 @@ export function TabList({ label, variant = 'line', className, children }: TabLis
       className={cx(styles.list, className)}
       data-variant={variant}
     >
-      {children}
+      <FocusableTabContext.Provider value={focusable}>{children}</FocusableTabContext.Provider>
     </div>
   );
 }
@@ -92,6 +101,7 @@ const KEY_STEP: Record<string, (index: number, last: number) => number> = {
 
 export function Tab({ value, children }: { value: string; children: ReactNode }) {
   const { current, select, idFor } = useTabs();
+  const focusable = useContext(FocusableTabContext) ?? current;
   const selected = current === value;
 
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -113,7 +123,7 @@ export function Tab({ value, children }: { value: string; children: ReactNode })
       id={idFor('tab', value)}
       aria-selected={selected}
       aria-controls={idFor('panel', value)}
-      tabIndex={selected ? 0 : -1}
+      tabIndex={value === focusable ? 0 : -1}
       data-value={value}
       className={styles.tab}
       onClick={() => select(value)}

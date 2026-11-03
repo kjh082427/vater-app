@@ -28,6 +28,7 @@
 
 .item[data-align='end'] {
   margin-left: auto;
+  padding-right: var(--space-5);
   border-right: 0;
   border-left: var(--rule-hair) solid var(--color-line);
 }
