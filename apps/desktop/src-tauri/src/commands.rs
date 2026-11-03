@@ -93,6 +93,35 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
     autolaunch.is_enabled().map_err(|e| e.to_string())
 }
 
+/// 사이드카 로그 폴더: `%APPDATA%\Vater\logs` (스펙 8장 로그). APPDATA가 없으면 None.
+pub fn log_dir_from(appdata: Option<std::ffi::OsString>) -> Option<std::path::PathBuf> {
+    let base = std::path::PathBuf::from(appdata.filter(|v| !v.is_empty())?);
+    Some(base.join("Vater").join("logs"))
+}
+
+/// 사이드카가 끝내 뜨지 않았을 때 오류 화면의 [로그 폴더 열기] (스펙 8장).
+#[tauri::command]
+pub fn open_log_folder() -> Result<(), String> {
+    let dir = log_dir_from(std::env::var_os("APPDATA"))
+        .ok_or_else(|| "로그 폴더 위치(APPDATA)를 찾지 못했습니다.".to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg(&dir)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        Err(format!(
+            "이 운영체제에서는 폴더를 열 수 없습니다: {}",
+            dir.display()
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +180,14 @@ mod tests {
             serde_json::to_value(payload).unwrap(),
             json!({"route": "/alerts"})
         );
+    }
+
+    #[test]
+    fn log_dir_is_appdata_vater_logs() {
+        let dir = log_dir_from(Some("C:\\Users\\a\\AppData\\Roaming".into())).unwrap();
+        assert!(dir.ends_with(std::path::Path::new("Vater").join("logs")));
+        assert!(dir.starts_with("C:\\Users\\a\\AppData\\Roaming"));
+        assert_eq!(log_dir_from(None), None);
+        assert_eq!(log_dir_from(Some("".into())), None);
     }
 }
