@@ -1,10 +1,6 @@
-/*
- * 표. 칸 안쪽 여백만큼 표를 양옆으로 내밀어(bleed) 글자는 구역 먹선 끝에 맞추고,
- * 호버·포커스 바탕은 글자보다 조금 넓게 칠한다.
- */
+/* 표. 양 끝 칸은 안쪽 여백 없이 구역 먹선 끝에 맞춘다(선과 글자가 같은 끝에서 시작) */
 .table {
-  width: calc(100% + var(--space-2) * 2);
-  margin-inline: calc(var(--space-2) * -1);
+  width: 100%;
   border-collapse: collapse;
 }
 
@@ -18,7 +14,7 @@
 }
 
 .caption[data-hidden='false'] {
-  padding: 0 var(--space-2) var(--space-2);
+  padding: 0 0 var(--space-2);
   text-align: left;
   font-size: var(--text-xs);
   color: var(--color-ink-3);
@@ -29,6 +25,16 @@
   padding: 0 var(--space-2);
   text-align: left;
   vertical-align: middle;
+}
+
+.th:first-child,
+.td:first-child {
+  padding-left: 0;
+}
+
+.th:last-child,
+.td:last-child {
+  padding-right: 0;
 }
 
 .th {
@@ -63,11 +69,11 @@
 
 .row:focus-visible {
   outline: var(--rule-focus) solid var(--color-focus);
-  outline-offset: calc(var(--rule-focus) * -1);
+  outline-offset: 0;
   background: var(--color-hover);
 }
 
 .empty {
-  padding: var(--space-4) var(--space-2);
+  padding: var(--space-4) 0;
   color: var(--color-ink-3);
 }

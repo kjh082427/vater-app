@@ -2,6 +2,7 @@
 .list[data-variant='line'] {
   display: flex;
   gap: var(--space-5);
+  margin-bottom: var(--space-3);
   border-bottom: var(--rule-hair) solid var(--color-line);
 }
 
