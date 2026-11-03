@@ -156,6 +156,9 @@ impl SidecarManager {
         let (stop_tx, stop_rx) = watch::channel(false);
         let (done_tx, done_rx) = watch::channel(None);
         // 127.0.0.1로만 보내므로 시스템·환경변수 프록시를 쓰지 않는다.
+        // 빌드 전체에 rustls-no-provider가 켜져 있으면(업데이터 플러그인) 암호화 모듈 없이는 Client가 패닉한다.
+        // 이미 설치되어 있으면 Err이고 그대로 둔다. 사이드카 통신 자체는 평문 127.0.0.1이다.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let http = reqwest::Client::builder()
             .no_proxy()
             .build()
