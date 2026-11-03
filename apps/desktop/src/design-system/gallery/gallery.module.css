@@ -406,3 +406,19 @@ code {
 .progressDemo {
   width: 12rem;
 }
+
+/* 차트 견본 */
+.chartBox {
+  display: flex;
+  height: 12rem;
+}
+
+.chartEdges {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.barBox {
+  max-width: 26rem;
+}

@@ -4,8 +4,10 @@ import { AppShell } from '../components/AppShell';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Disclaimer } from '../components/Disclaimer';
+import { DivergingBar } from '../components/DivergingBar';
 import { Icon } from '../components/Icon';
 import { KpiTile } from '../components/KpiTile';
+import { LineChart } from '../components/LineChart';
 import { Menu } from '../components/Menu';
 import { ProgressBar } from '../components/ProgressBar';
 import { SegmentedControl } from '../components/SegmentedControl';
@@ -14,13 +16,16 @@ import { SidebarNav } from '../components/SidebarNav';
 import { SignedNumber } from '../components/SignedNumber';
 import { Sparkline } from '../components/Sparkline';
 import { Tab, TabList, Tabs } from '../components/Tabs';
-import { formatNumber } from '../format/money';
+import { formatEokChange, formatNumber } from '../format/money';
 import styles from './dashboard.module.css';
-import { FlowsLine, WatchTable } from './parts';
-import { brief, indices, watchlist } from './sample';
+import { WatchTable } from './parts';
+import { brief, flows, indices, watchlist } from './sample';
 import { navItems, SidebarFoot, StatusBarSample } from './ShellPreview';
 
 const [kospi, kosdaq] = indices as [(typeof indices)[0], (typeof indices)[0]];
+const dayLabels = kospi.closes.map((_, i) =>
+  i === kospi.closes.length - 1 ? '오늘' : `${kospi.closes.length - 1 - i}일 전`,
+);
 
 const alerts = [
   {
@@ -177,13 +182,14 @@ export function DashboardPreview() {
               <b className="vt-num">{formatNumber(shown.close, 2)}</b>
               <IndexChange row={shown} />
             </div>
-            <div className={styles.chartSlot}>
-              <Sparkline
-                values={shown.closes}
-                direction={shown.change > 0 ? 'up' : 'down'}
-                label={`${shown.name} 최근 30일`}
-              />
-            </div>
+            <LineChart
+              values={shown.closes}
+              labels={dayLabels}
+              baseline={shown.closes[shown.closes.length - 2]}
+              direction={shown.change > 0 ? 'up' : shown.change < 0 ? 'down' : 'flat'}
+              format={(n) => formatNumber(n, 2)}
+              aria-label={`${shown.name} 최근 30거래일 종가`}
+            />
           </Card>
           <Card
             title="브리핑 요약"
@@ -194,7 +200,15 @@ export function DashboardPreview() {
               <AiText size="lead" attribution="AI 해석">
                 {brief.lead}
               </AiText>
-              <FlowsLine />
+              <DivergingBar
+                aria-label="투자자별 순매수 · 코스피"
+                format={formatEokChange}
+                rows={[
+                  { label: '외국인', value: flows.foreign },
+                  { label: '기관', value: flows.institution },
+                  { label: '개인', value: flows.individual },
+                ]}
+              />
               <div className={styles.foot}>
                 <Disclaimer />
                 <Button variant="quiet">브리핑 읽기</Button>

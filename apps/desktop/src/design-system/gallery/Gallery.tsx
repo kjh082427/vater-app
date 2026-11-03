@@ -6,8 +6,10 @@ import { DataTable, type Column } from '../components/DataTable';
 import { Dialog } from '../components/Dialog';
 import { DECISION_LABEL, DecisionScale, type Decision } from '../components/DecisionScale';
 import { Disclaimer } from '../components/Disclaimer';
+import { DivergingBar } from '../components/DivergingBar';
 import { FeedStatus } from '../components/FeedStatus';
 import { Icon } from '../components/Icon';
+import { LineChart } from '../components/LineChart';
 import { MarketState } from '../components/MarketState';
 import { Menu } from '../components/Menu';
 import { ProgressBar } from '../components/ProgressBar';
@@ -22,6 +24,7 @@ import { TextField } from '../components/TextField';
 import { Toggle } from '../components/Toggle';
 import {
   formatEokChange,
+  formatEok,
   formatNumber,
   formatPercent,
   formatSigned,
@@ -33,7 +36,7 @@ import {
 } from '../format/money';
 import styles from './gallery.module.css';
 import { FlowsLine, IndexTable, WatchTable } from './parts';
-import { analysisSummary, brief, watchlist } from './sample';
+import { analysisSummary, brief, flows, indices, watchlist } from './sample';
 import { navItems, SidebarFoot, StatusBarSample } from './ShellPreview';
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -454,6 +457,82 @@ const AGENT_TABS: [string, string, string][] = [
   ['risk', '리스크', '환율이 크게 움직이면 결론을 다시 봐야 한다고 정리했습니다.'],
 ];
 
+const kospiCloses = indices[0]?.closes ?? [];
+const dayLabels = kospiCloses.map((_, i) => `D-${kospiCloses.length - 1 - i}`);
+const fmt2 = (n: number) => formatNumber(n, 2);
+
+function Charts() {
+  return (
+    <Section title="차트" meta="직접 그린 SVG. 방향 색은 옆 숫자와 같은 자료, 축 눈금 12px">
+      <div className={styles.rows}>
+        <Row label="LineChart: 영역 + 선, 전일 종가 점선, 마지막 값 표지">
+          <div className={styles.chartBox}>
+            <LineChart
+              values={kospiCloses}
+              labels={dayLabels}
+              baseline={kospiCloses[kospiCloses.length - 2]}
+              direction="up"
+              format={fmt2}
+              aria-label="코스피 최근 30거래일 종가"
+            />
+          </div>
+        </Row>
+        <Row label="빈 자료 · 값 1개 · 모두 같음 · null 섞임">
+          <div className={styles.chartEdges}>
+            <LineChart
+              values={[]}
+              direction="flat"
+              format={fmt2}
+              height={96}
+              aria-label="자료 없음 견본"
+            />
+            <LineChart
+              values={[742.15]}
+              direction="down"
+              format={fmt2}
+              height={96}
+              aria-label="값 1개 견본"
+            />
+            <LineChart
+              values={[100, 100, 100, 100]}
+              direction="flat"
+              format={fmt2}
+              height={96}
+              aria-label="보합 견본"
+            />
+            <LineChart
+              values={[5, 6, null, 7, 8, null, 6, 9]}
+              direction="up"
+              format={fmt2}
+              height={96}
+              aria-label="끊긴 선 견본"
+            />
+          </div>
+        </Row>
+        <Row label="DivergingBar: 수급(순매수 오른쪽 빨강, 순매도 왼쪽 파랑, 0은 막대 없음)">
+          <div className={styles.barBox}>
+            <DivergingBar
+              aria-label="코스피 투자자별 순매수"
+              format={formatEokChange}
+              rows={[
+                { label: '외국인', value: flows.foreign },
+                { label: '기관', value: flows.institution },
+                { label: '개인', value: flows.individual },
+                { label: '기타', value: 0 },
+              ]}
+            />
+          </div>
+        </Row>
+        <Row label="억 금액(부호 없음)">
+          <p className="vt-num">
+            거래대금 {formatEok(9_812_300_000_000)} · 시가총액 {formatEok(426_000_000_000_000)}
+          </p>
+        </Row>
+      </div>
+    </Section>
+  );
+}
+
 function InputsDemo() {
   const [market, setMarket] = useState<'all' | 'kr' | 'us' | 'jp'>('kr');
   const [range, setRange] = useState<'1d' | '5d' | '1m' | '1y'>('1d');
@@ -805,6 +884,7 @@ export function Gallery() {
       <InputsDemo />
       <SectionsAndTables />
       <Sparklines />
+      <Charts />
       <Notices />
       <AiProse />
       <Chrome />

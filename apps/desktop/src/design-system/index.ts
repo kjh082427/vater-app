@@ -23,9 +23,15 @@ export {
   type DisclaimerProps,
 } from './components/Disclaimer';
 export { Dialog, type DialogProps } from './components/Dialog';
+export {
+  DivergingBar,
+  type DivergingBarProps,
+  type DivergingBarRow,
+} from './components/DivergingBar';
 export { FeedStatus, type FeedState, type FeedStatusProps } from './components/FeedStatus';
 export { Icon, type IconName, type IconProps } from './components/Icon';
 export { KpiTile, type KpiTileProps } from './components/KpiTile';
+export { LineChart, type LineChartProps } from './components/LineChart';
 export {
   MarketState,
   type Market,
