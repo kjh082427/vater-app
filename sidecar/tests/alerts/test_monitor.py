@@ -111,6 +111,8 @@ class Market:
         self.closes: dict[tuple[str, date], float] = {}  # (종목, 날짜) → 그날 확정 종가
         self.fail: Exception | None = None
         self.fail_for: dict[str, Exception] = {}  # 종목별 오류
+        self.bar_fail_for: dict[str, Exception] = {}  # 일봉만 실패
+        self.price_delay = 0.0  # 현재가 응답에 걸리는 시간(동시 요청 확인용)
 
     async def price(self, item: WatchItem) -> Quote:
         self.price_calls.append(item.code)
@@ -118,6 +120,8 @@ class Market:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
+        if self.price_delay:
+            await asyncio.sleep(self.price_delay)
         price = self.prices.get(item.code, 100.0)
         change = self.changes.get(item.code, 0.0)
         return Quote(item.market, item.code, price, change, 0.0, 1000)  # type: ignore[arg-type]
@@ -132,6 +136,8 @@ class Market:
             raise self.fail
         if item.code in self.fail_for:
             raise self.fail_for[item.code]
+        if item.code in self.bar_fail_for:
+            raise self.bar_fail_for[item.code]
         if (item.code, through) not in self.closes:
             return 1  # 예전 봉만 왔다(그날 확정 봉은 아직 없음)
         c = self.closes[(item.code, through)]
@@ -858,3 +864,67 @@ async def test_preview_rejects_bad_params(db: sqlite3.Connection) -> None:
     with pytest.raises(VaterError) as e:
         await rig.monitor.preview(item, "ma_cross", {"fast": 20, "slow": 5}, "close")
     assert (e.value.code, e.value.status) == ("ALERT_RULE_INVALID", 422)
+
+
+async def test_previous_close_waits_for_the_last_sessions_bar(db: sqlite3.Connection) -> None:
+    # 직전 세션 일봉 받기가 실패한 동안은 더 오래된 일봉으로 전일 대비를 지어내지 않는다
+    rig = Rig(db, KR_OPEN)
+    rig.watch("005930")
+    friday = DAY - timedelta(days=4)  # 금요일 일봉만 있다(월요일 일봉은 아직 못 받음)
+    BarRepo(db).upsert("KR", "005930", [Bar(friday, 1, 1, 1, 66000, 1000)])
+    rig.market.bar_fail_for["005930"] = KisApiError("EGW00201", "초당 거래건수 초과")
+    await rig.monitor.tick_once()
+    assert rig.realtime is not None
+    sub = rig.bus.subscribe()
+
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1000, "100001"))
+    assert [q["change"] for q in quotes(drained(sub))] == [None]
+
+    del rig.market.bar_fail_for["005930"]
+    rig.market.closes[("005930", DAY - timedelta(days=1))] = 69000  # 월요일 종가
+    rig.clock.at = KR_OPEN + timedelta(minutes=5)
+    await rig.monitor.tick_once()  # 다시 받아 직전 세션 일봉이 생겼다
+    rig.mono.t += 2
+    rig.realtime.on_tick(Tick("KR", "005930", 71000, 2.9, 1100, "100501"))
+    assert [q["change"] for q in quotes(drained(sub))] == [2000.0]
+
+
+async def test_watch_quotes_do_not_call_kis_while_offline(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.fail = VaterError("KIS_UNREACHABLE", "끊김", status=503)
+    await rig.monitor.tick_once()
+    assert rig.monitor.status()["state"] == "offline"
+    calls = len(rig.market.price_calls)
+
+    got = await rig.monitor.watch_quotes()
+
+    assert len(rig.market.price_calls) == calls  # 끊긴 동안 종목마다 15초씩 기다리지 않는다
+    assert got[0]["price"] is None and got[0]["feed"] == "offline"
+
+
+async def test_concurrent_watch_quotes_share_one_call_per_symbol(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.watch("000660")
+    rig.market.price_delay = 0.05
+
+    a, b = await asyncio.gather(rig.monitor.watch_quotes(), rig.monitor.watch_quotes())
+
+    assert sorted(rig.market.price_calls) == ["000660", "005930"]
+    assert [q["price"] for q in a] == [q["price"] for q in b]
+
+
+async def test_a_failing_symbol_is_retried_once_per_window(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_AFTER)
+    rig.watch("005930")
+    rig.market.fail_for["005930"] = KisApiError("EGW00500", "조회할 수 없는 종목")
+
+    for seconds in (0, 5, 10):
+        rig.clock.at = KR_AFTER + timedelta(seconds=seconds)
+        await rig.monitor.watch_quotes()
+    assert rig.market.price_calls == ["005930"]
+
+    rig.clock.at = KR_AFTER + timedelta(seconds=31)
+    await rig.monitor.watch_quotes()
+    assert rig.market.price_calls == ["005930", "005930"]
