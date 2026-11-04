@@ -1,0 +1,141 @@
+# 태그 하나로 서명된 설치 파일과 latest.json을 공개 저장소 kjh082427/vater-releases에 올린다 (스펙 11장).
+# 비밀값(사용자가 직접 등록): TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD, RELEASES_TOKEN
+# 비밀값이 없으면 서명·업로드를 건너뛰고 설치 파일만 산출물로 남긴다.
+# 초안으로 올려 검증한 뒤 공개하므로, 중간에 실패해도 불완전한 릴리스가 공개되지 않는다.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "릴리스할 태그 (예: v0.1.0)"
+        required: true
+      notes:
+        description: "업데이트 설명"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  TAURI_CLI: "@tauri-apps/cli@2.12.3"
+  RELEASES_REPO: kjh082427/vater-releases
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: 태그와 버전 대조, 비밀값 확인
+        id: meta
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          HAS_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          HAS_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
+        run: |
+          python apps/desktop/src-tauri/packaging/check-versions.py --tag $env:TAG
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $version = $env:TAG.Substring(1)
+          $pubkey = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).plugins.updater.pubkey
+          $publish = ($env:HAS_KEY -eq 'true') -and ($env:HAS_TOKEN -eq 'true')
+          if ($publish -and [string]::IsNullOrWhiteSpace($pubkey)) {
+            throw 'tauri.conf.json의 plugins.updater.pubkey가 비어 있습니다. 공개 키 없이 낸 앱은 업데이트를 받지 못합니다.'
+          }
+          if (-not $publish) { '::warning::Signing key or RELEASES_TOKEN missing: building the installer only, nothing is uploaded.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$($env:TAG)" >> $env:GITHUB_OUTPUT
+          "publish=$($publish.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          "prerelease=$(($version -match '-').ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      # ---------- 사이드카 ----------
+      - uses: astral-sh/setup-uv@v6.8.0
+        with:
+          version: "0.13.6"
+      - run: uv python install 3.13.18
+      - name: Sidecar PyInstaller onedir
+        run: ./apps/desktop/src-tauri/packaging/build-sidecar.ps1
+      - name: Sidecar smoke
+        run: ./apps/desktop/src-tauri/packaging/smoke-sidecar.ps1
+
+      # ---------- 셸 ----------
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: npm ci
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Rust ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Tauri build (서명)
+        if: steps.meta.outputs.publish == 'true'
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx --yes $env:TAURI_CLI build --bundles nsis --config src-tauri/packaging/release.tauri.conf.json -- --locked
+      - name: Tauri build (서명 없음)
+        if: steps.meta.outputs.publish != 'true'
+        working-directory: apps/desktop
+        run: npx --yes $env:TAURI_CLI build --bundles nsis -- --locked
+
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: vater-release-${{ steps.meta.outputs.version }}
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe*
+          if-no-files-found: error
+          retention-days: 30
+
+      # ---------- 설치해서 확인 ----------
+      - name: Installed app smoke
+        run: ./apps/desktop/src-tauri/packaging/smoke-installed.ps1
+      - name: Acceptance W1–W9
+        run: ./apps/desktop/src-tauri/packaging/acceptance-installed.ps1
+
+      # ---------- vater-releases에 올리기 ----------
+      - name: latest.json 만들기
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          $bundle = 'apps/desktop/src-tauri/target/release/bundle/nsis'
+          python apps/desktop/src-tauri/packaging/make-latest-json.py `
+            --version $env:VERSION `
+            --sig "$bundle/Vater_$($env:VERSION)_x64-setup.exe.sig" `
+            --base-url "https://github.com/$($env:RELEASES_REPO)/releases/download" `
+            --notes "$env:NOTES" `
+            --out "$bundle/latest.json"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: 초안으로 올리고 검증한 뒤 공개
+        if: steps.meta.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          NOTES: ${{ inputs.notes }}
+        run: ./apps/desktop/src-tauri/packaging/publish-release.ps1

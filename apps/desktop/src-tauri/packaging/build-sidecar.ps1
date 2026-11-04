@@ -18,6 +18,7 @@ try {
     # --collect-data vater_core: SQL 마이그레이션과 llm/catalog.json(importlib.resources로 읽는다)
     # --collect-submodules uvicorn: uvicorn이 문자열로 import하는 loop·protocol 모듈
     # --collect-submodules keyring.backends, --copy-metadata keyring: Windows 자격 증명 관리자 백엔드(entry point로 찾는다)
+    # --copy-metadata vater-core: /health의 버전(importlib.metadata). 없으면 0.0.0-dev로 보인다
     uv run --locked --no-dev --with "pyinstaller==$PyInstallerVersion" pyinstaller `
         --noconfirm --clean --onedir --console `
         --name vater-core `
@@ -25,6 +26,7 @@ try {
         --collect-submodules uvicorn `
         --collect-submodules keyring.backends `
         --copy-metadata keyring `
+        --copy-metadata vater-core `
         --distpath (Join-Path $sidecar 'dist') `
         --workpath (Join-Path $work 'build') `
         --specpath $work `

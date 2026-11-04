@@ -126,6 +126,33 @@ describe('Tauri 플랫폼', () => {
     await platform.openLogFolder();
     expect(invoke).toHaveBeenCalledWith('open_log_folder');
   });
+
+  it('앱 버전과 업데이트: get_app_version, check_update, install_update', async () => {
+    const { bridge, invoke } = fakeTauri({
+      get_app_version: '0.2.0',
+      check_update: { state: 'available', version: '0.3.0', notes: '고침' },
+      install_update: null,
+    });
+    const platform = createTauriPlatform(bridge);
+    expect(await platform.getAppVersion()).toBe('0.2.0');
+    expect(await platform.checkUpdate()).toEqual({
+      state: 'available',
+      version: '0.3.0',
+      notes: '고침',
+    });
+    await platform.installUpdate();
+    expect(invoke).toHaveBeenCalledWith('install_update');
+  });
+
+  it('update-available 이벤트를 전달한다', async () => {
+    const { bridge, emit } = fakeTauri({});
+    const seen: unknown[] = [];
+    const off = createTauriPlatform(bridge).onUpdateAvailable((info) => seen.push(info));
+    await Promise.resolve();
+    emit('update-available', { state: 'available', version: '0.3.0' });
+    expect(seen).toEqual([{ state: 'available', version: '0.3.0' }]);
+    off();
+  });
 });
 
 describe('브라우저 플랫폼 (Vite 개발 서버)', () => {
@@ -161,5 +188,15 @@ describe('브라우저 플랫폼 (Vite 개발 서버)', () => {
     await expect(platform.openLogFolder()).rejects.toMatchObject({
       message: '설치한 앱에서만 열 수 있습니다',
     });
+  });
+
+  it('업데이트는 쓸 수 없고 앱 버전은 모른다(/health를 쓴다)', async () => {
+    const platform = createBrowserPlatform({});
+    expect(await platform.getAppVersion()).toBeNull();
+    expect(await platform.checkUpdate()).toEqual({ state: 'disabled' });
+    await expect(platform.installUpdate()).rejects.toMatchObject({
+      message: '설치한 앱에서만 할 수 있습니다',
+    });
+    expect(typeof platform.onUpdateAvailable(() => undefined)).toBe('function');
   });
 });

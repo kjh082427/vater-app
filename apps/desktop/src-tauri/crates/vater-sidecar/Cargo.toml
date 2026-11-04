@@ -10,6 +10,8 @@ publish = false
 serde_json = "=1.0.154"
 rand = "=0.10.3"
 reqwest = { version = "=0.13.5", default-features = false }
+# 업데이터 플러그인이 reqwest에 켜는 rustls-no-provider는 클라이언트를 만들기 전에 암호화 모듈을 요구한다
+rustls = { version = "=0.23.46", default-features = false, features = ["ring"] }
 tokio = { version = "=1.53.3", features = ["io-util", "macros", "process", "rt", "sync", "time"] }
 
 # Windows 작업 개체(사이드카를 셸과 함께 끝나게 묶는다). 이미 Cargo.lock에 있는 버전(2025-10-06 배포).
