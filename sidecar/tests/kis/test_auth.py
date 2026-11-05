@@ -185,3 +185,13 @@ async def test_cache_json_is_small(store: EnvFileSecretStore) -> None:
     async with httpx.AsyncClient() as http:
         await manager(store, http).token()
     assert len(store.get(SecretName.KIS_ACCESS_TOKEN) or "") < 1000
+
+
+@respx.mock
+async def test_token_server_outage_is_not_an_auth_failure(store: EnvFileSecretStore) -> None:
+    respx.post(f"{PROD}/oauth2/tokenP").mock(return_value=httpx.Response(503))
+    async with httpx.AsyncClient() as http:
+        tm = TokenManager(http, store, CREDS, KisServer.PROD)
+        with pytest.raises(VaterError) as e:
+            await tm.token()
+    assert e.value.code == "KIS_UNREACHABLE"

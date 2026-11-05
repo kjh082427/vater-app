@@ -1155,6 +1155,8 @@ export interface components {
       last_error: string | null;
       /** Last Synced At */
       last_synced_at: string | null;
+      /** Server */
+      server: string | null;
       /**
        * Status
        * @enum {string}

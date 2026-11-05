@@ -10,7 +10,7 @@
 
 ## Global Constraints
 - 라벨 `area:core`. 주문 없음.
-- 새 마이그레이션 `005_portfolio.sql`: `portfolio_daily(day TEXT PK, kr_value, kr_cost, us_value, us_cost, usdkrw, backfilled INTEGER)`, `fx_daily(day TEXT PK, usdkrw)`
+- 새 마이그레이션 `006_portfolio.sql`: `portfolio_daily(day TEXT PK, kr_value, kr_cost, us_value, us_cost, usdkrw, backfilled INTEGER)`, `fx_daily(day TEXT PK, usdkrw)`
 - 환율: `FHKST03030100`, `FID_COND_MRKT_DIV_CODE=X`, `FID_INPUT_ISCD=FX@KRW`(실제 호출 확인). 하루 한 시점만 저장, `?refresh=true`일 때 다시 받음.
 - 시세가 없으면 평가값은 null. **값을 지어내지 않는다.** 브리핑 숫자는 자료에서만 계산한다.
 

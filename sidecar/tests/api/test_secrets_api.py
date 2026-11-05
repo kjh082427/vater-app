@@ -4,7 +4,9 @@ from typing import Any
 
 import httpx
 
+from vater_core.api.deps import AppDeps
 from vater_core.logging_setup import setup_logging
+from vater_core.secrets.names import SecretName
 
 
 async def test_put_secret_is_write_only(client: httpx.AsyncClient) -> None:
@@ -86,3 +88,15 @@ async def test_broker_secret_is_masked_in_logs(deps: Any) -> None:
         root.removeHandler(h)
         h.close()
     assert "broker-sec-55" not in text
+
+
+async def test_changing_a_kis_key_drops_the_cached_tokens(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    assert deps.secrets is not None
+    await client.put("/secrets/KIS_APP_KEY", json={"value": "old-key"})
+    deps.secrets.set(SecretName.KIS_ACCESS_TOKEN, "cached")
+    await client.put("/secrets/KIS_APP_KEY", json={"value": "old-key"})  # 같은 값: 발급을 아낀다
+    assert deps.secrets.get(SecretName.KIS_ACCESS_TOKEN) == "cached"
+    await client.put("/secrets/KIS_APP_KEY", json={"value": "new-key"})
+    assert deps.secrets.get(SecretName.KIS_ACCESS_TOKEN) is None
