@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { AlertKindInfo, AlertRule, MarketCode, WatchItem } from '../../api/types';
+import type {
+  AlertKindInfo,
+  AlertRule,
+  BrokerOut,
+  ConnectionOut,
+  HoldingOut,
+  MarketCode,
+  WatchItem,
+  WatchResult,
+} from '../../api/types';
 import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -12,6 +21,7 @@ import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { AlertHistory } from './AlertHistory';
 import styles from './alerts.module.css';
+import { UploadButtons, UploadDialog } from '../holdings/UploadDialog';
 import { WatchPanel } from './WatchPanel';
 
 export interface AlertsScreenProps {
@@ -25,6 +35,12 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const watch = useResource<WatchItem[]>('/watchlist');
   const rules = useResource<AlertRule[]>('/alerts/rules');
   const kinds = useResource<AlertKindInfo[]>('/alerts/kinds');
+  const brokers = useResource<BrokerOut[]>('/brokers');
+  const connections = useResource<ConnectionOut[]>('/connections');
+  const holdings = useResource<HoldingOut[]>('/holdings');
+  // 업로드 확인 창: brokerId null은 연결한 증권사 모두
+  const [uploading, setUploading] = useState<{ brokerId: string | null } | null>(null);
+  const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
@@ -53,6 +69,16 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     }
   }
 
+  function uploadDone(result: WatchResult) {
+    setUploading(null);
+    setUploaded(
+      `${result.added}종목을 감시 종목에 올렸습니다.${result.skipped > 0 ? ` ${result.skipped}종목은 이미 있거나 찾지 못해 건너뛰었습니다.` : ''}${result.rules > 0 ? ` 알림 규칙 ${result.rules}개를 만들었습니다.` : ''}`,
+    );
+    watch.reload();
+    rules.reload();
+    holdings.reload();
+  }
+
   function removed(item: WatchItem) {
     watch.mutate((list) => list?.filter((w) => w.id !== item.id));
     rules.mutate((list) => list?.filter((r) => r.watchlist_id !== item.id));
@@ -76,6 +102,21 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
             title="감시 종목"
             description={items && items.length > 0 ? `${items.length}종목` : undefined}
           >
+            <UploadButtons
+              brokers={brokers.data ?? []}
+              connections={connections.data ?? []}
+              holdings={holdings.data ?? []}
+              watchedKeys={watchedKeys}
+              onOpen={(brokerId) => {
+                setUploaded(null);
+                setUploading({ brokerId });
+              }}
+            />
+            {uploaded ? (
+              <p role="status" className={common.meta}>
+                {uploaded}
+              </p>
+            ) : null}
             {adding ? (
               <div className={styles.editor}>
                 <SymbolSearch
@@ -176,6 +217,15 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               </ul>
             ) : null}
           </Card>
+          {uploading ? (
+            <UploadDialog
+              brokerId={uploading.brokerId}
+              brokers={brokers.data ?? []}
+              kinds={kinds.data}
+              onClose={() => setUploading(null)}
+              onUploaded={uploadDone}
+            />
+          ) : null}
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
         </div>
       </div>
