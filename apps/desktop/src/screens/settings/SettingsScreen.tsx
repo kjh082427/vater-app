@@ -99,6 +99,55 @@ function BriefingSettings({
   );
 }
 
+const QUOTE_SECONDS = [30, 60, 300, 600, 1800, 3600] as const;
+const QUOTE_LABEL: Record<number, string> = {
+  30: '30초',
+  60: '1분',
+  300: '5분',
+  600: '10분',
+  1800: '30분',
+  3600: '1시간',
+};
+const HOLDINGS_MINUTES = [0, 10, 30, 60] as const;
+const HOLDINGS_LABEL: Record<number, string> = { 0: '끔', 10: '10분', 30: '30분', 60: '1시간' };
+
+/** 갱신 주기(스펙 3장): 주가(기본 10분)와 보유 수량(기본 끔). 둘 다 장이 열린 시간에만 돈다. */
+function RefreshSettings({
+  settings,
+  save,
+}: {
+  settings: Settings | undefined;
+  save: (changes: Settings) => Promise<boolean>;
+}) {
+  if (!settings) return null;
+  const quotes = Number(settings['quotes.refresh_sec'] ?? 600);
+  const holdings = Number(settings['holdings.sync_minutes'] ?? 0);
+  return (
+    <>
+      <SelectField
+        label="주가 갱신 주기"
+        hint="실시간·폴링 규칙이 없는 종목에만 적용합니다. 장이 열린 시간에만 갱신하고, 규칙이 있는 종목의 알림 시간은 바뀌지 않습니다. 시세는 종목당 30초 동안 재사용하므로 30초가 가장 짧습니다."
+        value={String(quotes)}
+        onChange={(v) => void save({ 'quotes.refresh_sec': Number(v) })}
+        options={QUOTE_SECONDS.map((n) => ({
+          value: String(n),
+          label: QUOTE_LABEL[n] ?? `${n}초`,
+        }))}
+      />
+      <SelectField
+        label="보유 수량 갱신 주기"
+        hint="앱을 켤 때 한 번과 [새로 고침]은 늘 합니다. 주기 조회는 장이 열린 시간에만 합니다. 자산 추이를 위해 하루 한 번은 끔이어도 조회합니다."
+        value={String(holdings)}
+        onChange={(v) => void save({ 'holdings.sync_minutes': Number(v) })}
+        options={HOLDINGS_MINUTES.map((n) => ({
+          value: String(n),
+          label: HOLDINGS_LABEL[n] ?? `${n}분`,
+        }))}
+      />
+    </>
+  );
+}
+
 function GeneralSettings({
   settings,
   save,
@@ -158,6 +207,7 @@ function GeneralSettings({
         onChange={(on) => void save({ 'general.close_to_tray': on })}
       />
       {error ? <ApiErrorNotice error={error} /> : null}
+      <RefreshSettings settings={settings} save={save} />
       <dl className={styles.facts}>
         <dt>버전</dt>
         <dd className="vt-num">{appVersion ?? health.data?.version ?? '—'}</dd>

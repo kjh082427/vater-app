@@ -12,6 +12,7 @@ import type { EventType } from '../api/types';
 import type { Resource } from '../api/useResource';
 
 export interface LiveContext<T> {
+  api: ApiClient;
   events: EventHub;
   get: () => T | undefined;
   mutate: (update: (prev: T | undefined) => T | undefined) => void;
@@ -95,6 +96,7 @@ class Entry<T> {
     if (this.source.live) {
       this.offs.push(
         this.source.live({
+          api: this.store.api,
           events,
           get: () => this.snapshot.data,
           mutate: this.mutate,

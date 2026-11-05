@@ -314,3 +314,77 @@ describe('브리핑 상세: 미국', () => {
     );
   });
 });
+
+describe('브리핑 상세: 내 자산 구역(스펙 15장)', () => {
+  const assets = {
+    change_krw: 130236,
+    change_pct: 1.21,
+    currencies: {
+      KRW: { change: 111000, change_pct: 1.05 },
+      USD: { change: 13.74, change_pct: 2.1 },
+    },
+    top: { code: '005930', name: '삼성전자', amount: 111000, currency: 'KRW' },
+    bottom: { code: 'AAPL', name: '애플', amount: -3.21, currency: 'USD' },
+  };
+  const kr = () => {
+    const b = mock.db.briefings.find((x) => x.id === 21);
+    if (!b) throw new Error('fixture');
+    return b;
+  };
+
+  it('전체 변화와 통화별 변화, 가장 많이 기여한·빠진 종목을 보여 주고 AI를 거치지 않았다고 알린다', async () => {
+    kr().my_assets = assets;
+    renderAt('#/briefings/21');
+    const card = await waitFor(() => region('내 자산'));
+    expect(within(card).getByText('+130,236원')).toHaveAttribute('data-direction', 'up');
+    expect(within(card).getByText('+1.21%')).toBeInTheDocument();
+    // 원화 변화와 가장 많이 기여한 종목(삼성전자) 둘 다 +111,000원
+    expect(within(card).getAllByText('+111,000원')).toHaveLength(2);
+    expect(within(card).getByText('+$13.74')).toBeInTheDocument();
+    expect(within(card).getByText('삼성전자')).toBeInTheDocument();
+    expect(within(card).getByText('−$3.21')).toHaveAttribute('data-direction', 'down');
+    expect(
+      within(card).getByText(/앱이 계산한 값입니다\. AI를 거치지 않습니다/),
+    ).toBeInTheDocument();
+    // AI 해석 꼬리표가 붙지 않는다
+    expect(within(card).queryByText('AI 해석')).not.toBeInTheDocument();
+  });
+
+  it('보유 내역이 없으면(my_assets null) 이 구역을 숨긴다', async () => {
+    kr().my_assets = null;
+    renderAt('#/briefings/21');
+    await screen.findByRole('region', { name: '지수' });
+    expect(screen.queryByRole('region', { name: '내 자산' })).not.toBeInTheDocument();
+  });
+
+  it('my_assets 필드가 아예 없어도 숨긴다', async () => {
+    delete kr().my_assets;
+    renderAt('#/briefings/21');
+    await screen.findByRole('region', { name: '지수' });
+    expect(screen.queryByRole('region', { name: '내 자산' })).not.toBeInTheDocument();
+  });
+
+  it('top·bottom이 null이면 "해당 없음", 전일 기록이 없어 변화가 null이면 —와 이유', async () => {
+    kr().my_assets = {
+      change_krw: null,
+      change_pct: null,
+      currencies: { KRW: { change: null, change_pct: null } },
+      top: null,
+      bottom: null,
+    };
+    renderAt('#/briefings/21');
+    const card = await waitFor(() => region('내 자산'));
+    expect(within(card).getAllByText('해당 없음')).toHaveLength(2);
+    expect(
+      within(card).getByText(/전일 기록이나 종가·환율이 없어 변화를 계산하지 못했습니다/),
+    ).toBeInTheDocument();
+    expect(within(card).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('계산이 실패해 my_assets가 빠졌으면 빠진 항목에 "내 자산"', async () => {
+    kr().status = 'partial';
+    kr().missing = ['my_assets'];
+    renderAt('#/briefings/21');
+    expect(await screen.findByText('빠진 항목: 내 자산')).toBeInTheDocument();
+  });
+});

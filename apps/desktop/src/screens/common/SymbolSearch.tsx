@@ -3,6 +3,7 @@ import { useResource } from '../../api/useResource';
 import type { SymbolOut } from '../../api/types';
 import { Button } from '../../design-system';
 import { ApiErrorNotice } from './ApiErrorNotice';
+import { CategoryBrowser } from './CategoryBrowser';
 import { Field } from './Field';
 import formStyles from './form.module.css';
 import { StockName } from './quotes';
@@ -11,6 +12,53 @@ import styles from './screen.module.css';
 const DEBOUNCE_MS = 250;
 
 export const symbolKey = (s: { market: string; code: string }) => `${s.market}:${s.code}`;
+
+export interface SymbolResultListProps {
+  label: string;
+  symbols: SymbolOut[];
+  actionLabel: string;
+  onPick: (symbol: SymbolOut) => void;
+  marked?: { keys: ReadonlySet<string>; label: string };
+  busyKey?: string | null;
+}
+
+/** 종목 목록: 종목마다 행동 버튼 하나(이미 표시된 종목은 글자). 검색 결과와 분류 탐색이 같이 쓴다. */
+export function SymbolResultList({
+  label,
+  symbols,
+  actionLabel,
+  onPick,
+  marked,
+  busyKey,
+}: SymbolResultListProps) {
+  return (
+    <ul className={styles.results} aria-label={label}>
+      {symbols.map((s) => {
+        const key = symbolKey(s);
+        return (
+          <li key={key} className={styles.result}>
+            <StockName market={s.market} name={s.name} code={s.code} />
+            <span className={styles.stockMeta}>{s.exchange}</span>
+            <span className={styles.resultAction}>
+              {marked?.keys.has(key) ? (
+                <span className={styles.stockMeta}>{marked.label}</span>
+              ) : (
+                <Button
+                  size="sm"
+                  busy={busyKey === key}
+                  aria-label={`${s.name} ${actionLabel}`}
+                  onClick={() => onPick(s)}
+                >
+                  {actionLabel}
+                </Button>
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export interface SymbolSearchProps {
   /** 결과마다 붙는 버튼 글자. 예: "추가", "선택". */
@@ -72,32 +120,21 @@ export function SymbolSearch({
         </p>
       ) : null}
       {query && results.data && results.data.length > 0 ? (
-        <ul className={styles.results} aria-label="검색 결과">
-          {results.data.map((s) => {
-            const key = symbolKey(s);
-            return (
-              <li key={key} className={styles.result}>
-                <StockName market={s.market} name={s.name} code={s.code} />
-                <span className={styles.stockMeta}>{s.exchange}</span>
-                <span className={styles.resultAction}>
-                  {marked?.keys.has(key) ? (
-                    <span className={styles.stockMeta}>{marked.label}</span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      busy={busyKey === key}
-                      aria-label={`${s.name} ${actionLabel}`}
-                      onClick={() => onPick(s)}
-                    >
-                      {actionLabel}
-                    </Button>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        <SymbolResultList
+          label="검색 결과"
+          symbols={results.data}
+          actionLabel={actionLabel}
+          onPick={onPick}
+          marked={marked}
+          busyKey={busyKey}
+        />
       ) : null}
+      <CategoryBrowser
+        actionLabel={actionLabel}
+        onPick={onPick}
+        marked={marked}
+        busyKey={busyKey}
+      />
     </div>
   );
 }

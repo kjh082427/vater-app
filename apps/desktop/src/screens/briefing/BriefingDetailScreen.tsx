@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { BriefingDetail } from '../../api/types';
+import type { BriefingDetail, MyAssets } from '../../api/types';
 import {
   AiText,
   Card,
   Disclaimer,
   formatNumber,
   Section,
+  SignedNumber,
   Tab,
   TabList,
   TabPanel,
@@ -55,6 +56,63 @@ function Part({
       <div className={styles.body}>
         <Interpretation text={text} />
         {missing ? <NotReceived label={title} /> : children}
+      </div>
+    </Card>
+  );
+}
+
+const CURRENCY_NAME: Record<string, string> = { KRW: '원화', USD: '달러' };
+
+/**
+ * 내 자산(스펙 15장): 오늘 평가금액 변화와 가장 많이 기여한·빠진 종목. 앱이 보유 내역으로 직접 계산한 값이라
+ * AI를 거치지 않고(꼬리표 없음), AI 입력에도 들어가지 않는다. 일부 종목의 종가가 없으면 그 통화는 더하지 않는다.
+ */
+function MyAssetsSection({ assets }: { assets: MyAssets }) {
+  const move = (m: MyAssets['top'], word: string) => (
+    <div>
+      <dt>{word}</dt>
+      <dd>
+        {m ? (
+          <>
+            <b>{m.name}</b>{' '}
+            <SignedNumber value={m.amount} format={m.currency === 'USD' ? 'usd' : 'won'} unit />
+          </>
+        ) : (
+          <span className={common.meta}>해당 없음</span>
+        )}
+      </dd>
+    </div>
+  );
+  return (
+    <Card title="내 자산" description="오늘 평가금액 변화(전일 종가 대비)">
+      <div className={styles.body}>
+        <dl className={styles.assets}>
+          <div>
+            <dt>전체(원화 환산)</dt>
+            <dd>
+              <SignedNumber value={assets.change_krw} format="won" unit />{' '}
+              <SignedNumber value={assets.change_pct} format="percent" />
+            </dd>
+          </div>
+          {Object.entries(assets.currencies).map(([cur, c]) => (
+            <div key={cur}>
+              <dt>{CURRENCY_NAME[cur] ?? cur}</dt>
+              <dd>
+                <SignedNumber value={c.change} format={cur === 'USD' ? 'usd' : 'won'} unit />{' '}
+                <SignedNumber value={c.change_pct} format="percent" />
+              </dd>
+            </div>
+          ))}
+          {move(assets.top, '가장 많이 기여')}
+          {move(assets.bottom, '가장 많이 빠짐')}
+        </dl>
+        {assets.change_krw === null ? (
+          <p className={styles.missing}>
+            전일 기록이나 종가·환율이 없어 변화를 계산하지 못했습니다. 일부 종목의 종가가 없으면 그
+            통화는 더하지 않습니다.
+          </p>
+        ) : null}
+        <p className={common.meta}>앱이 계산한 값입니다. AI를 거치지 않습니다.</p>
       </div>
     </Card>
   );
@@ -109,6 +167,7 @@ function Body({ b }: { b: BriefingDetail }) {
       <div className={common.twoUp}>
         <div className={common.twoUpGrid}>
           <div className={common.column}>
+            {b.my_assets ? <MyAssetsSection assets={b.my_assets} /> : null}
             <Part title="지수" text={text.market} missing={has('indices')}>
               <IndexTable rows={parseIndices(b.data)} />
             </Part>
