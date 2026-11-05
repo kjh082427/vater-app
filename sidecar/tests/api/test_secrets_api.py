@@ -58,3 +58,31 @@ async def test_value_is_trimmed_and_deletable(client: httpx.AsyncClient) -> None
     assert (await client.get("/secrets")).json()["LLM_GOOGLE_KEY"] is True
     assert (await client.delete("/secrets/LLM_GOOGLE_KEY")).status_code == 204
     assert (await client.get("/secrets")).json()["LLM_GOOGLE_KEY"] is False
+
+
+async def test_broker_secrets_are_not_reachable_through_the_secrets_api(
+    client: httpx.AsyncClient, deps: Any
+) -> None:
+    deps.secrets.set("BROKER_1_APP_KEY", "broker-key")
+    assert (await client.put("/secrets/BROKER_1_APP_KEY", json={"value": "x"})).status_code in (
+        400,
+        422,
+    )
+    assert (await client.delete("/secrets/BROKER_1_APP_KEY")).status_code in (400, 422)
+    assert "BROKER_1_APP_KEY" not in (await client.get("/secrets")).json()
+    assert deps.secrets.get("BROKER_1_APP_KEY") == "broker-key"
+
+
+async def test_broker_secret_is_masked_in_logs(deps: Any) -> None:
+    deps.secrets.set("BROKER_1_APP_SECRET", "broker-sec-55")
+    setup_logging(deps.data_dir, deps.secrets.known_values)
+    log = logging.getLogger("vater_core.test")
+    log.info("oops broker-sec-55")
+    root = logging.getLogger()
+    for h in root.handlers:
+        h.flush()
+    text = (deps.data_dir / "logs" / "vater-core.log").read_text(encoding="utf-8")
+    for h in [h for h in root.handlers if getattr(h, "_vater", False)]:
+        root.removeHandler(h)
+        h.close()
+    assert "broker-sec-55" not in text
