@@ -20,6 +20,7 @@ from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
 from vater_core.brokers.base import ADAPTERS, BrokerContext, BrokerCreds
 from vater_core.brokers.readonly import ReadOnlyHttp
+from vater_core.kis.services import require_kis
 from vater_core.secrets.names import BrokerSecretField, SecretName, broker_secret
 from vater_core.secrets.store import SecretStore
 from vater_core.store.holdings import (
@@ -34,7 +35,7 @@ from vater_core.store.settings import SettingsRepo
 
 logger = logging.getLogger(__name__)
 
-AUTH_ERRORS = {"BROKER_AUTH_INVALID"}
+AUTH_ERRORS = {"BROKER_AUTH_INVALID", "KIS_AUTH_INVALID"}
 TICK_SEC = 60.0
 _FIELDS: tuple[BrokerSecretField, ...] = ("APP_KEY", "APP_SECRET", "ACCOUNT", "TOKEN")
 _MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
@@ -162,6 +163,7 @@ class HoldingsService:
             BrokerCreds(conn.id, key, secret, account),
             s,
             lambda base, allowed: ReadOnlyHttp(http, base, allowed),
+            kis=require_kis(self._deps).client if conn.broker_id == "kis" else None,
         )
 
     def _forget_secrets(self, conn_id: int) -> None:

@@ -835,3 +835,15 @@ async def test_delete_broker_data_refused_while_connected_but_clears_a_lost_one(
 def test_account_mask_uses_digits_only() -> None:
     assert holdings_service.mask_account("12 34 56 78") == "****5678"
     assert holdings_service.mask_account("   ") == ""
+
+
+async def test_rejected_kis_key_marks_the_connection_lost(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    assert deps.secrets is not None
+    deps.secrets.set(SecretName.KIS_APP_KEY, "kis-key")
+    deps.secrets.set(SecretName.KIS_APP_SECRET, "kis-secret")
+    await connect(client, "kis", "1234567801")
+    fakes["kis"].sync_error = VaterError("KIS_AUTH_INVALID", "인증 실패", status=401)
+    await client.post("/holdings/sync", json={})
+    assert (await client.get("/connections")).json()[0]["status"] == "lost"
