@@ -28,6 +28,7 @@ from vater_core.config import load_runtime
 from vater_core.holdings.service import get_holdings
 from vater_core.kis.master import keep_master_fresh
 from vater_core.logging_setup import setup_logging
+from vater_core.portfolio.daily import get_daily
 from vater_core.secrets.store import select_secret_store
 from vater_core.stdout_events import emit
 from vater_core.store.db import open_db
@@ -89,6 +90,7 @@ def main() -> None:
             get_alerts(deps).start()  # 알림 감시 (장중 실시간·폴링, 장 마감 후 평가)
             get_briefing(deps).start()  # 일일 시장 브리핑 일정
             get_holdings(deps).start()  # 보유 내역: 시작 때 한 번, 설정한 주기마다
+            get_daily(deps).start()  # 자산 추이: 하루 한 번, 빈 거래일은 채운다
         get_analysis(deps)  # 분석 작업 큐(워커 1개)를 띄운다. 제출이 없으면 아무 일도 하지 않는다
         # 분석 완료·실패를 알림 이력에 남긴다
         stop_event_alerts = record_event_alerts(deps.events, db) if deps.events else None
@@ -103,6 +105,8 @@ def main() -> None:
                 await deps.alerts.stop()
             if deps.briefing is not None:
                 await deps.briefing.stop()
+            if deps.daily is not None:
+                await deps.daily.stop()
             if deps.holdings is not None:
                 await deps.holdings.stop()
             if deps.analysis is not None:

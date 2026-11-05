@@ -272,6 +272,13 @@ class BarRepo:
         ).fetchall()
         return [(date.fromisoformat(r[0]), float(r[1])) for r in rows]
 
+    def close_on(self, market: str, code: str, day: date) -> float | None:
+        r = self._conn.execute(
+            "SELECT close FROM daily_bars WHERE market = ? AND code = ? AND day = ?",
+            (market, code, day.isoformat()),
+        ).fetchone()
+        return float(r[0]) if r else None
+
     def close_before(self, market: str, code: str, day: date) -> float | None:
         """그 날짜 전의 가장 최근 종가(실시간 틱의 전일 대비 계산용)."""
         r = self._conn.execute(

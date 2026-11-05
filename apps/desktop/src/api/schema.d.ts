@@ -674,6 +674,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/portfolio/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Portfolio History
+     * @description 주식 평가금액 추이(오래된 것부터). 예수금은 넣지 않는다.
+     */
+    get: operations['portfolio_history_portfolio_history_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/portfolio/summary': {
     parameters: {
       query?: never;
@@ -1394,6 +1414,19 @@ export interface components {
       status: string;
       /** Version */
       version: string;
+    };
+    /** HistoryPoint */
+    HistoryPoint: {
+      /** Backfilled */
+      backfilled: boolean;
+      /** Cost */
+      cost: number | null;
+      /** Day */
+      day: string;
+      /** Usdkrw */
+      usdkrw: number | null;
+      /** Value */
+      value: number | null;
     };
     /** HoldingOut */
     HoldingOut: {
@@ -4054,6 +4087,56 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['IndexOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  portfolio_history_portfolio_history_get: {
+    parameters: {
+      query?: {
+        range?: '1m' | '3m' | '1y' | 'all';
+        view?: 'all' | 'krw' | 'usd';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HistoryPoint'][];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */
