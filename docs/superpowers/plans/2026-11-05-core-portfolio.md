@@ -9,6 +9,7 @@
 **Spec:** v2 설계 3, 4-1, 4-4, 6, 12, 13, 15장. 선행: `core/holdings`.
 
 ## Global Constraints
+- **개인정보를 AI에 보내지 않는다(스펙 8-1).** 평가금액, 수량, 평단가, 보유 종목은 AI 입력에 넣지 않는다.
 - 라벨 `area:core`. 주문 없음.
 - 새 마이그레이션 `006_portfolio.sql`: `portfolio_daily(day TEXT PK, kr_value, kr_cost, us_value, us_cost, usdkrw, backfilled INTEGER)`, `fx_daily(day TEXT PK, usdkrw)`
 - 환율: `FHKST03030100`, `FID_COND_MRKT_DIV_CODE=X`, `FID_INPUT_ISCD=FX@KRW`(실제 호출 확인). 하루 한 시점만 저장, `?refresh=true`일 때 다시 받음.
@@ -51,6 +52,7 @@
 
 ### Task 5: 브리핑 개인화
 **Files:** `briefing/collect.py`, 스키마 / Test `tests/briefing/`
-- 자료에 `my_assets: {change_krw, change_pct, top:{code,name,amount}, bottom:{...}}`. AI 문장에는 숫자를 넣지 않는 기존 규칙 유지.
+- `my_assets: {change_krw, change_pct, top:{code,name,amount}, bottom:{...}}`는 저장과 표시에만 쓰고 **AI 입력(`build_messages`)에 넣지 않는다**(스펙 8-1). 수집 자료와 분리해 둔다.
+- 테스트: 보유 내역이 있어도 `build_messages` 결과에 종목명, 코드, 금액이 없음. `analysis/`, `briefing/interpret.py`, `llm/`이 `holdings`, `portfolio`, `store.holdings`를 import하면 실패하는 검사(`tests/test_no_personal_data_to_ai.py`).
 - [ ] 테스트(실패 확인): 기여 최대·최소, 보유 없으면 키 없음과 `missing` 제외, 전일 기록 없음
 - [ ] 구현 → 커밋 `feat(briefing): 내 자산 구역`
