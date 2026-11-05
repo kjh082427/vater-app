@@ -9,7 +9,7 @@
 **Spec:** v2 설계 0, 1, 8장. 참고: `docs/brokers/meritz.md`. 선행: `core/holdings`.
 
 ## Global Constraints
-- 라벨 `area:core`. **경로 허용 목록 고정. 주문 경로 금지.**
+- 라벨 `area:core`. **경로 허용 목록 고정. 주문 경로 금지.** 공식 명세의 메리츠 주문 경로를 `tests/test_readonly_guarantee.py`의 패턴과 그 테스트에 더한다.
 - 모든 요청에 `mac_address`(12자리 대문자 16진수). 앱은 `uuid.getnode()`로 읽는다. MAC을 로그에 쓰지 않는다.
 - 계좌 비밀번호는 받지 않는다. 조회에 필요하다고 확인되면 멈추고 사용자에게 묻는다.
 

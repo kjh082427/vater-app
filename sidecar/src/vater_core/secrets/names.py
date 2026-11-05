@@ -1,6 +1,7 @@
 """비밀키 이름. 개발용 `.env`의 키 이름과 같다 (`.env.example` 참고)."""
 
 from enum import StrEnum
+from typing import Literal
 
 
 class SecretName(StrEnum):
@@ -20,3 +21,13 @@ class SecretName(StrEnum):
 USER_SETTABLE: tuple[SecretName, ...] = tuple(
     n for n in SecretName if n not in (SecretName.KIS_ACCESS_TOKEN, SecretName.KIS_WS_APPROVAL_KEY)
 )
+
+
+BrokerSecretField = Literal["APP_KEY", "APP_SECRET", "ACCOUNT", "TOKEN"]
+# 저장된 증권사 비밀키의 이름 목록. 키링은 목록을 주지 않아 저장소 안에 함께 둔다(이름만).
+BROKER_INDEX = "BROKER_SECRET_NAMES"
+
+
+def broker_secret(conn_id: int, field: BrokerSecretField) -> str:
+    """증권사 연결별 비밀키 이름. API로는 읽거나 쓸 수 없다(`USER_SETTABLE`에 없음)."""
+    return f"BROKER_{conn_id}_{field}"
