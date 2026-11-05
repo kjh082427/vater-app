@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 from vater_core.api.errors import VaterError
-from vater_core.brokers.base import ADAPTERS, BrokerContext, KisReader, average, number
+from vater_core.brokers.base import ADAPTERS, BrokerContext, KisReader, average, number, stock_code
 from vater_core.kis.client import KisApiError
 from vater_core.kis.config import KisServer, Priority
 from vater_core.store.holdings import HoldingRow, bad_broker_response
@@ -143,7 +143,7 @@ class KisAdapter:
         rows = [
             HoldingRow(
                 "KR",
-                r["pdno"],
+                stock_code(r["pdno"]),
                 r.get("prdt_name") or r["pdno"],
                 number(r["hldg_qty"]),
                 average(r.get("pchs_avg_pric")),
@@ -156,7 +156,7 @@ class KisAdapter:
             rows.append(
                 HoldingRow(
                     "US" if us else None,
-                    r["pdno"],
+                    stock_code(r["pdno"]),
                     r.get("prdt_name") or r["pdno"],
                     number(r["ccld_qty_smtl1"]),
                     average(r.get("avg_unpr3")),

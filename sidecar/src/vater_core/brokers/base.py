@@ -19,6 +19,14 @@ def number(raw: Any) -> Decimal:
         raise bad_broker_response() from None
 
 
+def stock_code(raw: Any) -> str:
+    """증권사 응답의 종목코드. 비어 있으면 저장하지 않도록 실패한다."""
+    code = str(raw or "").strip()
+    if not code:
+        raise bad_broker_response()
+    return code
+
+
 def average(raw: Any) -> Decimal | None:
     """증권사 응답의 평단가. 비어 있으면 모르는 값이다."""
     return number(raw) if raw not in (None, "") else None

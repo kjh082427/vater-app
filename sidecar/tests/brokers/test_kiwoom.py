@@ -324,11 +324,131 @@ async def test_empty_response_never_means_sold_without_a_zero_total(
     assert e.value.code == "BROKER_RESPONSE_INVALID"
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        ok(tot_evlt_amt="", acnt_evlt_remn_indv_tot=[]),  # 빈 합계를 0으로 믿지 않는다
+        {"tot_evlt_amt": ZERO, "acnt_evlt_remn_indv_tot": []},  # return_code 없음
+        {"return_code": "E100", "tot_evlt_amt": ZERO, "acnt_evlt_remn_indv_tot": []},
+    ],
+)
 @respx.mock
-async def test_empty_account_is_zero_rows_even_with_a_blank_total(secrets: SecretStore) -> None:
-    routes(ok(tot_evlt_amt="", acnt_evlt_remn_indv_tot=[]))
+async def test_doubtful_success_never_clears_holdings(
+    secrets: SecretStore, body: dict[str, Any]
+) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.post(KR_URL).mock(return_value=httpx.Response(200, json=body))
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_zero_total_with_an_empty_list_is_zero_rows(secrets: SecretStore) -> None:
+    routes()
     async with httpx.AsyncClient() as http:
         assert await adapter(http, secrets).holdings() == []
+
+
+@pytest.mark.parametrize("code", [8003, 8006, 8009])
+@respx.mock
+async def test_token_service_trouble_is_not_a_lost_connection(
+    secrets: SecretStore, code: int
+) -> None:
+    respx.post(TOKEN_URL).mock(
+        return_value=httpx.Response(200, json={"return_code": code, "return_msg": "실패"})
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_API_ERROR"
+
+
+@respx.mock
+async def test_plain_auth_failure_code_is_reissued_once(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "old")
+    respx.post(TOKEN_URL).mock(return_value=httpx.Response(200, json=ISSUED))
+    respx.post(KR_URL).mock(
+        side_effect=[
+            httpx.Response(200, json={"return_code": 3, "return_msg": "인증에 실패했습니다"}),
+            httpx.Response(200, json=EMPTY_KR),
+        ]
+    )
+    respx.post(US_URL).mock(return_value=httpx.Response(200, json=EMPTY_US))
+    async with httpx.AsyncClient() as http:
+        assert await adapter(http, secrets).holdings() == []
+
+
+@respx.mock
+async def test_second_rejection_keeps_the_reason(secrets: SecretStore) -> None:
+    respx.post(TOKEN_URL).mock(return_value=httpx.Response(200, json=ISSUED))
+    respx.post(KR_URL).mock(
+        return_value=httpx.Response(200, json={"return_code": 8010, "return_msg": "IP 불일치"})
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert "IP 불일치" in e.value.message
+
+
+@respx.mock
+async def test_lowercase_continuation_flag_is_understood(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.post(KR_URL).mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                headers={"cont-yn": "y", "next-key": "K1"},
+                json=ok(tot_evlt_amt="1", acnt_evlt_remn_indv_tot=[kr_row()]),
+            ),
+            httpx.Response(
+                200,
+                headers={"cont-yn": "N"},
+                json=ok(tot_evlt_amt="1", acnt_evlt_remn_indv_tot=[kr_row("A000660")]),
+            ),
+        ]
+    )
+    respx.post(US_URL).mock(return_value=httpx.Response(200, json=EMPTY_US))
+    async with httpx.AsyncClient() as http:
+        assert len(await adapter(http, secrets).holdings()) == 2
+
+
+@respx.mock
+async def test_next_key_without_a_flag_fails(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.post(KR_URL).mock(
+        return_value=httpx.Response(
+            200,
+            headers={"next-key": "K1"},
+            json=ok(tot_evlt_amt="1", acnt_evlt_remn_indv_tot=[kr_row()]),
+        )
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_codes_are_cleaned_and_blank_codes_fail(secrets: SecretStore) -> None:
+    routes(
+        ok(tot_evlt_amt="1", acnt_evlt_remn_indv_tot=[kr_row("A005930 "), kr_row("A000660_NX")]),
+        ok(tot_evlt_amt="1", result_list=[us_row(" AAPL ")]),
+    )
+    async with httpx.AsyncClient() as http:
+        rows = await adapter(http, secrets).holdings()
+    assert [r.code for r in rows] == ["005930", "000660", "AAPL"]
+
+
+@respx.mock
+async def test_blank_code_fails(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    routes(ok(tot_evlt_amt="1", acnt_evlt_remn_indv_tot=[kr_row("  ")]))
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
 
 
 @respx.mock

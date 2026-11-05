@@ -69,12 +69,13 @@ async def connect(
     broker: str = "kiwoom",
     account: str | None = "81234567",
     replaces: int | None = None,
+    app_key: str = "key-a",
 ) -> Any:
     r = await c.post(
         "/connections",
         json={
             "broker_id": broker,
-            "app_key": "key-a",
+            "app_key": app_key,
             "app_secret": "sec-b",
             "account": account,
             "replaces": replaces,
@@ -247,7 +248,7 @@ async def test_two_accounts_of_a_broker_merge_into_one_entry(
     client: httpx.AsyncClient, fakes: dict[str, Fake]
 ) -> None:
     await connect(client, "kiwoom", "11110000")
-    await connect(client, "kiwoom", "22220000")
+    await connect(client, "kiwoom", "22220000", app_key="key-c")  # 키움 키는 계좌마다 따로다
     fakes["kiwoom"].rows = [sam("2", "100")]
     await client.post("/holdings/sync", json={})
     got = (await client.get("/holdings/symbol/KR/005930")).json()
@@ -915,3 +916,25 @@ async def test_negative_quantity_fails_instead_of_counting_as_sold(
     r = (await client.post("/holdings/sync", json={})).json()[0]
     assert r["error"]["code"] == "BROKER_RESPONSE_INVALID"
     assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+
+
+async def test_same_key_with_another_account_number_is_a_duplicate(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client, account="11111111")
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "key-a", "app_secret": "s", "account": "22222222"},
+    )
+    assert r.status_code == 409 and r.json()["code"] == "BROKER_DUPLICATE"
+
+
+async def test_connection_without_an_account_shows_a_key_hint(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    first = await connect(client, account=None)
+    assert first["account_mask"].startswith("키 ") and "key-a" not in first["account_mask"]
+    r = await client.post(
+        "/connections", json={"broker_id": "kiwoom", "app_key": "key-b", "app_secret": "s"}
+    )
+    assert r.json()["account_mask"] != first["account_mask"]

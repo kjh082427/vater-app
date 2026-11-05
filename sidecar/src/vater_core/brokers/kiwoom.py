@@ -9,7 +9,7 @@ import re
 from typing import Any
 
 from vater_core.api.errors import VaterError
-from vater_core.brokers.base import ADAPTERS, BrokerContext, average, number
+from vater_core.brokers.base import ADAPTERS, BrokerContext, average, number, stock_code
 from vater_core.secrets.names import broker_secret
 from vater_core.store.holdings import HoldingRow, bad_broker_response
 
@@ -23,9 +23,10 @@ MAX_PAGES = 20  # 다 못 받으면 저장하지 않는다. 일부만 저장하�
 PAGE_DELAY_SEC = (
     0.25  # 조회는 초당 5회까지다. 비정상 부하가 반복되면 서비스가 해지된다(약관 8, 9조)
 )
-_RETRY_CODES = {8005, 8010, 8031, 8103}  # 토큰 무효, 발급 IP 변경, 투자구분 불일치
+_AUTH_FAILED = 3  # 사유가 return_msg에 들어 있을 때가 많다
+_RETRY_CODES = {_AUTH_FAILED, 8005, 8010, 8031, 8103}  # 토큰 무효, 발급 IP 변경, 투자구분 불일치
 _RATE_CODES = {5, 1700, 1701, 1702}
-_NOT_AUTH_CODES = {8104, 8200}  # 모의 미지원, 법인 미지원
+_NOT_AUTH_CODES = {8003, 8006, 8009, 8104, 8200}  # 토큰 조회·생성·발급 장애, 모의·법인 미지원
 _EMBEDDED = re.compile(r"\[(\d{3,5}):")
 
 
@@ -69,7 +70,8 @@ def _check(status: int, payload: Any, code: int | None) -> None:
         )
     if not isinstance(payload, dict):
         raise bad_broker_response()
-    if status == 401 or (code and 8000 <= code < 9000 and code not in _NOT_AUTH_CODES):
+    in_auth_range = code is not None and 8000 <= code < 9000 and code not in _NOT_AUTH_CODES
+    if status == 401 or code == _AUTH_FAILED or in_auth_range:
         raise _auth_error(detail)
     if code or status != 200:
         raise VaterError("BROKER_API_ERROR", f"키움: {detail or status}", status=502)
@@ -82,17 +84,15 @@ def _json(response: Any) -> Any:
         return None
 
 
-def _kr_code(code: str) -> str:
-    """접두어 1자리 + 코드 6자리. 접두어는 A(주식), J(ELW), Q(ETN)다."""
+def _kr_code(raw: Any) -> str:
+    """접두어 1자리 + 코드 6자리. 접두어는 A(주식), J(ELW), Q(ETN)다. `_NX`는 넥스트레이드 표시."""
+    code = stock_code(raw).split("_")[0]
     return code[1:] if len(code) == 7 and code[0] in "AJQ" else code
 
 
 def _require_zero_total(body: dict[str, Any], field: str) -> None:
     """빈 목록을 "다 팔았다"로 믿기 전에 합계로 확인한다. 저장된 내역을 지우는 일이라 그렇다."""
-    if field not in body:
-        raise bad_broker_response()
-    raw = str(body[field]).strip()
-    if raw and number(raw) != 0:
+    if number(body.get(field)) != 0:
         raise bad_broker_response()
 
 
@@ -136,13 +136,20 @@ class KiwoomAdapter:
             code = _return_code(payload)
             if r.status_code == 401 or code in _RETRY_CODES:
                 if reissued:
-                    raise _auth_error()
+                    raise _auth_error(str((payload or {}).get("return_msg", "")))
                 self._secrets.delete(self._token_name)
                 reissued = True
                 continue
             _check(r.status_code, payload, code)
-            more = r.headers.get("cont-yn") == "Y"
-            return payload, (r.headers.get("next-key") or "") if more else None
+            if code != 0:  # return_code가 없거나 읽을 수 없으면 성공으로 보지 않는다
+                raise bad_broker_response()
+            more = (r.headers.get("cont-yn") or "").upper()
+            following = r.headers.get("next-key") or ""
+            if more == "Y":
+                return payload, following
+            if more != "N" and following:
+                raise bad_broker_response()
+            return payload, None
 
     async def _rows(self, path: str, body: dict[str, str], list_field: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -175,7 +182,7 @@ class KiwoomAdapter:
         rows = [
             HoldingRow(
                 "KR",
-                _kr_code(r["stk_cd"]),
+                _kr_code(r.get("stk_cd")),
                 r.get("stk_nm") or r["stk_cd"],
                 number(r["rmnd_qty"]),
                 average(r.get("pur_pric")),
@@ -188,7 +195,7 @@ class KiwoomAdapter:
             rows.append(
                 HoldingRow(
                     "US" if currency == "USD" else None,
-                    r["stk_cd"],
+                    stock_code(r.get("stk_cd")),
                     r.get("frgn_stk_nm") or r["stk_cd"],
                     number(r["poss_qty"]),
                     average(r.get("frgn_stk_book_uv")),

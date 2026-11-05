@@ -5,6 +5,7 @@
 
 import asyncio
 import contextlib
+import hashlib
 import logging
 import re
 import time
@@ -43,6 +44,11 @@ _MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
 
 def _digits(account: str | None) -> str:
     return re.sub(r"\D", "", account or "")
+
+
+def _key_hint(app_key: str | None) -> str:
+    """계좌번호를 받지 않는 증권사의 연결 구분. 해시 앞부분이라 키를 되돌릴 수 없다."""
+    return f"키 {hashlib.sha256(app_key.encode()).hexdigest()[:4]}" if app_key else ""
 
 
 def mask_account(account: str | None) -> str:
@@ -187,10 +193,13 @@ class HoldingsService:
 
     def _same_account(self, conn: Connection, digits: str, app_key: str | None) -> bool:
         s = self._secrets
+        stored_key = s.get(broker_secret(conn.id, "APP_KEY"))
+        if app_key and stored_key == app_key:  # 키움·메리츠의 키는 계좌에 묶인다
+            return True
         stored = _digits(s.get(broker_secret(conn.id, "ACCOUNT")))
         if stored and digits:  # 뒷자리만 같은 다른 계좌를 막지 않도록 저장된 번호로 비교한다
             return stored == digits
-        return s.get(broker_secret(conn.id, "APP_KEY")) == app_key
+        return stored_key == app_key
 
     async def connect(
         self,
@@ -252,7 +261,8 @@ class HoldingsService:
             for c in self.repo.connections()
         ):  # 실전과 모의 수량을 한 합계에 섞지 않는다
             raise _server_mismatch()
-        conn = self.repo.add_connection(broker_id, mask_account(account), server)
+        label = mask_account(account) or _key_hint(key)
+        conn = self.repo.add_connection(broker_id, label, server)
         try:
             s = self._secrets
             if account:
