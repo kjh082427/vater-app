@@ -12,6 +12,8 @@ import { Icon } from '../components/Icon';
 import { LineChart } from '../components/LineChart';
 import { MarketState } from '../components/MarketState';
 import { Menu } from '../components/Menu';
+import { BrokerBar } from '../components/BrokerBar';
+import { BrokerChip } from '../components/BrokerChip';
 import { ProgressBar } from '../components/ProgressBar';
 import { Section } from '../components/Section';
 import { SegmentedControl } from '../components/SegmentedControl';
@@ -616,6 +618,20 @@ function InputsDemo() {
         <Row label="ProgressBar">
           <div className={styles.progressDemo}>
             <ProgressBar value={60} label="분석 진행 60%" />
+          </div>
+        </Row>
+        <Row label="BrokerBar·BrokerChip: 색은 칸과 점에만">
+          <div className={styles.progressDemo}>
+            <BrokerBar
+              shares={[
+                { id: 'kis', name: '한투', color: '#7B634F', ratio: 0.5 },
+                { id: 'meritz', name: '메리츠', color: '#D14C34', ratio: 0.3 },
+                { id: 'mirae', name: '미래에셋', color: '#D97A00', ratio: 0.2 },
+              ]}
+            />
+            <BrokerChip id="kis" color="#7B634F">
+              한투 10주
+            </BrokerChip>
           </div>
         </Row>
         <Row label="Dialog: 초점 가둠, Esc, 닫히면 연 버튼으로">

@@ -1,0 +1,15 @@
+.bar {
+  display: flex;
+  gap: var(--space-0-5);
+  width: 100%;
+  min-width: 2.5rem;
+  height: 0.75rem;
+  background: var(--color-card);
+}
+
+.cell {
+  flex-basis: 0;
+  min-width: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--broker-color);
+}
