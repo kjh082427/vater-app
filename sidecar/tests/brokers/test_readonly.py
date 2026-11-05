@@ -75,6 +75,9 @@ async def test_any_request_error_becomes_broker_unreachable() -> None:
 _NETWORK_MODULES = ("httpx", "urllib", "requests", "aiohttp", "http", "socket", "importlib")
 
 
+_INTERNALS = {"_http", "_allowed", "open_connection", "create_connection"}
+
+
 def bypasses(source: str) -> list[str]:
     """허용 목록을 건너뛸 수 있는 코드를 찾는다."""
     found = []
@@ -87,10 +90,10 @@ def bypasses(source: str) -> list[str]:
         found += [m for m in modules if m.split(".")[0] in _NETWORK_MODULES]
         if isinstance(node, ast.ImportFrom):
             found += [a.name for a in node.names if a.name == "KisClient"]
-        if isinstance(node, ast.Attribute) and node.attr == "_http":
-            found.append("._http")
-        if isinstance(node, ast.Constant) and node.value == "_http":  # getattr(x, "_http")
-            found.append("._http")
+        if isinstance(node, ast.Attribute) and node.attr in _INTERNALS:
+            found.append(node.attr)
+        if isinstance(node, ast.Constant) and node.value in _INTERNALS:  # getattr(x, "_http")
+            found.append(str(node.value))
         if isinstance(node, ast.Name) and node.id == "__import__":
             found.append("__import__")
     return found
@@ -107,6 +110,8 @@ def bypasses(source: str) -> list[str]:
         "async def f(ro): await ro._http.post('/orders')",
         "from vater_core.kis.client import KisClient",
         "async def f(ctx): await getattr(ctx.kis, '_http').post('/orders')",
+        "async def f(asyncio): await asyncio.open_connection('x', 443)",
+        "def f(ro): ro._allowed = frozenset()",
     ],
 )
 def test_bypass_scan_catches(source: str) -> None:

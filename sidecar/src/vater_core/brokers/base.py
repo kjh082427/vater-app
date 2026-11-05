@@ -2,12 +2,34 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
 from vater_core.brokers.readonly import ReadOnlyHttp
 from vater_core.kis.config import KisServer, Priority
 from vater_core.secrets.store import SecretStore
-from vater_core.store.holdings import HoldingRow
+from vater_core.store.holdings import HoldingRow, bad_broker_response
+
+
+def number(raw: Any) -> Decimal:
+    """증권사 응답의 수량. 읽지 못하면 저장하지 않도록 실패한다."""
+    try:
+        return Decimal(str(raw))
+    except InvalidOperation:
+        raise bad_broker_response() from None
+
+
+def stock_code(raw: Any) -> str:
+    """증권사 응답의 종목코드. 비어 있으면 저장하지 않도록 실패한다."""
+    code = str(raw or "").strip()
+    if not code:
+        raise bad_broker_response()
+    return code
+
+
+def average(raw: Any) -> Decimal | None:
+    """증권사 응답의 평단가. 비어 있으면 모르는 값이다."""
+    return number(raw) if raw not in (None, "") else None
 
 
 @dataclass(frozen=True)

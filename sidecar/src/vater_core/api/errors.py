@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from vater_core.logging_setup import mask
+
 logger = logging.getLogger(__name__)
 
 _HTTP_CODES = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED"}
@@ -19,10 +21,12 @@ class VaterError(Exception):
     """사이드카가 의도적으로 내는 오류. UI는 `code`로 안내 문구와 버튼을 정한다."""
 
     def __init__(self, code: str, message: str, hint: str | None = None, status: int = 400) -> None:
+        # 외부 서버가 오류 문구에 키를 되풀이해도 화면과 로그로 나가지 않게 한다
+        message = mask(message)
         super().__init__(f"{code}: {message}")
         self.code = code
         self.message = message
-        self.hint = hint
+        self.hint = mask(hint) if hint else hint
         self.status = status
 
 

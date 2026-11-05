@@ -5,11 +5,10 @@
 """
 
 import re
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from vater_core.api.errors import VaterError
-from vater_core.brokers.base import ADAPTERS, BrokerContext, KisReader
+from vater_core.brokers.base import ADAPTERS, BrokerContext, KisReader, average, number, stock_code
 from vater_core.kis.client import KisApiError
 from vater_core.kis.config import KisServer, Priority
 from vater_core.store.holdings import HoldingRow, bad_broker_response
@@ -45,21 +44,10 @@ def _split_account(account: str | None) -> tuple[str, str]:
     return digits[:8], digits[8:]
 
 
-def _number(raw: Any) -> Decimal:
-    try:
-        return Decimal(str(raw))
-    except InvalidOperation:
-        raise bad_broker_response() from None
-
-
-def _average(raw: Any) -> Decimal | None:
-    return _number(raw) if raw not in (None, "") else None
-
-
 def _require_zero_total(summary: Any, field: str) -> None:
     """빈 목록을 "다 팔았다"로 믿기 전에 합계로 확인한다. 저장된 내역을 지우는 일이라 그렇다."""
     row = summary[0] if isinstance(summary, list) and summary else summary
-    if not isinstance(row, dict) or _number(row.get(field)) != 0:
+    if not isinstance(row, dict) or number(row.get(field)) != 0:
         raise bad_broker_response()
 
 
@@ -155,10 +143,10 @@ class KisAdapter:
         rows = [
             HoldingRow(
                 "KR",
-                r["pdno"],
+                stock_code(r["pdno"]),
                 r.get("prdt_name") or r["pdno"],
-                _number(r["hldg_qty"]),
-                _average(r.get("pchs_avg_pric")),
+                number(r["hldg_qty"]),
+                average(r.get("pchs_avg_pric")),
                 "KRW",
             )
             for r in await self._domestic()
@@ -168,10 +156,10 @@ class KisAdapter:
             rows.append(
                 HoldingRow(
                     "US" if us else None,
-                    r["pdno"],
+                    stock_code(r["pdno"]),
                     r.get("prdt_name") or r["pdno"],
-                    _number(r["ccld_qty_smtl1"]),
-                    _average(r.get("avg_unpr3")),
+                    number(r["ccld_qty_smtl1"]),
+                    average(r.get("avg_unpr3")),
                     r.get("buy_crcy_cd") or ("USD" if us else ""),
                 )
             )

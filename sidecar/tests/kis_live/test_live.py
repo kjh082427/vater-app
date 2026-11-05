@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
+from vater_core.api.errors import VaterError
 from vater_core.brokers.base import BrokerContext, BrokerCreds
 from vater_core.brokers.kis import KisAdapter
 from vater_core.kis.auth import TokenManager
@@ -187,8 +188,11 @@ async def test_holdings_counts_only(live: tuple[KisClient, TokenManager]) -> Non
         kis=c,
     )
     adapter = KisAdapter(ctx)
-    await adapter.test()
-    rows = await adapter.holdings()
+    try:
+        await adapter.test()
+        rows = await adapter.holdings()
+    except VaterError as e:  # 트레이스백에는 요청 값(계좌번호)이 나온다. 코드만 보여 준다
+        pytest.fail(e.code, pytrace=False)
     markets = {m: sum(1 for r in rows if r.market == m) for m in ("KR", "US", None)}
     print(f"\nholdings: {len(rows)} rows, by market {markets}")
     assert all(r.quantity >= 0 for r in rows)
