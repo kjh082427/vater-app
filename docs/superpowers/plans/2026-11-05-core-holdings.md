@@ -28,9 +28,9 @@
 
 ### Task 1: 연결별 비밀키
 **Files:** `secrets/store.py`, `secrets/names.py` / Test `tests/secrets/`
-- `SecretStore.get/set/delete`가 `SecretName | str`을 받는다(`StrEnum`이라 `str(name)`).
-- `broker_secret(conn_id: int, field: Literal["APP_KEY","APP_SECRET","ACCOUNT","TOKEN"]) -> str` → `BROKER_{id}_{field}`. 새 고정 이름 `KIS_ACCOUNT`(USER_SETTABLE)
-- `known_values()`는 고정 이름 + 저장된 연결 이름을 모두 돌려준다. 키링은 목록을 못 주므로 `store.remember_names`로 연결 id를 settings 표에서 읽어 주입한다.
+- `SecretStore.get/set/delete`가 문자열 이름을 받는다(`SecretName`은 `StrEnum`).
+- `broker_secret(conn_id: int, field: Literal["APP_KEY","APP_SECRET","ACCOUNT","TOKEN"]) -> str` → `BROKER_{id}_{field}`. 한투 계좌도 이 이름을 쓴다.
+- `known_values()`는 고정 이름 + 저장된 연결 이름을 모두 돌려준다. 키링은 목록을 못 주므로 저장소 안의 `BROKER_SECRET_NAMES`에 이름만 적어 둔다(로그 설정이 DB보다 먼저 돌기 때문).
 - [ ] 테스트(실패 확인): 두 저장소 모두 동적 이름 저장·삭제, **연결 키 값이 로그 필터에서 가려짐**, `/secrets` API로 동적 이름을 읽거나 쓸 수 없음
 - [ ] 구현 → 전체 테스트 → 커밋 `feat(secrets): 증권사 연결별 비밀키`
 

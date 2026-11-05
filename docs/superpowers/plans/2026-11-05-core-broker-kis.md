@@ -10,7 +10,7 @@
 
 ## Global Constraints
 - 라벨 `area:core`. **TR은 허용 목록으로 고정한다. 주문 TR 금지.**
-- 계좌번호는 `KIS_ACCOUNT`(8-2 형식)에만 저장한다.
+- 계좌번호는 연결 비밀키 `BROKER_{id}_ACCOUNT`(8-2 형식)에만 저장한다.
 - 실연동 테스트는 `@pytest.mark.kis_live`, 조회만.
 
 ## Review Focus
