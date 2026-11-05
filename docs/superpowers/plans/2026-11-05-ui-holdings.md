@@ -62,3 +62,9 @@
 
 ### Task 8: 흐름 테스트와 마무리
 - [ ] Playwright(흉내 증권사 서버): 연결 → 업로드 → 내 보유 → 해제. 캡처 3크기, impeccable 검출기, README → 커밋 `test(ui): v2 흐름`
+
+### 추가 작업: 대시보드 편집 끌어서 바꾸기 (스펙 18장)
+**Files:** `src/dashboard/DashboardEditor.tsx`, `src/dashboard/editor/KpiStripSettings.tsx`와 테스트. 새 라이브러리 없이 `Divider.tsx`의 포인터 처리 방식을 따른다.
+- [ ] 테스트(실패 확인): 칸 1과 4 교체(내용과 옵션이 함께 이동, 틀과 비율 유지), 최소 크기가 안 맞으면 거절과 이유, 입력칸·버튼을 눌러도 끌기가 시작되지 않음, 키보드로 같은 교체, 숫자 줄 순서 변경과 저장
+- [ ] 구현 → 커밋 `feat(ui): 대시보드 칸 교체와 숫자 줄 순서`
+
