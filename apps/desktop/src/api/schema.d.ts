@@ -265,6 +265,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/brokers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Brokers */
+    get: operations['list_brokers_brokers_get'];
+    put?: never;
+    /** Add Broker */
+    post: operations['add_broker_brokers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/brokers/{broker_id}/data': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Broker Data */
+    delete: operations['delete_broker_data_brokers__broker_id__data_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/connections': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Connections */
+    get: operations['list_connections_connections_get'];
+    put?: never;
+    /** Add Connection */
+    post: operations['add_connection_connections_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/connections/{conn_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove Connection */
+    delete: operations['remove_connection_connections__conn_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/events': {
     parameters: {
       query?: never;
@@ -293,6 +363,135 @@ export interface paths {
     get: operations['health_health_get'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Holdings */
+    get: operations['list_holdings_holdings_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/csv/commit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Csv Commit
+     * @description 그 증권사의 수동 항목을 파일 내용으로 바꾼다. 하나라도 틀리면 아무것도 바꾸지 않는다.
+     */
+    post: operations['csv_commit_holdings_csv_commit_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/csv/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Csv Preview
+     * @description 저장하지 않고 행을 해석한다. 열을 고르면 그 값이 추정보다 우선한다.
+     */
+    post: operations['csv_preview_holdings_csv_preview_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/manual': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Save Manual */
+    put: operations['save_manual_holdings_manual_put'];
+    post?: never;
+    /** Delete Manual */
+    delete: operations['delete_manual_holdings_manual_delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/symbol/{market}/{code}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Symbol Holdings */
+    get: operations['symbol_holdings_holdings_symbol__market___code__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync Holdings */
+    post: operations['sync_holdings_holdings_sync_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/holdings/watch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Watch Holdings
+     * @description 고른 종목을 감시 종목에 넣는다. 보유 내역은 그대로다(v2 설계 2장).
+     */
+    post: operations['watch_holdings_holdings_watch_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -834,6 +1033,51 @@ export interface components {
        */
       market: 'KR' | 'US';
     };
+    /** BrokerCreate */
+    BrokerCreate: {
+      /** Name */
+      name: string;
+    };
+    /** BrokerOut */
+    BrokerOut: {
+      /** Builtin */
+      builtin: boolean;
+      /** Color */
+      color: string;
+      /** Id */
+      id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'api' | 'manual';
+      /** Name */
+      name: string;
+    };
+    /** BrokerShare */
+    BrokerShare: {
+      /** Broker Id */
+      broker_id: string;
+      /** Color */
+      color: string;
+      /** Name */
+      name: string;
+      /** Quantity */
+      quantity: string;
+      /** Ratio */
+      ratio: number;
+      /** Stale */
+      stale: boolean;
+    };
+    /** BulkRule */
+    BulkRule: {
+      /** Kind */
+      kind: string;
+      /** Params */
+      params?: {
+        [key: string]: unknown;
+      } | null;
+    };
     /** CatalogOut */
     CatalogOut: {
       /** Cloud */
@@ -885,6 +1129,115 @@ export interface components {
       ok: boolean;
       /** Provider */
       provider: string;
+    };
+    /** ConnectionCreate */
+    ConnectionCreate: {
+      /** Account */
+      account?: string | null;
+      /** App Key */
+      app_key?: string | null;
+      /** App Secret */
+      app_secret?: string | null;
+      /** Broker Id */
+      broker_id: string;
+      /** Replaces */
+      replaces?: number | null;
+    };
+    /** ConnectionOut */
+    ConnectionOut: {
+      /** Account Mask */
+      account_mask: string;
+      /** Broker Id */
+      broker_id: string;
+      /** Id */
+      id: number;
+      /** Last Error */
+      last_error: string | null;
+      /** Last Synced At */
+      last_synced_at: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'ok' | 'lost' | 'disconnected';
+    };
+    /** CsvCandidate */
+    CsvCandidate: {
+      /** Code */
+      code: string;
+      /** Market */
+      market: string;
+      /** Name */
+      name: string;
+    };
+    /** CsvChanges */
+    CsvChanges: {
+      /** Added */
+      added: number;
+      /** Removed */
+      removed: number;
+      /** Updated */
+      updated: number;
+    };
+    /** CsvCommit */
+    CsvCommit: {
+      /** Broker Id */
+      broker_id: string;
+      /** Rows */
+      rows: components['schemas']['CsvCommitRow'][];
+    };
+    /** CsvCommitRow */
+    CsvCommitRow: {
+      /** Avg Price */
+      avg_price: number | string;
+      /** Code */
+      code: string;
+      /**
+       * Market
+       * @enum {string}
+       */
+      market: 'KR' | 'US';
+      /** Quantity */
+      quantity: number | string;
+    };
+    /** CsvGuess */
+    CsvGuess: {
+      /** Avg Price */
+      avg_price: string | null;
+      /** Code */
+      code: string | null;
+      /** Name */
+      name: string | null;
+      /** Quantity */
+      quantity: string | null;
+    };
+    /** CsvPreview */
+    CsvPreview: {
+      changes: components['schemas']['CsvChanges'];
+      /** Columns */
+      columns: string[];
+      guess: components['schemas']['CsvGuess'];
+      /** Rows */
+      rows: components['schemas']['CsvRowOut'][];
+    };
+    /** CsvRowOut */
+    CsvRowOut: {
+      /** Avg Price */
+      avg_price: number | null;
+      /** Candidates */
+      candidates: components['schemas']['CsvCandidate'][];
+      /** Code */
+      code: string | null;
+      /** Error */
+      error: string | null;
+      /** Market */
+      market: ('KR' | 'US') | null;
+      /** Name */
+      name: string;
+      /** Quantity */
+      quantity: string | null;
+      /** Row */
+      row: number;
     };
     /** Dashboard */
     Dashboard: {
@@ -968,6 +1321,38 @@ export interface components {
       status: string;
       /** Version */
       version: string;
+    };
+    /** HoldingOut */
+    HoldingOut: {
+      /** Avg Price */
+      avg_price: number | null;
+      /** Broker Id */
+      broker_id: string;
+      /** Code */
+      code: string;
+      /** Connection Id */
+      connection_id: number;
+      /** Currency */
+      currency: string;
+      /** Is New */
+      is_new: boolean;
+      /** Market */
+      market: ('KR' | 'US') | null;
+      /** Name */
+      name: string;
+      /** Quantity */
+      quantity: string;
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: 'api' | 'manual' | 'csv';
+      /** Supported */
+      supported: boolean;
+      /** Unsupported Reason */
+      unsupported_reason: string | null;
+      /** Updated At */
+      updated_at: string;
     };
     /** IndexOut */
     IndexOut: {
@@ -1072,6 +1457,34 @@ export interface components {
       tag: string;
       /** Variant */
       variant: string;
+    };
+    /** ManualHolding */
+    ManualHolding: {
+      /** Avg Price */
+      avg_price: number | string;
+      /** Broker Id */
+      broker_id: string;
+      /** Code */
+      code: string;
+      /**
+       * Market
+       * @enum {string}
+       */
+      market: 'KR' | 'US';
+      /** Quantity */
+      quantity: number | string;
+    };
+    /** ManualKey */
+    ManualKey: {
+      /** Broker Id */
+      broker_id: string;
+      /** Code */
+      code: string;
+      /**
+       * Market
+       * @enum {string}
+       */
+      market: 'KR' | 'US';
     };
     /** ModelChoice */
     ModelChoice: {
@@ -1227,6 +1640,21 @@ export interface components {
       /** Started */
       started: boolean;
     };
+    /** SymbolHoldings */
+    SymbolHoldings: {
+      /** Avg Price */
+      avg_price: number | null;
+      /** Brokers */
+      brokers: components['schemas']['BrokerShare'][];
+      /** Cost */
+      cost: number | null;
+      /** Currency */
+      currency: string | null;
+      /** Total */
+      total: string;
+      /** Unpriced Quantity */
+      unpriced_quantity: string;
+    };
     /** SymbolOut */
     SymbolOut: {
       /** Code */
@@ -1241,6 +1669,21 @@ export interface components {
       name: string;
       /** Name En */
       name_en: string | null;
+    };
+    /** SyncRequest */
+    SyncRequest: {
+      /** Broker Id */
+      broker_id?: string | null;
+    };
+    /** SyncResultOut */
+    SyncResultOut: {
+      /** Broker Id */
+      broker_id: string;
+      /** Connection Id */
+      connection_id: number;
+      error?: components['schemas']['ErrorBody'] | null;
+      /** Ok */
+      ok: boolean;
     };
     /** TierChoiceOut */
     TierChoiceOut: {
@@ -1319,6 +1762,36 @@ export interface components {
       source: ('realtime' | 'polling' | 'rest') | null;
       /** Watchlist Id */
       watchlist_id: number;
+    };
+    /** WatchRequest */
+    WatchRequest: {
+      /** Items */
+      items: components['schemas']['WatchTarget'][];
+      rule?: components['schemas']['BulkRule'] | null;
+      /**
+       * Seen
+       * @default []
+       */
+      seen: components['schemas']['WatchTarget'][];
+    };
+    /** WatchResult */
+    WatchResult: {
+      /** Added */
+      added: number;
+      /** Rules */
+      rules: number;
+      /** Skipped */
+      skipped: number;
+    };
+    /** WatchTarget */
+    WatchTarget: {
+      /** Code */
+      code: string;
+      /**
+       * Market
+       * @enum {string}
+       */
+      market: 'KR' | 'US';
     };
   };
   responses: never;
@@ -2216,6 +2689,298 @@ export interface operations {
       };
     };
   };
+  list_brokers_brokers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  add_broker_brokers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BrokerCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerOut'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  delete_broker_data_brokers__broker_id__data_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        broker_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  list_connections_connections_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConnectionOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  add_connection_connections_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConnectionCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConnectionOut'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  remove_connection_connections__conn_id__delete: {
+    parameters: {
+      query: {
+        delete_data: boolean;
+      };
+      header?: never;
+      path: {
+        conn_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
   events_events_get: {
     parameters: {
       query?: never;
@@ -2279,6 +3044,411 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['Health'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  list_holdings_holdings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  csv_commit_holdings_csv_commit_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CsvCommit'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CsvChanges'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  csv_preview_holdings_csv_preview_post: {
+    parameters: {
+      query: {
+        broker_id: string;
+        name_col?: string | null;
+        code_col?: string | null;
+        quantity_col?: string | null;
+        avg_price_col?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'text/csv': string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CsvPreview'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  save_manual_holdings_manual_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ManualHolding'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  delete_manual_holdings_manual_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ManualKey'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  symbol_holdings_holdings_symbol__market___code__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        market: 'KR' | 'US';
+        code: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SymbolHoldings'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  sync_holdings_holdings_sync_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SyncRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncResultOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  watch_holdings_holdings_watch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WatchRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WatchResult'];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */

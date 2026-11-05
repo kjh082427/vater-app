@@ -7,8 +7,13 @@ from keyring.backend import KeyringBackend
 from keyring.errors import PasswordDeleteError
 
 from vater_core.api.errors import VaterError
-from vater_core.secrets.names import SecretName
-from vater_core.secrets.store import EnvFileSecretStore, KeyringSecretStore, select_secret_store
+from vater_core.secrets.names import SecretName, broker_secret
+from vater_core.secrets.store import (
+    EnvFileSecretStore,
+    KeyringSecretStore,
+    SecretStore,
+    select_secret_store,
+)
 
 
 class MemoryKeyring(KeyringBackend):
@@ -106,3 +111,62 @@ def test_select_store_override(tmp_path: Path) -> None:
     assert isinstance(
         select_secret_store({"VATER_SECRET_BACKEND": "keyring"}, "linux"), KeyringSecretStore
     )
+
+
+@pytest.fixture(params=["env", "keyring"])
+def any_store(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[SecretStore]:
+    if request.param == "env":
+        yield EnvFileSecretStore(tmp_path / ".env")
+        return
+    previous = keyring.get_keyring()
+    keyring.set_keyring(MemoryKeyring())
+    try:
+        yield KeyringSecretStore()
+    finally:
+        keyring.set_keyring(previous)
+
+
+def test_broker_secret_names() -> None:
+    assert broker_secret(7, "APP_KEY") == "BROKER_7_APP_KEY"
+    assert broker_secret(7, "TOKEN") == "BROKER_7_TOKEN"
+
+
+def test_broker_secrets_are_stored_deleted_and_known_for_masking(any_store: SecretStore) -> None:
+    any_store.set(SecretName.KIS_APP_KEY, "kis-1")
+    any_store.set(broker_secret(3, "APP_KEY"), "kiwoom-key-3")
+    any_store.set(broker_secret(3, "ACCOUNT"), "81234567")
+    any_store.set(broker_secret(4, "APP_SECRET"), "meritz-sec-4")
+    assert any_store.get(broker_secret(3, "APP_KEY")) == "kiwoom-key-3"
+    assert sorted(any_store.known_values()) == [
+        "81234567",
+        "kis-1",
+        "kiwoom-key-3",
+        "meritz-sec-4",
+    ]
+    any_store.delete(broker_secret(3, "APP_KEY"))
+    assert any_store.get(broker_secret(3, "APP_KEY")) is None
+    assert "kiwoom-key-3" not in any_store.known_values()
+
+
+def test_broker_secrets_survive_a_new_store_instance(tmp_path: Path) -> None:
+    EnvFileSecretStore(tmp_path / ".env").set(broker_secret(1, "APP_SECRET"), "sec-1")
+    # 앱을 다시 켜도 마스킹 대상에서 빠지지 않아야 한다
+    assert EnvFileSecretStore(tmp_path / ".env").known_values() == ["sec-1"]
+
+
+def test_broker_secret_rejects_newlines(any_store: SecretStore) -> None:
+    with pytest.raises(VaterError):
+        any_store.set(broker_secret(1, "APP_KEY"), "a\nb")
+
+
+def test_dynamic_name_is_indexed_before_its_value_is_written(tmp_path: Path) -> None:
+    """중간에 멈춰도 저장된 값이 마스킹 목록에서 빠지지 않게 한다."""
+    written: list[str] = []
+
+    class Recording(EnvFileSecretStore):
+        def _raw_set(self, name: str, value: str) -> None:
+            written.append(name)
+            super()._raw_set(name, value)
+
+    Recording(tmp_path / ".env").set(broker_secret(1, "TOKEN"), "abcd")
+    assert written == ["BROKER_SECRET_NAMES", "BROKER_1_TOKEN"]
