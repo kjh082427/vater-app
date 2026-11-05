@@ -6,6 +6,10 @@ from pathlib import Path
 ORDER_TR_ID = re.compile(r"\b[TV]TT[A-Z]\d{4}U\b")  # 한투 주문·정정·취소 TR ID (끝자리 U)
 ORDER_PATH = re.compile(r"/trading/order")  # 국내·해외 주문 엔드포인트 경로
 KIWOOM_ORDER = re.compile(r"/api/dostk/ordr|\bkt1000[0-9]\b|\bkt5\d{4}\b")  # 키움 주문 경로·TR
+# 메리츠 주문·예약주문·해외 주문·환전 경로와 TR (공식 카탈로그로 확인)
+MERITZ_ORDER = re.compile(
+    r"/trading/v1/|/forex/v1/exchanges|\bobtr[so]_oder_\d{3}a\b|\bobtsd_fbnk_\d{3}a\b"
+)
 SCANNED = {".py", ".json", ".sql", ".toml", ".yaml", ".yml"}
 SRC = Path(__file__).parents[1] / "src"
 
@@ -15,7 +19,12 @@ def find_order_references(root: Path) -> list[str]:
     for p in sorted(root.rglob("*")):
         if p.is_file() and p.suffix in SCANNED:
             for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-                if ORDER_TR_ID.search(line) or ORDER_PATH.search(line) or KIWOOM_ORDER.search(line):
+                if (
+                    ORDER_TR_ID.search(line)
+                    or ORDER_PATH.search(line)
+                    or KIWOOM_ORDER.search(line)
+                    or MERITZ_ORDER.search(line)
+                ):
                     hits.append(f"{p.relative_to(root)}:{i}")
     return hits
 
@@ -42,3 +51,17 @@ def test_guard_catches_kiwoom_order_ids(tmp_path: Path) -> None:
 def test_guard_scans_non_python_files(tmp_path: Path) -> None:
     (tmp_path / "tr_ids.json").write_text('{"buy": "TTTC0802U"}', encoding="utf-8")
     assert find_order_references(tmp_path) == ["tr_ids.json:1"]
+
+
+def test_guard_catches_meritz_order_ids(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text(
+        'A = "/trading/v1/orders/buy"\nB = "/trading/v1/overseas/reserved-orders/sell"\n'
+        'C = "/forex/v1/exchanges"\nD = "obtrs_oder_101a"\nE = "obtro_oder_112a"\n'
+        'F = "obtsd_fbnk_202a"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text(
+        'A = "/accounts/v1/me/holdings"\nB = "obacb_balc_114r"\nC = "obtro_oder_110r"\n',
+        encoding="utf-8",
+    )
+    assert find_order_references(tmp_path) == [f"a.py:{i}" for i in range(1, 7)]
