@@ -1,6 +1,7 @@
 """브리핑 만들기와 일정 루프 (스펙 6장).
 
-- 만들기: 수집 → 해석(LLM 1회, 워커 스레드) → 저장 → Windows 알림·SSE·알림 이력. 한 번에 1건.
+- 만들기: 수집 → 해석(LLM 1회, 워커 스레드) → 내 자산 → 저장 → 알림·SSE·알림 이력. 한 번에 1건.
+- 내 자산은 해석이 끝난 뒤에 계산하고 저장에만 넘긴다. `got.data`에 넣지 않는다(v2 설계 8-1, 15장).
 - LLM 문제(키 없음, 호출 실패, 읽을 수 없는 답)는 브리핑을 막지 않는다: 문장 없이 데이터만 저장하고
   `missing`에 `interpretation`을 남긴다.
 - 일정: 1분마다 시장별로 지금 만들어야 할 세션을 확인한다.
@@ -46,6 +47,7 @@ LLM_THREAD = "vater-briefing-llm"
 CollectFn = Callable[..., Awaitable[Collected]]
 InterpretFn = Callable[[str, dict[str, Any], LlmRun], dict[str, str]]
 NotifyFn = Callable[[str, str, str | None], None]
+AssetsFn = Callable[[BriefingMarket, date], Awaitable[dict[str, Any] | None]]
 
 
 def _now_default() -> datetime:
@@ -99,6 +101,7 @@ class BriefingService:
         now: Callable[[], datetime] = _now_default,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         llm_timeout: float = LLM_TIMEOUT_SEC,
+        assets_fn: AssetsFn | None = None,
     ) -> None:
         self._deps = deps
         self._clock = clock
@@ -110,6 +113,7 @@ class BriefingService:
         self._now = now
         self._sleep = sleep
         self._llm_timeout = llm_timeout
+        self._assets = assets_fn
         self._lock = asyncio.Lock()
         self._retry_at: dict[tuple[str, date], datetime] = {}
         self._loop_task: asyncio.Task[None] | None = None
@@ -159,8 +163,17 @@ class BriefingService:
                     "briefing %s %s: saved without interpretation (%s)", market, session, cause
                 )
                 missing.append("interpretation")
+            assets: dict[str, Any] | None = None
+            if self._assets is not None:
+                try:
+                    assets = await self._assets(market, session)
+                except Exception as e:  # 보유가 있는데 계산하지 못했다. 브리핑은 막지 않는다
+                    logger.warning(
+                        "briefing %s %s: my assets failed: %s", market, session, type(e).__name__
+                    )
+                    missing.append("my_assets")
             db = self._db()
-            bid = BriefingRepo(db).save(market, session, got.data, text, missing)
+            bid = BriefingRepo(db).save(market, session, got.data, text, missing, assets)
             label = LABEL[market]
             self._notify(
                 "오늘의 시장 브리핑",
@@ -258,6 +271,7 @@ def get_briefing(deps: AppDeps) -> BriefingService:
         from vater_core.kis.services import require_kis
         from vater_core.llm.catalog import load_catalog
         from vater_core.llm.presets import build_run
+        from vater_core.portfolio.daily import get_daily
 
         async def kr_trading_day(day: date) -> bool:
             return await is_domestic_trading_day(require_kis(deps).client, day)
@@ -272,7 +286,14 @@ def get_briefing(deps: AppDeps) -> BriefingService:
                 )
             return build_run(SettingsRepo(deps.db).get_all(), load_catalog(), deps.secrets)
 
+        async def assets(market: BriefingMarket, session: date) -> dict[str, Any] | None:
+            return await get_daily(deps).my_assets(market, session)
+
         deps.briefing = BriefingService(
-            deps, clock=MarketClock(kr_trading_day), feeds_fn=feeds, run_fn=run
+            deps,
+            clock=MarketClock(kr_trading_day),
+            feeds_fn=feeds,
+            run_fn=run,
+            assets_fn=assets,
         )
     return deps.briefing

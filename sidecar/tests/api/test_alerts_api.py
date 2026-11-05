@@ -163,7 +163,7 @@ async def test_pause_resume_and_status(client: httpx.AsyncClient) -> None:
 
 async def test_kinds_describe_the_rule_form(client: httpx.AsyncClient) -> None:
     kinds = {k["kind"]: k for k in (await client.get("/alerts/kinds")).json()}
-    assert len(kinds) == 10
+    assert len(kinds) == 11
     assert kinds["price_above"] == {
         "kind": "price_above",
         "params": {},

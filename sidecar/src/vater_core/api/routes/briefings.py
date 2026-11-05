@@ -29,9 +29,32 @@ class BriefingItem(BaseModel):
     created_at: str
 
 
+class AssetChange(BaseModel):
+    change: float | None
+    change_pct: float | None
+
+
+class AssetMove(BaseModel):
+    code: str
+    name: str
+    amount: float  # `currency` 통화 그대로의 금액
+    currency: str
+
+
+class MyAssets(BaseModel):
+    """앱이 계산한 내 자산 구역. AI를 거치지 않는다. 전일 기록이 없으면 변화 값은 null이다."""
+
+    change_krw: float | None  # 원화 환산 변화. 환율이나 종가가 없으면 null이다
+    change_pct: float | None
+    currencies: dict[str, AssetChange]
+    top: AssetMove | None
+    bottom: AssetMove | None
+
+
 class BriefingDetail(BriefingItem):
     data: dict[str, Any]
     text: dict[str, str] | None
+    my_assets: MyAssets | None = None  # 보유 내역이 없으면 null이고 빠진 항목으로 세지 않는다
 
 
 class BriefingRunRequest(BaseModel):
@@ -73,7 +96,8 @@ async def list_briefings(
 @router.get("/{bid}")
 async def read_briefing(bid: int, deps: AppDeps = Depends(get_deps)) -> BriefingDetail:  # noqa: B008
     b = _repo(deps).get(bid)
-    return BriefingDetail(**_item(b), data=b.data, text=b.text)
+    assets = MyAssets(**b.my_assets) if b.my_assets else None
+    return BriefingDetail(**_item(b), data=b.data, text=b.text, my_assets=assets)
 
 
 @router.post("/run", status_code=202)

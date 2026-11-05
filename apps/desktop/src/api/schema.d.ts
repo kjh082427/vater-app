@@ -688,6 +688,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/market/fx': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Market Fx
+     * @description 원달러 환율과 그 값의 날짜. 오늘 값이 없으면 7일 안의 최근 값, 그것도 없으면 null과 오늘.
+     */
+    get: operations['market_fx_market_fx_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/market/indices': {
     parameters: {
       query?: never;
@@ -697,6 +717,43 @@ export interface paths {
     };
     /** Read Indices */
     get: operations['read_indices_market_indices_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/portfolio/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Portfolio History
+     * @description 주식 평가금액 추이(오래된 것부터). 예수금은 넣지 않는다.
+     */
+    get: operations['portfolio_history_portfolio_history_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/portfolio/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Portfolio Summary */
+    get: operations['portfolio_summary_portfolio_summary_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -821,6 +878,26 @@ export interface paths {
     };
     /** Symbols Search */
     get: operations['symbols_search_symbols_search_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/symbols/{market}/{code}/bars': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Symbol Bars
+     * @description 종목 일봉 종가(오래된 것부터). 한투 키가 없거나 받지 못하면 가진 만큼만 준다.
+     */
+    get: operations['symbol_bars_symbols__market___code__bars_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1021,6 +1098,31 @@ export interface components {
       /** Status */
       status: string;
     };
+    /** AssetChange */
+    AssetChange: {
+      /** Change */
+      change: number | null;
+      /** Change Pct */
+      change_pct: number | null;
+    };
+    /** AssetMove */
+    AssetMove: {
+      /** Amount */
+      amount: number;
+      /** Code */
+      code: string;
+      /** Currency */
+      currency: string;
+      /** Name */
+      name: string;
+    };
+    /** BarOut */
+    BarOut: {
+      /** Close */
+      close: number;
+      /** Day */
+      day: string;
+    };
     /** BriefingDetail */
     BriefingDetail: {
       /** Created At */
@@ -1039,6 +1141,7 @@ export interface components {
       market: string;
       /** Missing */
       missing: string[];
+      my_assets?: components['schemas']['MyAssets'] | null;
       /**
        * Status
        * @enum {string}
@@ -1367,6 +1470,13 @@ export interface components {
       /** Market */
       market: string;
     };
+    /** FxOut */
+    FxOut: {
+      /** Day */
+      day: string;
+      /** Usdkrw */
+      usdkrw: number | null;
+    };
     /** GpuOut */
     GpuOut: {
       /** Name */
@@ -1407,6 +1517,19 @@ export interface components {
       status: string;
       /** Version */
       version: string;
+    };
+    /** HistoryPoint */
+    HistoryPoint: {
+      /** Backfilled */
+      backfilled: boolean;
+      /** Cost */
+      cost: number | null;
+      /** Day */
+      day: string;
+      /** Usdkrw */
+      usdkrw: number | null;
+      /** Value */
+      value: number | null;
     };
     /** HoldingOut */
     HoldingOut: {
@@ -1612,6 +1735,22 @@ export interface components {
        */
       state: 'running' | 'paused' | 'offline' | 'auth_invalid' | 'closed';
     };
+    /**
+     * MyAssets
+     * @description 앱이 계산한 내 자산 구역. AI를 거치지 않는다. 전일 기록이 없으면 변화 값은 null이다.
+     */
+    MyAssets: {
+      bottom: components['schemas']['AssetMove'] | null;
+      /** Change Krw */
+      change_krw: number | null;
+      /** Change Pct */
+      change_pct: number | null;
+      /** Currencies */
+      currencies: {
+        [key: string]: components['schemas']['AssetChange'];
+      };
+      top: components['schemas']['AssetMove'] | null;
+    };
     /** NodeHitOut */
     NodeHitOut: {
       /** Count */
@@ -1656,6 +1795,24 @@ export interface components {
       };
       /** Type */
       type: string;
+    };
+    /** PortfolioSummary */
+    PortfolioSummary: {
+      /** At */
+      at: string;
+      /** Currencies */
+      currencies: {
+        [key: string]: components['schemas']['Totals'];
+      };
+      /** Missing Prices */
+      missing_prices: number;
+      /** Symbols */
+      symbols: components['schemas']['SymbolValue'][];
+      total_krw: components['schemas']['Totals'] | null;
+      /** Unsupported */
+      unsupported: number;
+      /** Usdkrw */
+      usdkrw: number | null;
     };
     /** PullStartedOut */
     PullStartedOut: {
@@ -1786,6 +1943,33 @@ export interface components {
       /** Name En */
       name_en: string | null;
     };
+    /** SymbolValue */
+    SymbolValue: {
+      /** Avg Price */
+      avg_price: number | null;
+      /** Code */
+      code: string;
+      /** Cost */
+      cost: number | null;
+      /** Currency */
+      currency: string | null;
+      /** Market */
+      market: string;
+      /** Name */
+      name: string;
+      /** Pl */
+      pl: number | null;
+      /** Pl Pct */
+      pl_pct: number | null;
+      /** Price */
+      price: number | null;
+      /** Total */
+      total: string;
+      /** Unpriced Quantity */
+      unpriced_quantity: string;
+      /** Value */
+      value: number | null;
+    };
     /** SyncRequest */
     SyncRequest: {
       /** Broker Id */
@@ -1824,6 +2008,17 @@ export interface components {
       min_vram_mb: number;
       /** Recommended */
       recommended: string | null;
+    };
+    /** Totals */
+    Totals: {
+      /** Cost */
+      cost: number | null;
+      /** Pl */
+      pl: number | null;
+      /** Pl Pct */
+      pl_pct: number | null;
+      /** Value */
+      value: number | null;
     };
     /** WatchCreate */
     WatchCreate: {
@@ -4129,6 +4324,55 @@ export interface operations {
       };
     };
   };
+  market_fx_market_fx_get: {
+    parameters: {
+      query?: {
+        refresh?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FxOut'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
   read_indices_market_indices_get: {
     parameters: {
       query?: never;
@@ -4145,6 +4389,103 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['IndexOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  portfolio_history_portfolio_history_get: {
+    parameters: {
+      query?: {
+        range?: '1m' | '3m' | '1y' | 'all';
+        view?: 'all' | 'krw' | 'usd';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HistoryPoint'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  portfolio_summary_portfolio_summary_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioSummary'];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */
@@ -4605,6 +4946,58 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SymbolOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  symbol_bars_symbols__market___code__bars_get: {
+    parameters: {
+      query?: {
+        range?: '1m' | '3m' | '1y';
+      };
+      header?: never;
+      path: {
+        market: 'KR' | 'US';
+        code: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BarOut'][];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */

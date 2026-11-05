@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import logging
 import re
+import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -122,6 +123,14 @@ def summarize(holdings: list[Holding], brokers: list[Broker], stale: set[int]) -
         "currency": currency,
         "brokers": rows,
     }
+
+
+def avg_price_of(conn: sqlite3.Connection, market: str, code: str) -> float | None:
+    """종목의 합산 평단가(`GET /holdings/symbol`과 같은 값). 보유가 없거나 모르면 None."""
+    avg: float | None = summarize(HoldingsRepo(conn).by_symbol(market, code), [], set())[
+        "avg_price"
+    ]
+    return avg
 
 
 class HoldingsService:

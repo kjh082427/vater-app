@@ -35,6 +35,7 @@ from vater_core.alerts.evaluator import Evaluator, NotifyFn, NowFn
 from vater_core.alerts.rules import Live, Reading, condition, parse_rule
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
+from vater_core.holdings.service import avg_price_of
 from vater_core.kis.models import Quote, UsExchange
 from vater_core.kis.ws import DOMESTIC_TR, US_TR, Tick
 from vater_core.stdout_events import notify
@@ -239,6 +240,16 @@ class AlertMonitor:
             if self._rest_inflight.get(key) is task:
                 del self._rest_inflight[key]
 
+    async def ensure_bars(self, item: WatchItem) -> None:
+        """확정된 마지막 세션의 일봉이 없으면 받는다. 실패해도 가진 것으로 넘어간다."""
+        try:
+            day = await self._clock.last_closed_session(cast(MarketId, item.market))
+            last = BarRepo(self._db()).last_day(item.market, item.code)
+            if day is not None and (last is None or last < day):
+                await self._bars(item, day)
+        except Exception as e:
+            logger.warning("bars %s %s: refresh failed: %s", item.market, item.code, e)
+
     async def preview(
         self, item: WatchItem, kind: str, params: dict[str, Any], timing: str
     ) -> Reading:
@@ -251,14 +262,7 @@ class AlertMonitor:
         parsed = parse_rule(kind, params)
         market = cast(MarketId, item.market)
         bars = BarRepo(self._db())
-        day = await self._clock.last_closed_session(market)
-        if day is not None:
-            last = bars.last_day(item.market, item.code)
-            if last is None or last < day:
-                try:
-                    await self._bars(item, day)
-                except Exception as e:
-                    logger.warning("rule preview %s %s: bars failed: %s", item.market, item.code, e)
+        await self.ensure_bars(item)
         live: Live | None = None
         if timing == "realtime" and await self._clock.is_open(market):
             try:
@@ -267,7 +271,8 @@ class AlertMonitor:
                 live = Live(day=session, price=q.price, change_pct=q.change_pct, volume=q.volume)
             except Exception as e:
                 logger.warning("rule preview %s %s: price failed: %s", item.market, item.code, e)
-        return condition(parsed, bars.history(item.market, item.code), live)
+        avg = avg_price_of(self._db(), item.market, item.code) if kind == "avg_price_pct" else None
+        return condition(parsed, bars.history(item.market, item.code), live, avg)
 
     async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
         try:

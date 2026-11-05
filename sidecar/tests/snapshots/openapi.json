@@ -445,6 +445,84 @@
         "title": "AnalysisQueued",
         "type": "object"
       },
+      "AssetChange": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          }
+        },
+        "required": [
+          "change",
+          "change_pct"
+        ],
+        "title": "AssetChange",
+        "type": "object"
+      },
+      "AssetMove": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "amount",
+          "currency"
+        ],
+        "title": "AssetMove",
+        "type": "object"
+      },
+      "BarOut": {
+        "properties": {
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "close"
+        ],
+        "title": "BarOut",
+        "type": "object"
+      },
       "BriefingDetail": {
         "properties": {
           "created_at": {
@@ -485,6 +563,16 @@
             },
             "title": "Missing",
             "type": "array"
+          },
+          "my_assets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyAssets"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "enum": [
@@ -1535,6 +1623,31 @@
         "title": "FeedOut",
         "type": "object"
       },
+      "FxOut": {
+        "properties": {
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "usdkrw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usdkrw"
+          }
+        },
+        "required": [
+          "usdkrw",
+          "day"
+        ],
+        "title": "FxOut",
+        "type": "object"
+      },
       "GpuOut": {
         "properties": {
           "name": {
@@ -1669,6 +1782,60 @@
           "version"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HistoryPoint": {
+        "properties": {
+          "backfilled": {
+            "title": "Backfilled",
+            "type": "boolean"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "usdkrw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usdkrw"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "day",
+          "value",
+          "cost",
+          "usdkrw",
+          "backfilled"
+        ],
+        "title": "HistoryPoint",
         "type": "object"
       },
       "HoldingOut": {
@@ -2249,6 +2416,69 @@
         "title": "MonitorStatus",
         "type": "object"
       },
+      "MyAssets": {
+        "description": "앱이 계산한 내 자산 구역. AI를 거치지 않는다. 전일 기록이 없으면 변화 값은 null이다.",
+        "properties": {
+          "bottom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetMove"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change_krw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Krw"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "currencies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AssetChange"
+            },
+            "title": "Currencies",
+            "type": "object"
+          },
+          "top": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetMove"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "change_krw",
+          "change_pct",
+          "currencies",
+          "top",
+          "bottom"
+        ],
+        "title": "MyAssets",
+        "type": "object"
+      },
       "NodeHitOut": {
         "properties": {
           "count": {
@@ -2377,6 +2607,68 @@
           "options"
         ],
         "title": "Panel",
+        "type": "object"
+      },
+      "PortfolioSummary": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "currencies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Totals"
+            },
+            "title": "Currencies",
+            "type": "object"
+          },
+          "missing_prices": {
+            "title": "Missing Prices",
+            "type": "integer"
+          },
+          "symbols": {
+            "items": {
+              "$ref": "#/components/schemas/SymbolValue"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "total_krw": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Totals"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unsupported": {
+            "title": "Unsupported",
+            "type": "integer"
+          },
+          "usdkrw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usdkrw"
+          }
+        },
+        "required": [
+          "symbols",
+          "currencies",
+          "total_krw",
+          "usdkrw",
+          "missing_prices",
+          "unsupported",
+          "at"
+        ],
+        "title": "PortfolioSummary",
         "type": "object"
       },
       "PullStartedOut": {
@@ -2796,6 +3088,123 @@
         "title": "SymbolOut",
         "type": "object"
       },
+      "SymbolValue": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pl"
+          },
+          "pl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pl Pct"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          },
+          "unpriced_quantity": {
+            "title": "Unpriced Quantity",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "cost",
+          "pl",
+          "pl_pct",
+          "market",
+          "code",
+          "name",
+          "total",
+          "unpriced_quantity",
+          "avg_price",
+          "currency",
+          "price"
+        ],
+        "title": "SymbolValue",
+        "type": "object"
+      },
       "SyncRequest": {
         "properties": {
           "broker_id": {
@@ -2922,6 +3331,62 @@
           "expected_minutes"
         ],
         "title": "TierOut",
+        "type": "object"
+      },
+      "Totals": {
+        "properties": {
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "pl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pl"
+          },
+          "pl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pl Pct"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "cost",
+          "pl",
+          "pl_pct"
+        ],
+        "title": "Totals",
         "type": "object"
       },
       "WatchCreate": {
@@ -6032,6 +6497,70 @@
         ]
       }
     },
+    "/market/fx": {
+      "get": {
+        "description": "원달러 환율과 그 값의 날짜. 오늘 값이 없으면 7일 안의 최근 값, 그것도 없으면 null과 오늘.",
+        "operationId": "market_fx_market_fx_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Market Fx",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/market/indices": {
       "get": {
         "operationId": "read_indices_market_indices_get",
@@ -6084,6 +6613,146 @@
         "summary": "Read Indices",
         "tags": [
           "market"
+        ]
+      }
+    },
+    "/portfolio/history": {
+      "get": {
+        "description": "주식 평가금액 추이(오래된 것부터). 예수금은 넣지 않는다.",
+        "operationId": "portfolio_history_portfolio_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1m",
+              "enum": [
+                "1m",
+                "3m",
+                "1y",
+                "all"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "krw",
+                "usd"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryPoint"
+                  },
+                  "title": "Response Portfolio History Portfolio History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Portfolio History",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/portfolio/summary": {
+      "get": {
+        "operationId": "portfolio_summary_portfolio_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Portfolio Summary",
+        "tags": [
+          "portfolio"
         ]
       }
     },
@@ -6639,6 +7308,101 @@
           }
         },
         "summary": "Symbols Search",
+        "tags": [
+          "kis"
+        ]
+      }
+    },
+    "/symbols/{market}/{code}/bars": {
+      "get": {
+        "description": "종목 일봉 종가(오래된 것부터). 한투 키가 없거나 받지 못하면 가진 만큼만 준다.",
+        "operationId": "symbol_bars_symbols__market___code__bars_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "market",
+            "required": true,
+            "schema": {
+              "enum": [
+                "KR",
+                "US"
+              ],
+              "title": "Market",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1m",
+              "enum": [
+                "1m",
+                "3m",
+                "1y"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BarOut"
+                  },
+                  "title": "Response Symbol Bars Symbols  Market   Code  Bars Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Symbol Bars",
         "tags": [
           "kis"
         ]

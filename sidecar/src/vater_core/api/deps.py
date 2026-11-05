@@ -24,6 +24,8 @@ if (
     from vater_core.kis.services import KisServices
     from vater_core.llm.state import LlmState
     from vater_core.market.indices import IndexBoard
+    from vater_core.portfolio.daily import DailyRecorder
+    from vater_core.portfolio.service import PortfolioService
 
 
 def _noop() -> None:
@@ -46,6 +48,8 @@ class AppDeps:
     alerts: AlertMonitor | None = None  # alerts.monitor.get_alerts()가 만든다
     briefing: BriefingService | None = None  # briefing.service.get_briefing()이 만든다
     holdings: HoldingsService | None = None  # holdings.service.get_holdings()가 만든다
+    portfolio: PortfolioService | None = None  # portfolio.service.get_portfolio()가 만든다
+    daily: DailyRecorder | None = None  # portfolio.daily.get_daily()가 만든다
     indices: IndexBoard | None = None  # api.routes.market이 처음 부를 때 만든다
 
 
