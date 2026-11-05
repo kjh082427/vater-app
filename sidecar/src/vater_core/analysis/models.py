@@ -1,8 +1,9 @@
 """분석 엔진·작업 큐·저장소가 함께 쓰는 데이터 형식."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from vater_core.analysis.summary import DecisionSummary
 from vater_core.analysis.symbols import Target
@@ -15,12 +16,11 @@ class TaPaths:
 
     results_dir: Path
     data_cache_dir: Path  # 체크포인트: data_cache_dir/checkpoints/<티커>.db (검증 실험 S5)
-    memory_log_path: Path
 
     @classmethod
     def under(cls, data_dir: Path) -> "TaPaths":
         base = data_dir / "cache" / "tradingagents"
-        return cls(base / "logs", base / "cache", base / "memory" / "trading_memory.md")
+        return cls(base / "logs", base / "cache")
 
 
 @dataclass(frozen=True)
@@ -37,6 +37,7 @@ class Progress:
     stage: str  # analysts | research | trader | risk | portfolio | other
     node: str
     elapsed_sec: float
+    wait: dict[str, Any] | None = None  # 기다리는 중: {reason: busy|rate, message, seconds}
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,4 @@ class EngineResult:
     reports: dict[str, str]
     timings: dict[str, float]  # 단계별 소요 시간(초)
     tokens: dict[str, int]  # {"in": 입력 토큰, "out": 출력 토큰}
+    fallbacks: dict[str, list[str]] = field(default_factory=dict)  # 단계별로 대신 답한 모델

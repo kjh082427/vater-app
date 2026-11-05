@@ -2330,6 +2330,14 @@
       },
       "ModelChoice": {
         "properties": {
+          "fallbacks": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fallbacks",
+            "type": "array"
+          },
           "model": {
             "title": "Model",
             "type": "string"

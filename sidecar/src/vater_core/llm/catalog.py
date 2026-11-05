@@ -52,6 +52,8 @@ class CloudProvider:
     deep: str | None
     quick: str | None
     free_tier: bool
+    # 혼잡·한도로 실패하면 넘어갈 무료 모델 순서 (v2 설계 20장). {"deep": (...), "quick": (...)}
+    fallback: dict[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,7 @@ def _parse(raw: dict[str, Any]) -> Catalog:
             deep=p["deep"],
             quick=p["quick"],
             free_tier=p["free_tier"],
+            fallback={t: tuple(ms) for t, ms in p.get("fallback", {}).items()},
         )
         for pid, p in raw["cloud"].items()
     }

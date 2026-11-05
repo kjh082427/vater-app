@@ -336,3 +336,47 @@ def test_abandoned_analysis_threads_are_reported() -> None:
         stop.set()
         t.join()
     assert abandoned_analysis_threads() == []
+
+
+async def test_wait_progress_and_fallback_models_are_saved(deps: AppDeps) -> None:
+    """v2 설계 20장: 기다리는 중임을 진행 이벤트로 알리고, 대신 답한 모델을 결과에 남긴다."""
+    from dataclasses import replace
+
+    class WaitingEngine(FakeEngine):
+        def run(self, job: EngineJob, on_progress: Any, cancel: threading.Event, kis: Any) -> Any:
+            wait = {"reason": "rate", "message": "분당 한도", "seconds": 25.0}
+            on_progress(Progress("other", "gemini-3.8-flash", 0.5, wait=wait))
+            result = super().run(job, on_progress, cancel, kis)
+            return replace(result, fallbacks={"deep": ["gemini-3.5-flash"]})
+
+    q = make_queue(deps, WaitingEngine(), [])
+    assert deps.events is not None and deps.db is not None
+    sub = deps.events.subscribe()
+    try:
+        aid = await q.submit("KR", "005930", None, None)
+        assert await wait_status(deps, aid, "done") == "done"
+    finally:
+        await q.stop()
+    waits = []
+    while not sub.queue.empty():
+        ev = sub.queue.get_nowait()
+        if ev.type == "analysis.progress" and ev.data.get("wait"):
+            waits.append(ev.data)
+    assert waits == [
+        {
+            "id": aid,
+            "stage": "other",
+            "node": "gemini-3.8-flash",
+            "elapsed_sec": 0.5,
+            "wait": {"reason": "rate", "message": "분당 한도", "seconds": 25.0},
+        }
+    ]
+    models = AnalysisRepo(deps.db).get(aid).models
+    assert models == {
+        "deep": {
+            "provider": "google",
+            "model": "gemini-3.8-flash",
+            "fallbacks": ["gemini-3.5-flash"],
+        },
+        "quick": {"provider": "google", "model": "gemini-3.5-flash-lite"},
+    }

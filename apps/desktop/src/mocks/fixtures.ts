@@ -265,8 +265,8 @@ export const analysisDone: AnalysisDetail = {
   decision_changed: true,
   created_at: '2026-11-03T12:41:00+09:00',
   models: {
-    deep: { provider: 'google', model: 'gemini-3-pro' },
-    quick: { provider: 'google', model: 'gemini-3-flash' },
+    deep: { provider: 'google', model: 'gemini-3-pro', fallbacks: [] },
+    quick: { provider: 'google', model: 'gemini-3-flash', fallbacks: [] },
   },
   summary: [
     'HBM 출하 확대로 메모리 실적 회복이 이어질 것으로 봅니다. (예시)',

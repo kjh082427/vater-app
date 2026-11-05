@@ -43,6 +43,8 @@ class LlmRun:
     # compat 주소에는 자격 증명이 섞일 수 있어서 repr에서 숨긴다.
     overrides: dict[str, Any] = field(repr=False)
     env: dict[str, str] = field(repr=False)
+    # 단계별 대체 모델 순서(설정한 모델이 맨 앞). Google 단계에만 있다 (v2 설계 20장).
+    chains: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def summary(self) -> str:
         return (
@@ -145,4 +147,9 @@ def build_run(
             quick_think_llm=mixed_variant,
         )
         quick = TierChoice("ollama", mixed_variant, OLLAMA_V1)
-    return LlmRun(chosen, deep, quick, overrides, c.env)
+    chains = {
+        tier: tuple(dict.fromkeys((t.model, *c.provider.fallback[tier])))
+        for tier, t in (("deep", deep), ("quick", quick))
+        if tier in c.provider.fallback and t.provider == ta
+    }
+    return LlmRun(chosen, deep, quick, overrides, c.env, chains)

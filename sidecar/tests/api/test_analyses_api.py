@@ -87,7 +87,11 @@ async def test_create_and_read(client: httpx.AsyncClient, queue: AnalysisQueue) 
     assert body["summary"] == ["근거 1.", "근거 2."]
     assert body["price_target"] == "250000" and body["time_horizon"] == "3-6 months"
     assert body["reports"]["market_report"] == "차트"
-    assert body["models"]["deep"] == {"provider": "google", "model": "gemini-3.8-flash"}
+    assert body["models"]["deep"] == {
+        "provider": "google",
+        "model": "gemini-3.8-flash",
+        "fallbacks": [],
+    }
     assert body["tokens"] == {"in": 10, "out": 5} and body["error"] is None
 
 

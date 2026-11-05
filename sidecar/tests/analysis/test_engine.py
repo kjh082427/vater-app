@@ -45,6 +45,10 @@ def job(
             "max_risk_discuss_rounds": 1,
         },
         env={"GOOGLE_API_KEY": "g-secret-123"},
+        chains={
+            "deep": ("gemini-3.8-flash", "gemini-3.5-flash"),
+            "quick": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
+        },
     )
     return EngineJob(
         1, resolve_target(db, market, code), date(2026, 11, 2), run, TaPaths.under(tmp_path)
@@ -80,7 +84,7 @@ def test_build_config_domestic_uses_kis(db: sqlite3.Connection, tmp_path: Path) 
     assert cfg["checkpoint_enabled"] is True and cfg["llm_max_retries"] == 2
     assert cfg["llm_provider"] == "google" and cfg["output_language"] == "Korean"
     assert cfg["data_cache_dir"] == str(tmp_path / "cache" / "tradingagents" / "cache")
-    assert cfg["memory_log_path"].startswith(str(tmp_path))
+    assert cfg["memory_log_path"] is None  # v2 설계 20장: 분석 메모리를 끈다
     assert cfg["results_dir"].startswith(str(tmp_path))
 
 
@@ -206,3 +210,52 @@ def test_engine_checks_cancel_before_building_graph(db: sqlite3.Connection, tmp_
     with pytest.raises(Cancelled):
         TradingAgentsEngine().run(job(db, tmp_path), lambda p: None, cancel, None)
     assert not (tmp_path / "cache").exists()  # 아무것도 만들지 않았다
+
+
+def test_memory_log_never_reaches_portfolio_manager(
+    db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v2 설계 8-1·20장: 다른 종목의 분석 기록(메모리 로그)이 상태와 프롬프트에 없다."""
+    from tradingagents.agents.managers.portfolio_manager import create_portfolio_manager
+    from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents.graph.trading_graph import TradingAgentsGraph
+    from tradingagents.memory import TradingMemoryLog
+
+    planted = tmp_path / "old" / "trading_memory.md"
+    old = TradingMemoryLog({"memory_log_path": str(planted)})
+    old.store_decision("NVDA", "2026-10-01", "**Rating**: Buy\nSECRET-NVDA-LESSON", "Buy")
+    old.update_with_outcome(
+        "NVDA", "2026-10-01", 0.05, 0.02, 5, "SECRET-NVDA-REFLECTION", "2026-10-08"
+    )
+    assert "SECRET-NVDA" in old.get_past_context("005930.KS")  # 켜져 있었다면 들어갔다
+    monkeypatch.setitem(DEFAULT_CONFIG, "memory_log_path", str(planted))
+
+    local = job(db, tmp_path)
+    overrides = {
+        **local.run.overrides,
+        "llm_provider": "ollama",
+        "backend_url": "http://127.0.0.1:9/v1",
+    }
+    run = LlmRun("local", local.run.deep, local.run.quick, overrides, {})
+    cfg = build_config(EngineJob(1, local.target, local.as_of, run, local.paths))
+    ta = TradingAgentsGraph(selected_analysts=["market"], config=cfg)
+    state = {"company_of_interest": "005930.KS", "trade_date": "2026-11-02"}
+    memory = ta._memory_step(state)
+    assert memory == {"past_context": "", "memory_note": ""}
+
+    prompts: list[str] = []
+
+    class Llm:
+        def with_structured_output(self, schema: Any) -> None:
+            raise NotImplementedError
+
+        def invoke(self, prompt: Any) -> Any:
+            prompts.append(str(prompt))
+            return type("R", (), {"content": "**Rating**: Hold"})()
+
+    pm = create_portfolio_manager(Llm())
+    full = ta.propagator.create_initial_state("005930.KS", "2026-11-02")
+    full.update(memory, investment_plan="계획", trader_investment_plan="매매안")
+    full["risk_debate_state"] = {**full["risk_debate_state"], "history": "토론"}
+    pm(full)
+    assert prompts and all("SECRET-NVDA" not in p and "NVDA" not in p for p in prompts)

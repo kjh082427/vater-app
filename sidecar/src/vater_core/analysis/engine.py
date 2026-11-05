@@ -5,11 +5,15 @@
   같은 종목·기준일·설정이면 끝난 단계를 건너뛴다.
 - 진행 스트리밍(S6): `graph.stream(subgraphs=True, stream_mode=["updates", "values"])`.
 - 결정(S4): TradingAgents의 `run_rating`.
+- Gemini 대기와 대체 모델(v2 설계 20장): 그래프를 만든 뒤 모델에 붙인다(`fallback.py`).
+  체크포인트 키에 모델 이름이 들어가서, 모델을 바꿔 체크포인트로 이어 가는 방식은 쓸 수 없다.
+- 분석 메모리는 끈다(v2 설계 8-1·20장): `memory_log_path=None`이면 기록을 읽지도 쓰지도 않는다.
 
 엔진은 워커 스레드에서 돈다(동기). 취소는 노드 경계에서만 반영된다(LLM 호출 도중에는 끊지 않는다).
 """
 
 import copy
+import dataclasses
 import logging
 import os
 import threading
@@ -19,6 +23,7 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from vater_core.analysis.fallback import WAIT_MESSAGE, GeminiFallback, install
 from vater_core.analysis.kis_vendor import (
     KIS_TOOLS,
     VENDOR,
@@ -30,6 +35,7 @@ from vater_core.analysis.models import EngineJob, EngineResult, Progress
 from vater_core.analysis.summary import summarize
 from vater_core.analysis.symbols import analysts_for
 from vater_core.api.errors import VaterError
+from vater_core.llm.presets import LlmRun
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +48,7 @@ REPORT_KEYS = (
     "trader_investment_plan",
     "final_trade_decision",
 )
-LLM_MAX_RETRIES = 2  # 스펙 8장: 클라우드 LLM 실패는 2회 재시도
+LLM_MAX_RETRIES = 2  # 스펙 8장: 클라우드 LLM 실패는 2회 재시도 (Gemini는 fallback.py가 맡는다)
 FINAL_NODE = "Portfolio Manager"
 _STAGES = {
     "Market Analyst": "analysts",
@@ -142,6 +148,24 @@ def result_from_final(
     )
 
 
+def attach_fallbacks(
+    ta: Any,
+    run: LlmRun,
+    on_progress: Callable[[Progress], None],
+    wait: Callable[[float], None],
+    t0: float,
+) -> dict[str, GeminiFallback]:
+    """Google 단계의 모델에 대기와 대체 모델을 붙이고, 기다릴 때 진행 이벤트를 보낸다."""
+
+    def on_wait(reason: str, model: str, seconds: float) -> None:
+        wait_info = {"reason": reason, "message": WAIT_MESSAGE[reason], "seconds": seconds}
+        elapsed = round(time.monotonic() - t0, 1)
+        on_progress(Progress("other", model, elapsed, wait=wait_info))
+
+    llms = {"deep": ta.deep_thinking_llm, "quick": ta.quick_thinking_llm}
+    return {tier: install(llms[tier], chain, wait, on_wait) for tier, chain in run.chains.items()}
+
+
 def build_config(job: EngineJob) -> dict[str, Any]:
     from tradingagents.default_config import DEFAULT_CONFIG
 
@@ -150,7 +174,7 @@ def build_config(job: EngineJob) -> dict[str, Any]:
     cfg.update(
         results_dir=str(job.paths.results_dir),
         data_cache_dir=str(job.paths.data_cache_dir),
-        memory_log_path=str(job.paths.memory_log_path),
+        memory_log_path=None,
         checkpoint_enabled=True,
         llm_max_retries=LLM_MAX_RETRIES,
     )
@@ -215,15 +239,16 @@ class TradingAgentsEngine:
 
         install_kis_vendor()
         config = build_config(job)
-        for p in (
-            job.paths.results_dir,
-            job.paths.data_cache_dir,
-            job.paths.memory_log_path.parent,
-        ):
+        for p in (job.paths.results_dir, job.paths.data_cache_dir):
             p.mkdir(parents=True, exist_ok=True)
         ticker, day = job.target.ticker, job.as_of.isoformat()
         tokens = _TokenCounter()
         session = kis_session(kis) if kis is not None else nullcontext()
+
+        def wait(seconds: float) -> None:  # 기다리는 동안 취소되면 바로 멈춘다
+            if cancel.wait(seconds):
+                raise Cancelled
+
         # LLM 클라이언트가 만들어질 때 키를 읽으므로 그래프 생성부터 감싼다.
         with scoped_env(job.run.env), session:
             ta = TradingAgentsGraph(
@@ -231,6 +256,7 @@ class TradingAgentsEngine:
                 config=config,
                 callbacks=[tokens.handler],
             )
+            fallbacks = attach_fallbacks(ta, job.run, on_progress, wait, time.monotonic())
             with ta.checkpoint_scope(ticker, day) as thread_id:
                 init = ta.create_run_state(ticker, day)
                 args = ta.propagator.get_graph_args()
@@ -262,4 +288,6 @@ class TradingAgentsEngine:
                         logger.warning("could not read checkpoint state", exc_info=True)
             # 성공이든 빈 결과든 이 체크포인트는 더 쓸 일이 없다(빈 결과면 다음은 처음부터).
             ta.clear_checkpoint_on_success(ticker, day)
-        return result_from_final(final, run_rating(final), outcome.timings, tokens.tokens)
+        result = result_from_final(final, run_rating(final), outcome.timings, tokens.tokens)
+        used = {tier: fb.used for tier, fb in fallbacks.items() if fb.used}
+        return dataclasses.replace(result, fallbacks=used)

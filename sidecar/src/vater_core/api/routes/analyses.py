@@ -1,7 +1,8 @@
 """AI 분석 API (스펙 2-3, 5장). 분석은 오래 걸려서 202로 바로 응답하고, 진행은 SSE로 보낸다.
 
 - `analysis.status` `{id, status, decision?, error?}`
-- `analysis.progress` `{id, stage, node, elapsed_sec}`
+- `analysis.progress` `{id, stage, node, elapsed_sec, wait}`. `wait`는 Gemini 혼잡·분당 한도로
+  기다리는 동안만 `{reason: busy|rate, message, seconds}`이고 평소에는 null이다 (v2 설계 20장).
 """
 
 from datetime import date
@@ -48,6 +49,7 @@ class AnalysisItem(BaseModel):
 class ModelChoice(BaseModel):
     provider: str
     model: str
+    fallbacks: list[str] = []  # 혼잡·한도로 대신 답한 모델 (v2 설계 20장)
 
 
 class ErrorInfo(BaseModel):

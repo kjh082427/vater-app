@@ -156,3 +156,26 @@ def test_summary(tmp_path: Path) -> None:
     s = settings(llm__local_model="qwen3.5:4b")
     run = build_run(s, load_catalog(), store(tmp_path, SecretName.LLM_GOOGLE_KEY), preset="mixed")
     assert run.summary() == "mixed: deep google/gemini-3.8-flash, quick ollama/qwen3.5:4b-16k"
+
+
+def test_google_fallback_chains_follow_catalog(tmp_path: Path) -> None:
+    """v2 설계 20장: 설정한 모델을 먼저, 그다음 카탈로그 순서. 같은 모델은 한 번만."""
+    run = build_run(settings(), load_catalog(), store(tmp_path, SecretName.LLM_GOOGLE_KEY))
+    assert run.chains == {
+        "deep": ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"),
+        "quick": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"),
+    }
+    s = settings(llm__cloud_deep_model="gemini-3.5-flash", llm__cloud_quick_model="my-model")
+    run = build_run(s, load_catalog(), store(tmp_path, SecretName.LLM_GOOGLE_KEY))
+    assert run.chains["deep"] == ("gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash")
+    assert run.chains["quick"][0] == "my-model" and len(run.chains["quick"]) == 4
+
+
+def test_fallback_only_for_google_tiers(tmp_path: Path) -> None:
+    keys = store(tmp_path, SecretName.LLM_GOOGLE_KEY, SecretName.LLM_ANTHROPIC_KEY)
+    mixed = build_run(settings(llm__local_model="qwen3.5:4b"), load_catalog(), keys, preset="mixed")
+    assert set(mixed.chains) == {"deep"}  # quick는 로컬
+    local = settings(llm__preset="local", llm__local_model="qwen3.5:4b")
+    assert build_run(local, load_catalog(), keys).chains == {}
+    other = build_run(settings(llm__cloud_provider="anthropic"), load_catalog(), keys)
+    assert other.chains == {}
