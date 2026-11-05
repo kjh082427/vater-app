@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useEvent, useServices, useStreamStatus } from '../api/services';
 import { useResource } from '../api/useResource';
-import type { CheckOut } from '../api/types';
+import type { BrokerOut, CheckOut, ConnectionOut } from '../api/types';
 import { AppShell, Banner, Button, Icon, SidebarNav, type NavItem } from '../design-system';
 import { ScreenHeader } from '../screens/common/ScreenHeader';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
@@ -184,6 +184,15 @@ function Shell({ route }: { route: Route }) {
   const stream = useStreamStatus();
   const llm = useResource<CheckOut>('/llm/check');
   const settings = useResource<Record<string, unknown>>('/settings');
+  const connections = useResource<ConnectionOut[]>('/connections');
+  const brokers = useResource<BrokerOut[]>('/brokers');
+  const reloadConnections = connections.reload;
+  const firstRoute = useRef(true);
+  useEffect(() => {
+    // 끊김은 화면을 옮길 때 다시 확인한다(알려 주는 SSE 이벤트가 없다)
+    if (firstRoute.current) firstRoute.current = false;
+    else reloadConnections();
+  }, [route.name, reloadConnections]);
   const analyses = useActiveAnalyses();
   const lastEventAt = useLastEventAt();
   const badge = useAlertBadge(route);
@@ -277,6 +286,26 @@ function Shell({ route }: { route: Route }) {
         }
       >
         {`인터넷 연결을 30초마다 다시 확인합니다.${lastSeen}`}
+      </Banner>
+    );
+  } else if (route.name !== 'settings' && connections.data?.some((c) => c.status === 'lost')) {
+    // 스펙 1-1: 끊긴 증권사는 알리고 [다시 연결]/[데이터 삭제]는 설정 > 증권사 연결에서 고른다
+    const lost = connections.data.filter((c) => c.status === 'lost');
+    banner = (
+      <Banner
+        tone="caution"
+        title="증권사 연결이 끊겼습니다"
+        action={
+          <a className={styles.bannerLink} href="#/settings">
+            다시 연결하거나 데이터 삭제
+          </a>
+        }
+      >
+        {`저장된 수량은 마지막 갱신 시각과 함께 유지됩니다. 끊긴 곳: ${[
+          ...new Set(
+            lost.map((c) => brokers.data?.find((b) => b.id === c.broker_id)?.name ?? c.broker_id),
+          ),
+        ].join(', ')}`}
       </Banner>
     );
   } else if (newVersion && route.name !== 'settings') {

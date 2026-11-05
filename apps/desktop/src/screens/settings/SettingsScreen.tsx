@@ -13,6 +13,7 @@ import common from '../common/screen.module.css';
 import { CloudSettings } from './CloudSection';
 import { KisSettings } from './KisSection';
 import { LocalSettings } from './LocalSection';
+import { ConnectionsSection } from '../holdings/ConnectionsSection';
 import styles from './settings.module.css';
 import { UpdateRow } from './UpdateRow';
 import { str, useSettings, type Settings } from './useSettings';
@@ -199,6 +200,12 @@ export function SettingsScreen() {
             settings={s}
             save={settings.save}
           />
+        </Card>
+        <Card
+          title="증권사 연결"
+          description="보유 종목과 평단가를 조회만 합니다. 주문은 하지 않습니다."
+        >
+          <ConnectionsSection />
         </Card>
         <Card title="AI 엔진">
           <div className={styles.body}>

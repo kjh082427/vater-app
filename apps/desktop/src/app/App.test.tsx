@@ -65,6 +65,34 @@ describe('앱 틀', () => {
   });
 });
 
+describe('끊긴 증권사 연결', () => {
+  it('끊긴 연결이 있으면 배너로 알리고 설정으로 안내한다(설정 화면에서는 숨김)', async () => {
+    mock.db.connections = [
+      {
+        id: 3,
+        broker_id: 'kiwoom',
+        account_mask: '키 ab12',
+        status: 'lost',
+        last_synced_at: '2026-11-06T09:00:00+09:00',
+        last_error: null,
+        server: null,
+      },
+    ];
+    renderApp('#/home');
+    expect(await screen.findByText('증권사 연결이 끊겼습니다')).toBeInTheDocument();
+    expect(screen.getByText(/끊긴 곳: 키움/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다시 연결하거나 데이터 삭제' })).toHaveAttribute(
+      'href',
+      '#/settings',
+    );
+    act(() => {
+      window.location.hash = '#/settings';
+    });
+    await screen.findByRole('heading', { level: 1, name: '설정' });
+    expect(screen.queryByText('증권사 연결이 끊겼습니다')).not.toBeInTheDocument();
+  });
+});
+
 describe('셸 navigate 이벤트(알림 클릭)', () => {
   it('경로로 이동한다', async () => {
     const { shell } = renderApp('#/home');

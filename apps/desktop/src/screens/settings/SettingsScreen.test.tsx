@@ -32,6 +32,15 @@ function capture(method: string, pathPrefix: string) {
   return seen;
 }
 
+describe('증권사 연결', () => {
+  it('설정에 증권사 연결 칸이 있고 조회 전용임을 알린다', async () => {
+    renderSettings();
+    const part = await waitFor(() => region('증권사 연결'));
+    expect(within(part).getByText(/주문은 하지 않습니다/)).toBeInTheDocument();
+    expect(await within(part).findByText(/연결한 증권사가 없습니다/)).toBeInTheDocument();
+  });
+});
+
 describe('한국투자증권', () => {
   it('키는 쓰기 전용: 저장하면 칸을 비우고 "저장됨", 값은 화면 어디에도 다시 보이지 않는다', async () => {
     mock.db.secrets.KIS_APP_KEY = false;

@@ -65,6 +65,8 @@ function KisStep({
       <p className={styles.text}>
         앱키와 앱시크릿을 넣고, 키를 받은 서버(실전·모의)를 고른 뒤 저장하고 연결 테스트를 누르세요.
         입력한 키를 저장한 다음 바로 그 키로 시험합니다. 시세 조회만 하며 주문은 하지 않습니다.
+        키움·메리츠 연결과 보유 종목 입력은 시작한 뒤 설정 &gt; 증권사 연결에서 나중에 할 수
+        있습니다.
       </p>
       <details className={styles.help}>
         <summary>앱키는 어디서 받나요?</summary>

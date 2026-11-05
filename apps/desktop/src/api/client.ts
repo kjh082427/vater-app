@@ -17,6 +17,8 @@ export type Query = Record<string, string | number | boolean | null | undefined>
 export interface RequestOptions {
   method?: Method;
   body?: unknown;
+  /** 주면 body(문자열)를 JSON으로 바꾸지 않고 이 형식 그대로 보낸다(CSV 미리보기: text/csv). */
+  contentType?: string;
   query?: Query;
   signal?: AbortSignal;
 }
@@ -72,14 +74,20 @@ export function createClient(
     const method = options.method ?? 'GET';
     const endpoint = await connection.current();
     const headers: Record<string, string> = { Authorization: `Bearer ${endpoint.token}` };
-    if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+    if (options.body !== undefined)
+      headers['Content-Type'] = options.contentType ?? 'application/json';
 
     let res: Response;
     try {
       res = await fetchImpl(urlOf(endpoint, path, options.query), {
         method,
         headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body:
+          options.body === undefined
+            ? undefined
+            : options.contentType
+              ? (options.body as string)
+              : JSON.stringify(options.body),
         signal: options.signal,
       });
     } catch (e) {
