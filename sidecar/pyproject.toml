@@ -37,7 +37,7 @@ packages = ["src/vater_core"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
-addopts = "-m 'not kis_live and not llm'"  # 실연동은 -m kis_live 로 직접 실행
+addopts = "-m 'not kis_live and not broker_live and not llm'"  # 실연동은 -m kis_live 로 직접 실행
 filterwarnings = [
     # stockstats·yfinance(TradingAgents 의존성)가 쓰는 pandas 문법 경고. 동작에는 영향 없음
     "ignore:The inplace keyword in DataFrame:Warning",
@@ -45,6 +45,7 @@ filterwarnings = [
 ]
 markers = [
     "kis_live: 실제 한국투자증권 키가 필요한 테스트 (기본 제외)",
+    "broker_live: 실제 키움·메리츠 키가 필요한 테스트 (기본 제외, 조회만)",
     "llm: 실제 LLM 호출이 필요한 테스트 (기본 제외)",
 ]
 
