@@ -615,6 +615,119 @@
         "title": "BriefingRunRequest",
         "type": "object"
       },
+      "BrokerCreate": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BrokerCreate",
+        "type": "object"
+      },
+      "BrokerOut": {
+        "properties": {
+          "builtin": {
+            "title": "Builtin",
+            "type": "boolean"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "api",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "kind",
+          "builtin"
+        ],
+        "title": "BrokerOut",
+        "type": "object"
+      },
+      "BrokerShare": {
+        "properties": {
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "broker_id",
+          "name",
+          "color",
+          "quantity",
+          "ratio",
+          "stale"
+        ],
+        "title": "BrokerShare",
+        "type": "object"
+      },
+      "BulkRule": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "BulkRule",
+        "type": "object"
+      },
       "CatalogOut": {
         "properties": {
           "cloud": {
@@ -780,6 +893,109 @@
           "defaults_available"
         ],
         "title": "CloudTestOut",
+        "type": "object"
+      },
+      "ConnectionCreate": {
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "app_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Key"
+          },
+          "app_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Secret"
+          },
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "broker_id"
+        ],
+        "title": "ConnectionCreate",
+        "type": "object"
+      },
+      "ConnectionOut": {
+        "properties": {
+          "account_mask": {
+            "title": "Account Mask",
+            "type": "string"
+          },
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "lost",
+              "disconnected"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "broker_id",
+          "account_mask",
+          "status",
+          "last_synced_at",
+          "last_error"
+        ],
+        "title": "ConnectionOut",
         "type": "object"
       },
       "Dashboard": {
@@ -1034,6 +1250,92 @@
           "version"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HoldingOut": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "enum": [
+                  "KR",
+                  "US"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "api",
+              "manual",
+              "csv"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "broker_id",
+          "connection_id",
+          "market",
+          "code",
+          "name",
+          "quantity",
+          "avg_price",
+          "currency",
+          "source",
+          "updated_at",
+          "supported"
+        ],
+        "title": "HoldingOut",
         "type": "object"
       },
       "IndexOut": {
@@ -1788,6 +2090,68 @@
         "title": "StartedOut",
         "type": "object"
       },
+      "SymbolHoldings": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "brokers": {
+            "items": {
+              "$ref": "#/components/schemas/BrokerShare"
+            },
+            "title": "Brokers",
+            "type": "array"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          },
+          "unpriced_quantity": {
+            "title": "Unpriced Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "avg_price",
+          "cost",
+          "unpriced_quantity",
+          "currency",
+          "brokers"
+        ],
+        "title": "SymbolHoldings",
+        "type": "object"
+      },
       "SymbolOut": {
         "properties": {
           "code": {
@@ -1831,6 +2195,56 @@
           "kind"
         ],
         "title": "SymbolOut",
+        "type": "object"
+      },
+      "SyncRequest": {
+        "properties": {
+          "broker_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broker Id"
+          }
+        },
+        "title": "SyncRequest",
+        "type": "object"
+      },
+      "SyncResultOut": {
+        "properties": {
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          },
+          "connection_id": {
+            "title": "Connection Id",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connection_id",
+          "broker_id",
+          "ok"
+        ],
+        "title": "SyncResultOut",
         "type": "object"
       },
       "TierChoiceOut": {
@@ -2078,6 +2492,77 @@
           "feed"
         ],
         "title": "WatchQuoteOut",
+        "type": "object"
+      },
+      "WatchRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchTarget"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkRule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "WatchRequest",
+        "type": "object"
+      },
+      "WatchResult": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "rules": {
+            "title": "Rules",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "skipped",
+          "rules"
+        ],
+        "title": "WatchResult",
+        "type": "object"
+      },
+      "WatchTarget": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "market": {
+            "enum": [
+              "KR",
+              "US"
+            ],
+            "title": "Market",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "code"
+        ],
+        "title": "WatchTarget",
         "type": "object"
       }
     }
@@ -3247,6 +3732,234 @@
         ]
       }
     },
+    "/brokers": {
+      "get": {
+        "operationId": "list_brokers_brokers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BrokerOut"
+                  },
+                  "title": "Response List Brokers Brokers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "List Brokers",
+        "tags": [
+          "holdings"
+        ]
+      },
+      "post": {
+        "operationId": "add_broker_brokers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrokerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Add Broker",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/connections": {
+      "get": {
+        "operationId": "list_connections_connections_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConnectionOut"
+                  },
+                  "title": "Response List Connections Connections Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "List Connections",
+        "tags": [
+          "holdings"
+        ]
+      },
+      "post": {
+        "operationId": "add_connection_connections_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Add Connection",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
     "/events": {
       "get": {
         "operationId": "events_events_get",
@@ -3344,6 +4057,263 @@
         "summary": "Health",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/holdings": {
+      "get": {
+        "operationId": "list_holdings_holdings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HoldingOut"
+                  },
+                  "title": "Response List Holdings Holdings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "List Holdings",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/holdings/symbol/{market}/{code}": {
+      "get": {
+        "operationId": "symbol_holdings_holdings_symbol__market___code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "market",
+            "required": true,
+            "schema": {
+              "enum": [
+                "KR",
+                "US"
+              ],
+              "title": "Market",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolHoldings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Symbol Holdings",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/holdings/sync": {
+      "post": {
+        "operationId": "sync_holdings_holdings_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyncResultOut"
+                  },
+                  "title": "Response Sync Holdings Holdings Sync Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Sync Holdings",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/holdings/watch": {
+      "post": {
+        "description": "고른 종목을 감시 종목에 넣는다. 보유 내역은 그대로다(v2 설계 2장).",
+        "operationId": "watch_holdings_holdings_watch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Watch Holdings",
+        "tags": [
+          "holdings"
         ]
       }
     },

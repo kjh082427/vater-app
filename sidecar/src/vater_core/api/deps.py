@@ -20,6 +20,7 @@ if (
     from vater_core.alerts.monitor import AlertMonitor
     from vater_core.analysis.queue import AnalysisQueue
     from vater_core.briefing.service import BriefingService
+    from vater_core.holdings.service import HoldingsService
     from vater_core.kis.services import KisServices
     from vater_core.llm.state import LlmState
     from vater_core.market.indices import IndexBoard
@@ -44,6 +45,7 @@ class AppDeps:
     analysis: AnalysisQueue | None = None  # analysis.queue.get_analysis()가 만든다
     alerts: AlertMonitor | None = None  # alerts.monitor.get_alerts()가 만든다
     briefing: BriefingService | None = None  # briefing.service.get_briefing()이 만든다
+    holdings: HoldingsService | None = None  # holdings.service.get_holdings()가 만든다
     indices: IndexBoard | None = None  # api.routes.market이 처음 부를 때 만든다
 
 
