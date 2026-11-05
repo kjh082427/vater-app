@@ -1,5 +1,7 @@
 """증권사 연결과 보유 내역 API (v2 설계 1, 2, 4-1장). 어댑터는 가짜다."""
 
+import asyncio
+import logging
 from collections.abc import Iterator
 from decimal import Decimal
 from typing import Any
@@ -10,7 +12,8 @@ import pytest
 from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
 from vater_core.brokers import base
-from vater_core.brokers.base import BrokerContext
+from vater_core.brokers.base import BrokerContext, BrokerCreds
+from vater_core.holdings import service as holdings_service
 from vater_core.secrets.names import SecretName, broker_secret
 from vater_core.store.db import open_db
 from vater_core.store.holdings import HoldingRow, HoldingsRepo
@@ -25,8 +28,9 @@ def sam(qty: str, avg: str | None = "60000") -> HoldingRow:
 class Fake:
     def __init__(self) -> None:
         self.rows: list[HoldingRow] = []
-        self.test_error: VaterError | None = None
-        self.sync_error: VaterError | None = None
+        self.test_error: Exception | None = None
+        self.sync_error: Exception | None = None
+        self.gate: asyncio.Event | None = None  # 진행 중인 호출을 붙잡아 경쟁을 재현한다
         self.contexts: list[BrokerContext] = []
 
     def __call__(self, ctx: BrokerContext) -> "Fake":
@@ -34,10 +38,16 @@ class Fake:
         return self
 
     async def test(self) -> None:
+        if self.gate:
+            await self.gate.wait()
         if self.test_error:
             raise self.test_error
 
     async def holdings(self) -> list[HoldingRow]:
+        if self.gate:
+            await self.gate.wait()
+        ctx = self.contexts[-1]
+        ctx.secrets.set(broker_secret(ctx.creds.conn_id, "TOKEN"), "token-value")
         if self.sync_error:
             raise self.sync_error
         return list(self.rows)
@@ -53,10 +63,21 @@ def fakes() -> Iterator[dict[str, Fake]]:
     base.ADAPTERS.update(saved)
 
 
-async def connect(c: httpx.AsyncClient, broker: str = "kiwoom", account: str = "81234567") -> Any:
+async def connect(
+    c: httpx.AsyncClient,
+    broker: str = "kiwoom",
+    account: str | None = "81234567",
+    replaces: int | None = None,
+) -> Any:
     r = await c.post(
         "/connections",
-        json={"broker_id": broker, "app_key": "key-a", "app_secret": "sec-b", "account": account},
+        json={
+            "broker_id": broker,
+            "app_key": "key-a",
+            "app_secret": "sec-b",
+            "account": account,
+            "replaces": replaces,
+        },
     )
     assert r.status_code == 201, r.text
     return r.json()
@@ -422,7 +443,7 @@ async def test_reconnect_after_disconnect_is_not_a_duplicate(
 ) -> None:
     c = await connect(client)
     await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
-    await connect(client)  # 비밀키를 지웠으므로 같은 계좌로 다시 연결할 수 있다
+    await connect(client, replaces=c["id"])  # 비밀키를 지웠으므로 같은 계좌로 다시 연결할 수 있다
 
 
 # ---- 수동 입력 (v2 설계 5장) ---------------------------------------------------
@@ -440,7 +461,7 @@ MANUAL = {
 async def test_manual_add_update_delete(client: httpx.AsyncClient, deps: AppDeps) -> None:
     _seed_symbol(deps)
     r = await client.put("/holdings/manual", json=MANUAL)
-    assert r.status_code == 200
+    assert r.status_code == 204
     got = (await client.get("/holdings")).json()[0]
     assert (got["name"], got["quantity"], got["avg_price"], got["currency"], got["source"]) == (
         "삼성전자",
@@ -519,6 +540,298 @@ async def test_reconnecting_the_same_account_replaces_kept_rows(
     fakes["kiwoom"].rows = [sam("10")]
     await client.post("/holdings/sync", json={})
     await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
-    await connect(client)  # 같은 계좌
+    fakes["kiwoom"].rows = [sam("12")]
+    new = await connect(client, replaces=c["id"])  # [다시 연결]
+    got = (await client.get("/holdings/symbol/KR/005930")).json()
+    assert got["total"] == "12" and got["brokers"][0]["stale"] is False
+    ids = [x["id"] for x in (await client.get("/connections")).json()]
+    assert ids == [new["id"]]
+
+
+# ---- 리뷰에서 나온 경우 ---------------------------------------------------------
+
+
+async def test_unexpected_adapter_error_fails_only_that_connection(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    bad = await connect(client)
+    await connect(client, "meritz", "71234567")
+    fakes["kiwoom"].sync_error = KeyError("output1")
+    fakes["meritz"].rows = [sam("3")]
+    r = await client.post("/holdings/sync", json={})
+    assert r.status_code == 200
+    by_id = {x["broker_id"]: x for x in r.json()}
+    assert by_id["kiwoom"]["ok"] is False
+    assert by_id["kiwoom"]["error"]["code"] == "BROKER_RESPONSE_INVALID"
+    assert by_id["meritz"]["ok"] is True
+    conns = {x["id"]: x for x in (await client.get("/connections")).json()}
+    assert conns[bad["id"]]["last_error"] == "BROKER_RESPONSE_INVALID"
+
+
+async def test_startup_sync_failure_keeps_the_periodic_loop_alive(
+    deps: AppDeps, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(holdings_service, "TICK_SEC", 0.0)
+    service = holdings_service.HoldingsService(deps)
+    ticked = asyncio.Event()
+
+    async def boom(broker_id: str | None = None) -> list[Any]:
+        raise RuntimeError("db locked")
+
+    async def tick() -> None:
+        ticked.set()
+
+    monkeypatch.setattr(service, "sync", boom)
+    monkeypatch.setattr(service, "tick_once", tick)
+    service.start()
+    await asyncio.wait_for(ticked.wait(), 1)
+    await service.stop()
+
+
+async def test_failed_connect_never_logs_the_key_in_an_adapter_exception(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    fakes["kiwoom"].test_error = RuntimeError("appkey key-a rejected")
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "key-a", "app_secret": "sec-b"},
+    )
+    assert r.status_code == 502 and r.json()["code"] == "BROKER_RESPONSE_INVALID"
+    assert "key-a" not in r.text and "key-a" not in caplog.text
+    assert (await client.get("/connections")).json() == []
+
+
+def test_creds_repr_hides_values() -> None:
+    text = repr(BrokerCreds(1, "key-a", "sec-b", "81234567"))
+    assert "key-a" not in text and "sec-b" not in text and "81234567" not in text
+
+
+async def test_disconnect_waits_for_a_running_sync(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    fakes["kiwoom"].gate = asyncio.Event()
+    sync = asyncio.create_task(client.post("/holdings/sync", json={}))
+    await asyncio.sleep(0.01)
+    leave = asyncio.create_task(
+        client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    )
+    await asyncio.sleep(0.01)
+    fakes["kiwoom"].gate.set()
+    await sync
+    await leave
+    assert (await client.get("/connections")).json()[0]["status"] == "disconnected"
+    assert deps.secrets is not None and deps.secrets.get(broker_secret(c["id"], "TOKEN")) is None
+
+
+async def test_connection_ids_are_never_reused(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    first = await connect(client)
+    await client.delete(f"/connections/{first['id']}", params={"delete_data": "true"})
+    assert (await connect(client))["id"] > first["id"]
+
+
+async def test_network_error_does_not_clear_lost(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
     await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].sync_error = AUTH
+    await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].sync_error = DOWN
+    await client.post("/holdings/sync", json={})
+    conn = (await client.get("/connections")).json()[0]
+    assert (conn["status"], conn["last_error"]) == ("lost", "BROKER_UNREACHABLE")
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["brokers"][0]["stale"] is True
+
+
+async def test_other_account_with_same_last_digits_keeps_the_old_rows(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client, account="11114567")
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    await connect(client, account="22224567")  # 끝 4자리만 같다
     assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+
+
+async def test_failed_reconnect_keeps_the_old_connection_and_rows(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    fakes["kiwoom"].sync_error = DOWN
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "k", "app_secret": "s", "replaces": c["id"]},
+    )
+    assert r.status_code == 503
+    assert [x["id"] for x in (await client.get("/connections")).json()] == [c["id"]]
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+
+
+async def test_reconnecting_a_lost_connection_replaces_it_and_its_keys(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].sync_error = AUTH
+    await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].sync_error = None
+    new = await connect(client, replaces=c["id"])
+    assert [x["id"] for x in (await client.get("/connections")).json()] == [new["id"]]
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+    assert deps.secrets is not None
+    assert deps.secrets.get(broker_secret(c["id"], "APP_KEY")) is None
+
+
+@pytest.mark.parametrize("replaces", [999, "other-broker"])
+async def test_replaces_must_be_a_connection_of_the_same_broker(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], replaces: Any
+) -> None:
+    other = await connect(client, "meritz", "71234567")
+    target = other["id"] if replaces == "other-broker" else replaces
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "k", "app_secret": "s", "replaces": target},
+    )
+    assert r.status_code == 404 and r.json()["code"] == "CONNECTION_NOT_FOUND"
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("12345678-01", "1234567801"), ("1234 5678", "12345678"), (None, None)],
+)
+async def test_same_account_in_another_format_or_same_key_is_a_duplicate(
+    client: httpx.AsyncClient,
+    fakes: dict[str, Fake],
+    first: str | None,
+    second: str | None,
+) -> None:
+    await connect(client, account=first)
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "key-a", "app_secret": "s", "account": second},
+    )
+    assert r.status_code == 409 and r.json()["code"] == "BROKER_DUPLICATE"
+
+
+async def test_cancelled_connect_leaves_nothing_behind(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    fakes["kiwoom"].gate = asyncio.Event()
+    service = holdings_service.get_holdings(deps)
+    task = asyncio.create_task(service.connect("kiwoom", "key-a", "sec-b", "81234567"))
+    await asyncio.sleep(0.01)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert service.repo.connections() == []
+    assert deps.secrets is not None and deps.secrets.get(broker_secret(1, "APP_KEY")) is None
+
+
+async def test_adapter_rows_are_cleaned_before_saving(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client)
+    fakes["kiwoom"].rows = [
+        sam("0"),  # 전량 매도 직후의 행
+        HoldingRow("KR", "000660", "SK하이닉스", Decimal("10"), Decimal("100"), KRW),
+        HoldingRow("KR", "000660", "SK하이닉스", Decimal("5"), Decimal("130"), KRW),
+        HoldingRow("HK", "0005", "HSBC", Decimal("2"), Decimal("0"), "HKD"),  # type: ignore[arg-type]
+    ]
+    assert (await client.post("/holdings/sync", json={})).json()[0]["ok"] is True
+    got = (await client.get("/holdings")).json()
+    assert [(h["market"], h["code"], h["quantity"], h["avg_price"]) for h in got] == [
+        ("KR", "000660", "15", 110),
+        (None, "0005", "2", None),
+    ]
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "0"
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "sNaN"])
+async def test_non_finite_row_fails_the_sync_and_keeps_old_data(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], value: str
+) -> None:
+    await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].rows = [sam(value)]
+    r = (await client.post("/holdings/sync", json={})).json()[0]
+    assert r["ok"] is False and r["error"]["code"] == "BROKER_RESPONSE_INVALID"
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+
+
+async def test_row_in_a_foreign_currency_counts_as_unpriced(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client)
+    await connect(client, "meritz", "71234567")
+    fakes["kiwoom"].rows = [HoldingRow("US", "AAPL", "애플", Decimal(10), Decimal(150), "USD")]
+    fakes["meritz"].rows = [HoldingRow("US", "AAPL", "애플", Decimal(5), Decimal(200000), "KRW")]
+    await client.post("/holdings/sync", json={})
+    got = (await client.get("/holdings/symbol/US/AAPL")).json()
+    assert (got["total"], got["avg_price"], got["unpriced_quantity"], got["currency"]) == (
+        "15",
+        150,
+        "5",
+        "USD",
+    )
+
+
+async def test_new_flag_and_unsupported_reason_for_the_upload_dialog(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    _seed_symbol(deps)
+    await connect(client)
+    fakes["kiwoom"].rows = [
+        sam("10"),
+        HoldingRow("KR", "580001", "어떤 ETN", Decimal(1), Decimal(100), KRW),
+        HoldingRow(None, "7203", "토요타", Decimal(1), None, "JPY"),
+    ]
+    await client.post("/holdings/sync", json={})
+    got = {h["code"]: h for h in (await client.get("/holdings")).json()}
+    assert got["005930"]["is_new"] is True and got["005930"]["unsupported_reason"] is None
+    assert got["580001"]["supported"] is False and "ETN" in got["580001"]["unsupported_reason"]
+    assert got["7203"]["supported"] is False and "시장" in got["7203"]["unsupported_reason"]
+
+    # 체크를 해제하고 올려도 확인 창에서 본 종목은 더 이상 새 종목이 아니다
+    shown = {"market": "KR", "code": "005930"}
+    r = await client.post("/holdings/watch", json={"items": [], "seen": [shown]})
+    assert r.status_code == 200
+    got = {h["code"]: h for h in (await client.get("/holdings")).json()}
+    assert got["005930"]["is_new"] is False
+    # 재동기화해도 유지된다
+    await client.post("/holdings/sync", json={})
+    got = {h["code"]: h for h in (await client.get("/holdings")).json()}
+    assert got["005930"]["is_new"] is False
+
+
+async def test_delete_broker_data_refused_while_connected_but_clears_a_lost_one(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    r = await client.delete("/brokers/kiwoom/data")
+    assert r.status_code == 409 and r.json()["code"] == "BROKER_CONNECTED"
+    fakes["kiwoom"].sync_error = AUTH
+    await client.post("/holdings/sync", json={})
+    assert (await client.delete("/brokers/kiwoom/data")).status_code == 204
+    assert (await client.get("/connections")).json() == []
+    assert (await client.get("/holdings")).json() == []
+    assert deps.secrets is not None
+    assert deps.secrets.get(broker_secret(c["id"], "APP_KEY")) is None
+
+
+def test_account_mask_uses_digits_only() -> None:
+    assert holdings_service.mask_account("12 34 56 78") == "****5678"
+    assert holdings_service.mask_account("   ") == ""

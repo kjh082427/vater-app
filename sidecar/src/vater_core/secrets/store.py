@@ -11,6 +11,7 @@ import keyring
 from keyring.errors import PasswordDeleteError
 
 from vater_core.api.errors import VaterError
+from vater_core.logging_setup import refresh_secret_cache
 from vater_core.secrets.names import BROKER_INDEX, SecretName
 
 SERVICE = "Vater"
@@ -56,10 +57,11 @@ class _IndexedStore:
     def set(self, name: str, value: str) -> None:
         _check_value(value)
         key = str(name)
-        self._raw_set(key, value)
         names = self._dynamic_names()
-        if not _is_fixed(key) and key not in names:
+        if not _is_fixed(key) and key not in names:  # 값보다 먼저 적어야 마스킹에서 빠지지 않는다
             self._raw_set(BROKER_INDEX, ",".join([*names, key]))
+        self._raw_set(key, value)
+        refresh_secret_cache()
 
     def delete(self, name: str) -> None:
         key = str(name)

@@ -17,7 +17,7 @@ INSERT INTO brokers (id, name, color, kind, builtin) VALUES
     ('mirae',   '미래에셋', '#D97A00', 'manual', 1);
 
 CREATE TABLE connections (
-    id             INTEGER PRIMARY KEY,
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,  -- 지운 번호를 다시 쓰면 진행 중인 동기화가 남의 연결에 기록한다
     broker_id      TEXT NOT NULL REFERENCES brokers (id),
     account_mask   TEXT NOT NULL,
     status         TEXT NOT NULL DEFAULT 'ok' CHECK (status IN ('ok', 'lost', 'disconnected')),
@@ -40,3 +40,12 @@ CREATE TABLE holdings (
     UNIQUE (broker_id, connection_id, market, code)
 );
 CREATE INDEX holdings_by_symbol ON holdings (market, code);
+
+-- 업로드 확인 창에서 이미 본 종목. 여기 없는 보유 종목이 "새 종목"이다 (v2 설계 2장).
+CREATE TABLE holdings_seen (
+    market TEXT NOT NULL,
+    code   TEXT NOT NULL,
+    PRIMARY KEY (market, code)
+);
+
+CREATE INDEX symbols_by_code ON symbols (code);  -- CSV는 시장 없이 코드만으로 찾는다

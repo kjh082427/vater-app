@@ -1,6 +1,5 @@
 """증권사 연결과 보유 내역 API (v2 설계 1, 2, 4-1, 5, 14장). 주문 경로는 없다."""
 
-from decimal import Decimal
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -14,12 +13,13 @@ from vater_core.api.errors import ErrorBody, VaterError
 from vater_core.holdings.csv_import import (
     ColumnGuess,
     build_rows,
+    csv_invalid,
     decode_csv,
     guess_columns,
     parse_table,
 )
 from vater_core.holdings.service import get_holdings
-from vater_core.store.holdings import HoldingRow
+from vater_core.store.holdings import AvgPrice, Holding, HoldingRow, HoldingsRepo, Quantity
 
 router = APIRouter(tags=["holdings"])
 
@@ -53,6 +53,7 @@ class ConnectionCreate(BaseModel):
     app_key: str | None = Field(default=None, repr=False)
     app_secret: str | None = Field(default=None, repr=False)
     account: str | None = Field(default=None, repr=False)
+    replaces: int | None = None  # [다시 연결]이 고른 옛 연결. 첫 조회가 성공하면 이것을 대신한다
 
 
 class SyncRequest(BaseModel):
@@ -78,6 +79,8 @@ class HoldingOut(BaseModel):
     source: Literal["api", "manual", "csv"]
     updated_at: str
     supported: bool
+    unsupported_reason: str | None
+    is_new: bool  # 업로드 확인 창에서 아직 보지 못한 종목
 
 
 class BrokerShare(BaseModel):
@@ -110,6 +113,9 @@ class BulkRule(BaseModel):
 
 class WatchRequest(BaseModel):
     items: list[WatchTarget]
+    seen: list[
+        WatchTarget
+    ] = []  # 확인 창에 보였지만 체크하지 않은 종목. 다시 새 종목으로 세지 않는다
     rule: BulkRule | None = None
 
 
@@ -117,8 +123,8 @@ class ManualHolding(BaseModel):
     broker_id: str
     market: Literal["KR", "US"]
     code: str
-    quantity: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
-    avg_price: Decimal = Field(gt=0, max_digits=20, decimal_places=4)
+    quantity: Quantity
+    avg_price: AvgPrice
 
 
 class ManualKey(BaseModel):
@@ -167,8 +173,8 @@ class CsvPreview(BaseModel):
 class CsvCommitRow(BaseModel):
     market: Literal["KR", "US"]
     code: str
-    quantity: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
-    avg_price: Decimal = Field(gt=0, max_digits=20, decimal_places=4)
+    quantity: Quantity
+    avg_price: AvgPrice
 
 
 class CsvCommit(BaseModel):
@@ -180,6 +186,14 @@ class WatchResult(BaseModel):
     added: int
     skipped: int
     rules: int
+
+
+def _unsupported_reason(repo: HoldingsRepo, h: Holding) -> str | None:
+    if h.market is None:
+        return "국내·미국 외 시장은 지원하지 않습니다."
+    if not repo.in_master(h.market, h.code):
+        return "종목 목록에 없는 상품입니다(ETN 등)."
+    return None
 
 
 @router.get("/brokers")
@@ -203,7 +217,7 @@ async def add_connection(
     deps: AppDeps = Depends(get_deps),  # noqa: B008
 ) -> ConnectionOut:
     conn = await get_holdings(deps).connect(
-        body.broker_id, body.app_key, body.app_secret, body.account
+        body.broker_id, body.app_key, body.app_secret, body.account, body.replaces
     )
     return ConnectionOut(**vars(conn))
 
@@ -214,7 +228,7 @@ async def remove_connection(
     delete_data: bool,
     deps: AppDeps = Depends(get_deps),  # noqa: B008
 ) -> Response:
-    get_holdings(deps).disconnect(conn_id, delete_data)
+    await get_holdings(deps).disconnect(conn_id, delete_data)
     return Response(status_code=204)
 
 
@@ -223,7 +237,7 @@ async def delete_broker_data(
     broker_id: str,
     deps: AppDeps = Depends(get_deps),  # noqa: B008
 ) -> Response:
-    get_holdings(deps).delete_broker_data(broker_id)
+    await get_holdings(deps).delete_broker_data(broker_id)
     return Response(status_code=204)
 
 
@@ -248,22 +262,29 @@ async def sync_holdings(
 
 @router.get("/holdings")
 async def list_holdings(deps: AppDeps = Depends(get_deps)) -> list[HoldingOut]:  # noqa: B008
-    return [
-        HoldingOut(
-            broker_id=h.broker_id,
-            connection_id=h.connection_id,
-            market=h.market,
-            code=h.code,
-            name=h.name,
-            quantity=format(h.quantity.normalize(), "f"),
-            avg_price=float(h.avg_price) if h.avg_price is not None else None,
-            currency=h.currency,
-            source=h.source,
-            updated_at=h.updated_at,
-            supported=h.supported,
+    repo = get_holdings(deps).repo
+    seen = repo.seen()
+    out = []
+    for h in repo.all():
+        reason = _unsupported_reason(repo, h)
+        out.append(
+            HoldingOut(
+                broker_id=h.broker_id,
+                connection_id=h.connection_id,
+                market=h.market,
+                code=h.code,
+                name=h.name,
+                quantity=format(h.quantity.normalize(), "f"),
+                avg_price=float(h.avg_price) if h.avg_price is not None else None,
+                currency=h.currency,
+                source=h.source,
+                updated_at=h.updated_at,
+                supported=reason is None,
+                unsupported_reason=reason,
+                is_new=(h.market or "", h.code) not in seen,
+            )
         )
-        for h in get_holdings(deps).repo.all()
-    ]
+    return out
 
 
 @router.get("/holdings/symbol/{market}/{code}")
@@ -275,7 +296,7 @@ async def symbol_holdings(
     return SymbolHoldings(**get_holdings(deps).summary(market, code))
 
 
-@router.put("/holdings/manual")
+@router.put("/holdings/manual", status_code=204)
 async def save_manual(
     body: ManualHolding,
     deps: AppDeps = Depends(get_deps),  # noqa: B008
@@ -295,7 +316,7 @@ async def save_manual(
             "KRW" if body.market == "KR" else "USD",
         ),
     )
-    return Response(status_code=200)
+    return Response(status_code=204)
 
 
 @router.delete("/holdings/manual", status_code=204)
@@ -326,6 +347,10 @@ async def watch_holdings(
                 status=422,
             )
         params = parse_rule(body.rule.kind, body.rule.params or {}).model_dump()
+    get_holdings(deps).repo.mark_seen(
+        (t.market, t.code.upper() if t.market == "US" else t.code)
+        for t in [*body.items, *body.seen]
+    )
     watch, rules = WatchlistRepo(deps.db), RuleRepo(deps.db)
     added = skipped = made = 0
     for item in body.items:
@@ -406,12 +431,19 @@ async def csv_commit(
     if deps.db is None:
         raise VaterError("DB_UNAVAILABLE", "저장소가 준비되지 않았습니다.", status=503)
     service = get_holdings(deps)
+    if not body.rows:
+        raise csv_invalid(
+            "올릴 종목이 없습니다.", "수동 항목을 지우려면 증권사 데이터 삭제를 써 주세요."
+        )
     rows = []
     for r in body.rows:
         code = r.code.upper() if r.market == "US" else r.code
         target = resolve_target(deps.db, r.market, code)
         currency = "KRW" if r.market == "KR" else "USD"
         rows.append(HoldingRow(r.market, code, target.name, r.quantity, r.avg_price, currency))
-    changes = service.manual_changes(body.broker_id, [(r.market or "", r.code) for r in rows])
+    keys: list[tuple[str, str]] = [(r.market or "", r.code) for r in rows]
+    if len(set(keys)) != len(keys):
+        raise csv_invalid("같은 종목이 두 번 있습니다.")
+    changes = service.manual_changes(body.broker_id, keys)
     service.replace_manual(body.broker_id, rows)
     return CsvChanges(**changes)

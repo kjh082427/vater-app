@@ -1,7 +1,7 @@
 """어댑터 규격과 등록 (v2 설계 1, 8장)."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from vater_core.brokers.readonly import ReadOnlyHttp
@@ -12,9 +12,9 @@ from vater_core.store.holdings import HoldingRow
 @dataclass(frozen=True)
 class BrokerCreds:
     conn_id: int
-    app_key: str
-    app_secret: str
-    account: str | None
+    app_key: str = field(repr=False)
+    app_secret: str = field(repr=False)
+    account: str | None = field(repr=False)
 
 
 @dataclass(frozen=True)

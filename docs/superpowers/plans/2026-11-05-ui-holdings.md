@@ -31,12 +31,14 @@
 ### Task 2: 증권사 연결
 **Files:** `screens/holdings/ConnectionsSection.tsx`, 설정 화면, 마법사 안내, 앱 배너
 - 설정 > 증권사 연결: 목록(마스킹 계좌, 상태), 추가, 해제 확인 창(스펙 1-1 문구), 끊김 배너 [다시 연결]/[데이터 삭제], 메리츠 MAC 안내.
-- [ ] 테스트(실패 확인): 테스트 실패 시 저장 안 함과 hint, 키가 다시 안 보임, 해제 후 삭제/유지, 끊김 배너 → 커밋 `feat(ui): 증권사 연결`
+- [다시 연결]은 `POST /connections`에 `replaces: <옛 연결 id>`를 보낸다. 연결 추가 때 같은 증권사에 끝 4자리가 같은 해제 연결이 있으면 "이전 내역을 이 연결로 바꿀까요?"를 묻는다(스펙 1-1). 연결 중인 증권사의 `DELETE /brokers/{id}/data`는 409 `BROKER_CONNECTED`다.
+- [ ] 테스트(실패 확인): 테스트 실패 시 저장 안 함과 hint, 키가 다시 안 보임, 해제 후 삭제/유지, 끊김 배너, 다시 연결의 `replaces` → 커밋 `feat(ui): 증권사 연결`
 
 ### Task 3: 업로드 창
 **Files:** `screens/holdings/UploadDialog.tsx`, `screens/alerts/AlertsScreen.tsx`
 - 검색창 위 버튼 `[증권사…] [연결한 증권사 모두] [보유 종목 직접 추가]`, "새 종목 N개" 표시. 전부 체크, "이미 감시 중"·"지원하지 않는 종목", 규칙 선택(기본 없음, 목표가 제외), 41종목 안내(실시간 규칙일 때 사용량과 함께).
-- [ ] 테스트(실패 확인): 버튼 개수, 체크 해제 항목 미전송, 실패 증권사만 오류, 규칙 일괄, 안내 문구, 연결 없음 → 커밋 `feat(ui): 보유 종목 업로드`
+- `GET /holdings`의 `is_new`와 `unsupported_reason`을 쓴다. "새 종목 N개"는 `is_new`이면서 감시 중이 아닌 지원 종목의 수, "이미 감시 중"은 `/watchlist`와 맞춰 본다. 올릴 때 체크한 종목은 `items`, 체크 안 한 종목은 `seen`으로 보낸다.
+- [ ] 테스트(실패 확인): 버튼 개수, 체크 해제 항목 미전송(`seen`으로만 전송), 실패 증권사만 오류, 규칙 일괄, 안내 문구, 연결 없음 → 커밋 `feat(ui): 보유 종목 업로드`
 
 ### Task 4: 주가 그래프와 내 보유 카드
 **Files:** `screens/holdings/PriceChart.tsx`, `MyHoldingsCard.tsx`, 감시·알림의 종목 영역

@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from vater_core.api.deps import AppDeps
-from vater_core.holdings.csv_import import decode_csv, guess_columns, parse_table
+from vater_core.holdings.csv_import import MAX_ROWS, decode_csv, guess_columns, parse_table
 
 
 def seed(deps: AppDeps) -> None:
@@ -214,3 +214,113 @@ async def test_csv_refused_for_connected_or_unknown_broker(
 ) -> None:
     seed(deps)
     assert (await preview(client, GOOD.encode(), broker_id="nope")).status_code == 422
+
+
+@pytest.mark.parametrize("line_end", ["\r", "\r\n", "\n"])
+async def test_any_line_ending_is_read(
+    client: httpx.AsyncClient, deps: AppDeps, line_end: str
+) -> None:
+    seed(deps)
+    text = line_end.join(["종목명,수량,평단가", "삼성전자,5,70000", ""])
+    r = await preview(client, text.encode())
+    assert r.status_code == 200, r.text
+    assert r.json()["rows"][0]["code"] == "005930"
+
+
+async def test_oversized_field_or_too_many_rows_is_refused(client: httpx.AsyncClient) -> None:
+    r = await preview(client, b'a,b\n"' + b"x" * 140_000 + b'",1\n')
+    assert r.status_code == 422 and r.json()["code"] == "CSV_INVALID"
+    r = await preview(client, b"a,b\n" + b"x,1\n" * (MAX_ROWS + 1))
+    assert r.status_code == 422 and r.json()["code"] == "CSV_INVALID"
+
+
+@pytest.mark.parametrize(
+    ("qty", "avg"),
+    [
+        ("1E+1000000", "70000"),
+        ("1E-1000000", "70000"),
+        ("0.123456789", "70000"),  # 수량은 소수 8자리까지
+        ("5", "1e400"),
+        ("5", "12345.12345"),  # 평단가는 소수 4자리까지
+        ("5", "NaN"),
+    ],
+)
+async def test_numbers_the_commit_would_refuse_are_row_errors(
+    client: httpx.AsyncClient, deps: AppDeps, qty: str, avg: str
+) -> None:
+    seed(deps)
+    r = await preview(client, f"종목명,수량,평단가\n삼성전자,{qty},{avg}\n".encode())
+    assert r.status_code == 200 and len(r.text) < 2000
+    assert r.json()["rows"][0]["error"]
+
+
+async def test_everything_the_preview_accepts_can_be_committed(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    seed(deps)
+    data = "종목명,수량,평단가\n삼성전자,0.12345678,12345.1234\nSK하이닉스,100.0000000000,5.00000\n"
+    rows = (await preview(client, data.encode())).json()["rows"]
+    assert [x["error"] for x in rows] == [None, None]
+    r = await client.post(
+        "/holdings/csv/commit",
+        json={
+            "broker_id": "samsung",
+            "rows": [{k: x[k] for k in ("market", "code", "quantity", "avg_price")} for x in rows],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+
+async def test_commit_refuses_empty_or_repeated_rows(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    seed(deps)
+    row = {"market": "KR", "code": "005930", "quantity": "1", "avg_price": 100}
+    await client.post("/holdings/csv/commit", json={"broker_id": "samsung", "rows": [row]})
+    for rows in ([], [row, row]):
+        r = await client.post("/holdings/csv/commit", json={"broker_id": "samsung", "rows": rows})
+        assert r.status_code == 422 and r.json()["code"] == "CSV_INVALID"
+    assert len((await client.get("/holdings")).json()) == 1
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "code"),
+    [
+        ("종목코드", "5930", "005930"),  # 엑셀이 앞자리 0을 지운 값
+        ("종목코드", '"=""000660"""', "000660"),  # 엑셀 수식 형태
+        ("종목명", "삼성전자보통주", "005930"),
+    ],
+)
+async def test_common_spreadsheet_forms_are_understood(
+    client: httpx.AsyncClient, deps: AppDeps, column: str, value: str, code: str
+) -> None:
+    seed(deps)
+    data = f"{column},수량,평단가\n{value},5,70000\n".encode()
+    assert (await preview(client, data)).json()["rows"][0]["code"] == code
+
+
+async def test_alphanumeric_kr_code_with_a_prefix(client: httpx.AsyncClient, deps: AppDeps) -> None:
+    seed(deps)
+    assert deps.db is not None
+    deps.db.execute(
+        "INSERT INTO symbols VALUES ('KR', '0088M0', 'KOSPI', '메쎄이상', NULL, 'stock')"
+    )
+    r = await preview(
+        client, b"code,\xec\x88\x98\xeb\x9f\x89,\xed\x8f\x89\xeb\x8b\xa8\nA0088M0,5,70000\n"
+    )
+    assert r.json()["rows"][0]["code"] == "0088M0"
+
+
+async def test_unmatched_name_offers_search_results(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    seed(deps)
+    r = await preview(client, "종목명,수량,평단가\nApple,5,150\n".encode())
+    row = r.json()["rows"][0]
+    assert row["error"] and [c["code"] for c in row["candidates"]] == ["AAPL"]
+
+
+def test_code_lookup_uses_an_index(deps: AppDeps) -> None:
+    assert deps.db is not None
+    plan = deps.db.execute("EXPLAIN QUERY PLAN SELECT * FROM symbols WHERE code = 'A'").fetchall()
+    assert "USING INDEX" in str(plan) or "USING COVERING INDEX" in str(plan)

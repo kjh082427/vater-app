@@ -4,9 +4,12 @@
 """
 
 import sqlite3
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, replace
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
+
+from pydantic import Field
 
 from vater_core.api.errors import VaterError
 
@@ -16,6 +19,9 @@ OTHER_MARKET = "OTHER"
 MANUAL_CONNECTION = 0
 MAX_BROKER_NAME = 20
 CUSTOM_COLORS = ("#2E8B57", "#138D90", "#7D3C98", "#6B8E23", "#B8860B")
+# 수동 입력과 CSV가 받는 값의 범위. 미리보기와 저장이 같은 규칙을 쓴다.
+Quantity = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=8)]
+AvgPrice = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=4)]
 
 
 @dataclass(frozen=True)
@@ -75,6 +81,41 @@ def _holding(r: sqlite3.Row | tuple) -> Holding:  # type: ignore[type-arg]
     market = None if r[2] == OTHER_MARKET else r[2]
     avg = Decimal(r[6]) if r[6] is not None else None
     return Holding(r[0], r[1], market, r[3], r[4], Decimal(r[5]), avg, r[7], r[8], r[9])
+
+
+def bad_broker_response() -> VaterError:
+    return VaterError(
+        "BROKER_RESPONSE_INVALID",
+        "증권사 응답을 이해하지 못했습니다.",
+        "증권사 서버 점검 중일 수 있습니다. 잠시 뒤 다시 시도해 주세요.",
+        status=502,
+    )
+
+
+def _combined(a: HoldingRow, b: HoldingRow) -> HoldingRow:
+    avg = None
+    if a.avg_price is not None and b.avg_price is not None and a.currency == b.currency:
+        cost = a.quantity * a.avg_price + b.quantity * b.avg_price
+        avg = cost / (a.quantity + b.quantity)
+    return replace(a, quantity=a.quantity + b.quantity, avg_price=avg)
+
+
+def clean_rows(rows: Iterable[HoldingRow]) -> list[HoldingRow]:
+    """어댑터 응답을 저장할 수 있는 모양으로 바꾼다. 응답 형식이 깨졌으면 저장하지 않는다."""
+    merged: dict[tuple[str, str], HoldingRow] = {}
+    for row in rows:
+        if not row.quantity.is_finite() or not (row.avg_price or Decimal(0)).is_finite():
+            raise bad_broker_response()
+        if row.quantity <= 0:  # 전량 매도 직후의 행
+            continue
+        clean = replace(
+            row,
+            market=row.market if row.market in ("KR", "US") else None,
+            avg_price=row.avg_price if row.avg_price and row.avg_price > 0 else None,
+        )
+        key = (clean.market or OTHER_MARKET, clean.code)
+        merged[key] = _combined(merged[key], clean) if key in merged else clean
+    return list(merged.values())
 
 
 _SELECT = (
@@ -183,9 +224,10 @@ class HoldingsRepo:
         conn = self.connection(conn_id)
         if conn is None:
             raise VaterError("CONNECTION_NOT_FOUND", "연결을 찾을 수 없습니다.", status=404)
+        cleaned = clean_rows(rows)
         with self._conn:
             self._conn.execute("DELETE FROM holdings WHERE connection_id = ?", (conn_id,))
-            for row in rows:
+            for row in cleaned:
                 self._upsert(conn.broker_id, conn_id, row, "api", at)
             self._conn.execute(
                 "UPDATE connections SET status = 'ok', last_error = NULL, last_synced_at = ? "
@@ -221,6 +263,19 @@ class HoldingsRepo:
     def delete_broker_data(self, broker_id: str) -> None:
         with self._conn:
             self._conn.execute("DELETE FROM holdings WHERE broker_id = ?", (broker_id,))
+
+    def in_master(self, market: str, code: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM symbols WHERE market = ? AND code = ?", (market, code)
+        ).fetchone()
+        return row is not None
+
+    def seen(self) -> set[tuple[str, str]]:
+        return {(r[0], r[1]) for r in self._conn.execute("SELECT market, code FROM holdings_seen")}
+
+    def mark_seen(self, keys: Iterable[tuple[str, str]]) -> None:
+        with self._conn:
+            self._conn.executemany("INSERT OR IGNORE INTO holdings_seen VALUES (?, ?)", list(keys))
 
     def all(self) -> list[Holding]:
         rows = self._conn.execute(_SELECT + "ORDER BY market, code, broker_id")

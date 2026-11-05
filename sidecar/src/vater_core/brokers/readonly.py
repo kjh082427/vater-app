@@ -29,9 +29,10 @@ class ReadOnlyHttp:
         parts = urlsplit(path)
         if parts.scheme or parts.netloc or ".." in path or (method, path) not in self._allowed:
             raise _blocked(method, path)
+        kwargs["follow_redirects"] = False  # 리다이렉트로 허용 목록 밖에 가지 않는다
         try:
             return await self._http.request(method, self._base + path, **kwargs)
-        except httpx.TransportError as e:
+        except httpx.RequestError as e:
             raise VaterError(
                 "BROKER_UNREACHABLE",
                 "증권사 서버에 연결할 수 없습니다.",

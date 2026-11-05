@@ -121,3 +121,5 @@ def setup_logging(data_dir: Path, secret_values: Callable[[], list[str]]) -> Non
     handler.setFormatter(MaskingFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+    # httpx는 INFO로 URL 전체를 남긴다. 증권사 조회 URL에는 계좌번호가 들어간다.
+    logging.getLogger("httpx").setLevel(logging.WARNING)

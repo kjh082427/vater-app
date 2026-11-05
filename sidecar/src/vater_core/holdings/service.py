@@ -4,7 +4,9 @@
 """
 
 import asyncio
+import contextlib
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,7 +22,14 @@ from vater_core.brokers.base import ADAPTERS, BrokerContext, BrokerCreds
 from vater_core.brokers.readonly import ReadOnlyHttp
 from vater_core.secrets.names import BrokerSecretField, SecretName, broker_secret
 from vater_core.secrets.store import SecretStore
-from vater_core.store.holdings import Broker, Connection, Holding, HoldingRow, HoldingsRepo
+from vater_core.store.holdings import (
+    Broker,
+    Connection,
+    Holding,
+    HoldingRow,
+    HoldingsRepo,
+    bad_broker_response,
+)
 from vater_core.store.settings import SettingsRepo
 
 logger = logging.getLogger(__name__)
@@ -28,10 +37,15 @@ logger = logging.getLogger(__name__)
 AUTH_ERRORS = {"BROKER_AUTH_INVALID"}
 TICK_SEC = 60.0
 _FIELDS: tuple[BrokerSecretField, ...] = ("APP_KEY", "APP_SECRET", "ACCOUNT", "TOKEN")
+_MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
+
+
+def _digits(account: str | None) -> str:
+    return re.sub(r"\D", "", account or "")
 
 
 def mask_account(account: str | None) -> str:
-    digits = (account or "").replace("-", "")
+    digits = _digits(account)
     return f"****{digits[-4:]}" if digits else ""
 
 
@@ -57,9 +71,10 @@ class SyncResult:
 
 
 def summarize(holdings: list[Holding], brokers: list[Broker], stale: set[int]) -> dict[str, Any]:
-    """한 종목의 합계. 평단가를 모르는 수량은 평단가·매입금액에서 뺀다(스펙 4-1)."""
+    """한 종목의 합계. 평단가를 모르거나 통화가 다른 수량은 평단가·매입금액에서 뺀다(스펙 4-1)."""
     total = sum((h.quantity for h in holdings), Decimal(0))
-    priced = [h for h in holdings if h.avg_price is not None]
+    currency = _MARKET_CURRENCY.get(holdings[0].market or "") if holdings else None
+    priced = [h for h in holdings if h.avg_price is not None and h.currency == currency]
     priced_qty = sum((h.quantity for h in priced), Decimal(0))
     cost = sum((h.quantity * (h.avg_price or Decimal(0)) for h in priced), Decimal(0))
     by_broker: dict[str, Decimal] = {}
@@ -88,7 +103,7 @@ def summarize(holdings: list[Holding], brokers: list[Broker], stale: set[int]) -
         "unpriced_quantity": format((total - priced_qty).normalize(), "f")
         if total != priced_qty
         else "0",
-        "currency": holdings[0].currency if holdings else None,
+        "currency": currency,
         "brokers": rows,
     }
 
@@ -155,10 +170,39 @@ class HoldingsService:
 
     # ---- 연결 -------------------------------------------------------------
 
+    def _same_account(self, conn: Connection, digits: str, app_key: str | None) -> bool:
+        s = self._secrets
+        stored = _digits(s.get(broker_secret(conn.id, "ACCOUNT")))
+        if stored and digits:  # 뒷자리만 같은 다른 계좌를 막지 않도록 저장된 번호로 비교한다
+            return stored == digits
+        return s.get(broker_secret(conn.id, "APP_KEY")) == app_key
+
     async def connect(
-        self, broker_id: str, app_key: str | None, app_secret: str | None, account: str | None
+        self,
+        broker_id: str,
+        app_key: str | None,
+        app_secret: str | None,
+        account: str | None,
+        replaces: int | None = None,
     ) -> Connection:
-        """연결 테스트를 통과해야 남긴다. 실패하면 비밀키까지 지운다."""
+        """연결 테스트를 통과해야 남긴다. 실패하면 비밀키까지 지운다.
+
+        `replaces`는 [다시 연결]이 고른 옛 연결이다. 해제하면 계좌번호도 지우므로 앱이 같은
+        계좌인지 알 수 없어 사용자가 고른다. 새 연결의 첫 조회가 성공해야 옛 연결을 지운다.
+        """
+        async with self._lock:
+            conn = await self._connect(broker_id, app_key, app_secret, account, replaces)
+        self._changed(broker_id)
+        return conn
+
+    async def _connect(
+        self,
+        broker_id: str,
+        app_key: str | None,
+        app_secret: str | None,
+        account: str | None,
+        replaces: int | None,
+    ) -> Connection:
         broker = self.repo.broker(broker_id)
         factory = ADAPTERS.get(broker_id)
         if broker is None or broker.kind != "api" or factory is None:
@@ -166,11 +210,16 @@ class HoldingsService:
         is_kis = broker_id == "kis"
         if not is_kis and not (app_key and app_secret):
             raise VaterError("HOLDING_INVALID", "앱키와 시크릿을 입력해 주세요.", status=422)
-        mask = mask_account(account)
-        # 뒷자리만 같은 다른 계좌를 막지 않도록 가린 값이 아니라 저장된 번호로 비교한다
-        clean = (account or "").strip()
-        if clean and any(
-            c.broker_id == broker_id and self._secrets.get(broker_secret(c.id, "ACCOUNT")) == clean
+        old = self.repo.connection(replaces) if replaces is not None else None
+        if replaces is not None and (old is None or old.broker_id != broker_id):
+            raise VaterError("CONNECTION_NOT_FOUND", "연결을 찾을 수 없습니다.", status=404)
+        key = None if is_kis else (app_key or "").strip()
+        digits = _digits(account)
+        if any(
+            c.broker_id == broker_id
+            and c.status != "disconnected"
+            and c.id != replaces
+            and self._same_account(c, digits, key)
             for c in self.repo.connections()
         ):
             raise VaterError(
@@ -179,12 +228,7 @@ class HoldingsService:
                 "다른 키로 연결하려면 먼저 연결을 해제해 주세요.",
                 status=409,
             )
-        conn = self.repo.add_connection(broker_id, mask)
-        replaced = [
-            c.id
-            for c in self.repo.connections()
-            if c.broker_id == broker_id and c.status == "disconnected" and c.account_mask == mask
-        ]
+        conn = self.repo.add_connection(broker_id, mask_account(account))
         try:
             s = self._secrets
             if account:
@@ -192,51 +236,62 @@ class HoldingsService:
             if not is_kis and app_key and app_secret:
                 s.set(broker_secret(conn.id, "APP_KEY"), app_key.strip())
                 s.set(broker_secret(conn.id, "APP_SECRET"), app_secret.strip())
-            await factory(self._context(conn)).test()
-        except Exception:
+            adapter = factory(self._context(conn))
+            await adapter.test()
+            if old is not None:
+                self.repo.replace_api(conn.id, await adapter.holdings(), _now())
+        except BaseException as e:  # 취소돼도 키와 행을 남기지 않는다
             self._forget_secrets(conn.id)
             self.repo.remove_connection(conn.id)
-            raise
-        for old in replaced:  # 같은 계좌를 다시 연결했다. 옛 수량을 합계에 두 번 넣지 않는다
-            self.repo.remove_connection(old)
+            if isinstance(e, VaterError) or not isinstance(e, Exception):
+                raise
+            # 예외 문구에 키가 있을 수 있고, 키를 지웠으니 마스킹도 못 한다. 종류만 남긴다
+            logger.warning("broker test crashed: %s %s", broker_id, type(e).__name__)
+            raise bad_broker_response() from None
+        if old is not None:  # 옛 수량을 합계에 두 번 넣지 않는다
+            self._forget_secrets(old.id)
+            self.repo.remove_connection(old.id)
         return conn
 
-    def disconnect(self, conn_id: int, delete_data: bool) -> None:
+    async def disconnect(self, conn_id: int, delete_data: bool) -> None:
         """키는 항상 지운다. 보유 내역은 사용자가 고른다(v2 설계 1-1장)."""
-        if self.repo.connection(conn_id) is None:
-            raise VaterError("CONNECTION_NOT_FOUND", "연결을 찾을 수 없습니다.", status=404)
-        self._forget_secrets(conn_id)
-        if delete_data:
-            self.repo.remove_connection(conn_id)
-        else:
-            self.repo.set_status(conn_id, "disconnected")
+        async with (
+            self._lock
+        ):  # 진행 중인 동기화가 끝난 뒤에 지워야 상태와 토큰이 되살아나지 않는다
+            if self.repo.connection(conn_id) is None:
+                raise VaterError("CONNECTION_NOT_FOUND", "연결을 찾을 수 없습니다.", status=404)
+            self._forget_secrets(conn_id)
+            if delete_data:
+                self.repo.remove_connection(conn_id)
+            else:
+                self.repo.set_status(conn_id, "disconnected")
         self._changed(None)
 
-    def delete_broker_data(self, broker_id: str) -> None:
-        """그 증권사의 보유 내역을 모두 지운다. 해제된 연결도 함께 지운다."""
+    async def delete_broker_data(self, broker_id: str) -> None:
+        """그 증권사의 보유 내역을 모두 지운다. 끊기거나 해제된 연결도 함께 지운다."""
         repo = self.repo
         if repo.broker(broker_id) is None:
             raise _unknown_broker(broker_id)
-        for c in repo.connections():
-            if c.broker_id == broker_id and c.status == "disconnected":
+        async with self._lock:
+            mine = [c for c in repo.connections() if c.broker_id == broker_id]
+            if any(c.status == "ok" for c in mine):
+                raise VaterError(
+                    "BROKER_CONNECTED",
+                    "연결 중인 증권사의 내역은 다음 갱신 때 다시 채워집니다.",
+                    "연결을 먼저 해제해 주세요.",
+                    status=409,
+                )
+            for c in mine:
+                self._forget_secrets(c.id)
                 repo.remove_connection(c.id)
-        repo.delete_broker_data(broker_id)
+            repo.delete_broker_data(broker_id)
         self._changed(broker_id)
 
     # ---- 수동 입력 --------------------------------------------------------
 
     def save_manual(self, broker_id: str, row: HoldingRow) -> None:
-        repo = self.repo
-        if repo.broker(broker_id) is None:
-            raise VaterError("HOLDING_INVALID", "증권사를 먼저 추가해 주세요.", status=422)
-        if any(c.broker_id == broker_id and c.status != "disconnected" for c in repo.connections()):
-            raise VaterError(
-                "HOLDING_INVALID",
-                "API로 연결된 증권사는 직접 입력할 수 없습니다.",
-                "연결된 증권사의 보유 내역은 [새로 고침]으로 갱신됩니다.",
-                status=422,
-            )
-        repo.manual_upsert(broker_id, row, _now())
+        self.ensure_manual_allowed(broker_id)
+        self.repo.manual_upsert(broker_id, row, _now())
         self._changed(broker_id)
 
     def manual_changes(self, broker_id: str, incoming: list[tuple[str, str]]) -> dict[str, int]:
@@ -282,11 +337,17 @@ class HoldingsService:
             if factory is None:
                 raise _unknown_broker(conn.broker_id)
             rows = await factory(self._context(conn)).holdings()
-        except VaterError as e:
-            self.repo.set_status(conn.id, "lost" if e.code in AUTH_ERRORS else "ok", e.code)
-            logger.warning("broker sync failed: %s %s", conn.broker_id, e.code)
-            return SyncResult(conn.id, conn.broker_id, False, e)
-        self.repo.replace_api(conn.id, rows, _now())
+            self.repo.replace_api(conn.id, rows, _now())
+        except Exception as e:  # 응답 형식이 깨져도 다른 연결과 주기 조회는 계속된다
+            err = e if isinstance(e, VaterError) else bad_broker_response()
+            # 일시 오류로 "연결 끊김"이 풀리지 않게 상태는 인증 실패 때만 바꾼다
+            self.repo.set_status(
+                conn.id, "lost" if err.code in AUTH_ERRORS else conn.status, err.code
+            )
+            logger.warning(
+                "broker sync failed: %s %s %s", conn.broker_id, err.code, type(e).__name__
+            )
+            return SyncResult(conn.id, conn.broker_id, False, err)
         return SyncResult(conn.id, conn.broker_id, True)
 
     async def sync(self, broker_id: str | None = None) -> list[SyncResult]:
@@ -322,7 +383,10 @@ class HoldingsService:
         await self.sync()
 
     async def _run(self) -> None:
-        await self.sync()  # 앱 시작 때 한 번
+        try:
+            await self.sync()  # 앱 시작 때 한 번
+        except Exception:
+            logger.exception("holdings startup sync failed")
         while True:
             await asyncio.sleep(TICK_SEC)
             try:
@@ -333,6 +397,13 @@ class HoldingsService:
     def start(self) -> None:
         if self._task is None:
             self._task = asyncio.create_task(self._run())
+
+    async def stop(self) -> None:
+        task, self._task = self._task, None
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 def get_holdings(deps: AppDeps) -> HoldingsService:

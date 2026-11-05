@@ -103,6 +103,8 @@ def main() -> None:
                 await deps.alerts.stop()
             if deps.briefing is not None:
                 await deps.briefing.stop()
+            if deps.holdings is not None:
+                await deps.holdings.stop()
             if deps.analysis is not None:
                 await deps.analysis.stop()  # 실행 중인 분석은 기다리지 않는다
             await http.aclose()  # 외부 API 연결을 정리하고 끝낸다

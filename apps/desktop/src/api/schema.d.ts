@@ -1140,6 +1140,8 @@ export interface components {
       app_secret?: string | null;
       /** Broker Id */
       broker_id: string;
+      /** Replaces */
+      replaces?: number | null;
     };
     /** ConnectionOut */
     ConnectionOut: {
@@ -1332,6 +1334,8 @@ export interface components {
       connection_id: number;
       /** Currency */
       currency: string;
+      /** Is New */
+      is_new: boolean;
       /** Market */
       market: ('KR' | 'US') | null;
       /** Name */
@@ -1345,6 +1349,8 @@ export interface components {
       source: 'api' | 'manual' | 'csv';
       /** Supported */
       supported: boolean;
+      /** Unsupported Reason */
+      unsupported_reason: string | null;
       /** Updated At */
       updated_at: string;
     };
@@ -1762,6 +1768,11 @@ export interface components {
       /** Items */
       items: components['schemas']['WatchTarget'][];
       rule?: components['schemas']['BulkRule'] | null;
+      /**
+       * Seen
+       * @default []
+       */
+      seen: components['schemas']['WatchTarget'][];
     };
     /** WatchResult */
     WatchResult: {
@@ -3233,13 +3244,11 @@ export interface operations {
     };
     responses: {
       /** @description Successful Response */
-      200: {
+      204: {
         headers: {
           [name: string]: unknown;
         };
-        content: {
-          'application/json': unknown;
-        };
+        content?: never;
       };
       /** @description 인증 실패 (AUTH_INVALID) */
       401: {

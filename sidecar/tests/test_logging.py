@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from vater_core.logging_setup import refresh_secret_cache, setup_logging
+from vater_core.secrets.names import broker_secret
+from vater_core.secrets.store import EnvFileSecretStore
 
 
 @pytest.fixture(autouse=True)
@@ -93,3 +95,18 @@ def test_setup_is_idempotent_and_never_logs_to_stdout(
     assert len(files) == 1
     logging.getLogger("vater_core.test").warning("hello")
     assert capsys.readouterr().out == ""  # stdout은 Tauri 이벤트 전용
+
+
+def test_request_urls_with_account_numbers_are_not_logged(tmp_path: Path) -> None:
+    setup_logging(tmp_path, list)
+    logging.getLogger("httpx").info("HTTP Request: GET https://x/balance?CANO=12345678")
+    assert "12345678" not in read_log(tmp_path)
+
+
+def test_saved_key_is_masked_without_waiting_for_the_cache(tmp_path: Path) -> None:
+    store = EnvFileSecretStore(tmp_path / ".env")
+    setup_logging(tmp_path, store.known_values)
+    logging.getLogger("x").info("warm the cache")
+    store.set(broker_secret(1, "TOKEN"), "fresh-token-value")
+    logging.getLogger("x").info("got fresh-token-value")
+    assert "fresh-token-value" not in read_log(tmp_path)

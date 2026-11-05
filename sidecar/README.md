@@ -111,7 +111,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run`
 
-증권사 보유 내역(v2, 주문 없음): `GET/POST /brokers` · `DELETE /brokers/{id}/data` · `GET/POST /connections` · `DELETE /connections/{id}?delete_data=` · `POST /holdings/sync` · `GET /holdings` · `GET /holdings/symbol/{market}/{code}` · `PUT/DELETE /holdings/manual` · `POST /holdings/watch` · `POST /holdings/csv/preview` · `POST /holdings/csv/commit`. 어댑터는 `brokers/`에 있고 허용 목록(`ReadOnlyHttp`)으로만 증권사를 부른다.
+증권사 보유 내역(v2, 주문 없음): `GET/POST /brokers` · `DELETE /brokers/{id}/data` · `GET/POST /connections`(`replaces`로 옛 연결 대신) · `DELETE /connections/{id}?delete_data=` · `POST /holdings/sync` · `GET /holdings` · `GET /holdings/symbol/{market}/{code}` · `PUT/DELETE /holdings/manual` · `POST /holdings/watch` · `POST /holdings/csv/preview` · `POST /holdings/csv/commit`. 어댑터는 `brokers/`에 있고 허용 목록(`ReadOnlyHttp`)으로만 증권사를 부른다. 한투만 시세와 한도를 함께 쓰는 GET 전용 `KisClient`를 쓴다.
 
 대시보드: `GET/PUT /ui/dashboards`(홈 대시보드 배치 문서. 모양만 검사, 64KB·화면 1~8장·칸 1~6개, 틀리면 422 `DASHBOARD_INVALID`) · `GET /market/indices`(코스피·코스닥·S&P 500·나스닥 현재값과 최근 30거래일 종가, 30초 캐시, 실패한 지수만 null)
 

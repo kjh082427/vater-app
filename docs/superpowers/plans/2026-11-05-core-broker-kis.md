@@ -4,18 +4,18 @@
 
 **Goal:** 한투 계좌의 보유 종목을 어댑터로 불러온다.
 
-**Architecture:** `brokers/kis.py`가 이미 있는 `KisClient`와 토큰을 쓴다. 기존 시세 코드는 건드리지 않는다.
+**Architecture:** `brokers/kis.py`가 이미 있는 `KisClient`와 토큰을 쓴다. 시세와 호출 한도를 함께 써야 하고, `KisClient`에는 GET만 있어 주문(POST)이 나갈 수 없다. 그래서 한투만 `ReadOnlyHttp` 대신 이것을 쓰고, `tests/brokers/test_readonly.py`도 `kis.py`에만 허용한다. 기존 시세 코드는 건드리지 않는다.
 
 **Spec:** v2 설계 0, 1, 8장. 참고: `docs/brokers/kis.md`(이 브랜치, main을 먼저 합친다). 선행: `core/holdings`.
 
 ## Global Constraints
-- 라벨 `area:core`. **TR은 허용 목록으로 고정한다. 주문 TR 금지.**
+- 라벨 `area:core`. **TR은 허용 목록으로 고정한다. 주문 TR 금지.** `brokers/kis.py`에 `(경로, TR)` 허용 목록을 두고 `KisClient.get`을 부르기 전에 검사한다. 목록 밖이면 `BROKER_CALL_BLOCKED`(테스트 포함).
 - 계좌번호는 연결 비밀키 `BROKER_{id}_ACCOUNT`(8-2 형식)에만 저장한다.
 - 실연동 테스트는 `@pytest.mark.kis_live`, 조회만.
 
 ## Review Focus
 1. **50종목이 넘는 계좌** → 연속 조회로 전부 받는다. (Task 1)
-2. **전량 매도 직후 `hldg_qty=0` 행** → 수량 0으로 처리. (Task 1)
+2. **전량 매도 직후 `hldg_qty=0` 행** → 저장할 때 `clean_rows`가 뺀다. 어댑터는 그대로 넘겨도 된다. (Task 1)
 3. **잘못된 계좌번호** → `BROKER_AUTH_INVALID`가 아니라 계좌 오류 문구. (Task 1)
 4. **미국 외 해외 종목(일본 등)** → `market=None`. (Task 2)
 5. **모의 서버** → `VTTC8434R`을 쓴다. (Task 1)

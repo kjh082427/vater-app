@@ -157,3 +157,16 @@ def test_broker_secrets_survive_a_new_store_instance(tmp_path: Path) -> None:
 def test_broker_secret_rejects_newlines(any_store: SecretStore) -> None:
     with pytest.raises(VaterError):
         any_store.set(broker_secret(1, "APP_KEY"), "a\nb")
+
+
+def test_dynamic_name_is_indexed_before_its_value_is_written(tmp_path: Path) -> None:
+    """중간에 멈춰도 저장된 값이 마스킹 목록에서 빠지지 않게 한다."""
+    written: list[str] = []
+
+    class Recording(EnvFileSecretStore):
+        def _raw_set(self, name: str, value: str) -> None:
+            written.append(name)
+            super()._raw_set(name, value)
+
+    Recording(tmp_path / ".env").set(broker_secret(1, "TOKEN"), "abcd")
+    assert written == ["BROKER_SECRET_NAMES", "BROKER_1_TOKEN"]
