@@ -50,6 +50,7 @@ def test_every_kind_has_defaults_and_timing() -> None:
         "bollinger",
         "volume_spike",
         "new_high_low",
+        "avg_price_pct",
     }
     assert default_timing("price_above") == "realtime"
     assert default_timing("rsi") == "close"

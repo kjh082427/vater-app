@@ -183,10 +183,11 @@ class RuleRepo:
         with self._conn:
             self._conn.execute("DELETE FROM alert_rules WHERE id = ?", (id,))
 
-    def set_state(self, id: int, state: bool) -> None:
+    def set_state(self, id: int, state: bool | None) -> None:
         with self._conn:
             self._conn.execute(
-                "UPDATE alert_rules SET last_state = ? WHERE id = ?", (int(state), id)
+                "UPDATE alert_rules SET last_state = ? WHERE id = ?",
+                (None if state is None else int(state), id),
             )
 
     def mark_fired(self, id: int, at: str) -> None:

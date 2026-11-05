@@ -35,6 +35,7 @@ from vater_core.alerts.evaluator import Evaluator, NotifyFn, NowFn
 from vater_core.alerts.rules import Live, Reading, condition, parse_rule
 from vater_core.alerts.store import BarRepo, RuleRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
+from vater_core.holdings.service import avg_price_of
 from vater_core.kis.models import Quote, UsExchange
 from vater_core.kis.ws import DOMESTIC_TR, US_TR, Tick
 from vater_core.stdout_events import notify
@@ -270,7 +271,8 @@ class AlertMonitor:
                 live = Live(day=session, price=q.price, change_pct=q.change_pct, volume=q.volume)
             except Exception as e:
                 logger.warning("rule preview %s %s: price failed: %s", item.market, item.code, e)
-        return condition(parsed, bars.history(item.market, item.code), live)
+        avg = avg_price_of(self._db(), item.market, item.code) if kind == "avg_price_pct" else None
+        return condition(parsed, bars.history(item.market, item.code), live, avg)
 
     async def _rest_quote(self, item: WatchItem) -> WatchQuote | None:
         try:

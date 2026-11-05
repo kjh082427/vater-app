@@ -18,12 +18,13 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from vater_core.alerts.clock import KST, NY
-from vater_core.alerts.rules import History, Live, condition, parse_rule
+from vater_core.alerts.rules import AvgPricePct, History, Live, condition, parse_rule
 from vater_core.alerts.store import AlertEvent, EventRepo, Rule, RuleRepo, WatchItem
 from vater_core.analysis.store import AnalysisRepo
 from vater_core.analysis.summary import decision_ko
 from vater_core.api.errors import VaterError
 from vater_core.api.events import EventBus
+from vater_core.holdings.service import avg_price_of
 from vater_core.stdout_events import notify
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ class Evaluator:
         notify_fn: NotifyFn = notify,
         now: NowFn = _now_default,
     ) -> None:
+        self._conn = conn
         self._rules = RuleRepo(conn)
         self._events = EventRepo(conn)
         self._bus = events
@@ -82,8 +84,16 @@ class Evaluator:
             except VaterError:
                 logger.warning("alert rule %s has invalid stored params: skipped", rule.id)
                 continue
-            reading = condition(params, history, live)
+            avg = (
+                avg_price_of(self._conn, item.market, item.code)
+                if isinstance(params, AvgPricePct)
+                else None
+            )
+            reading = condition(params, history, live, avg)
             if reading.state is None:
+                # 평단가 규칙은 보유가 없어지면 기준을 비운다: 다시 사면 기준값부터 저장한다
+                if isinstance(params, AvgPricePct) and rule.last_state is not None:
+                    self._rules.set_state(rule.id, None)
                 continue
             if (
                 rule.last_state is False

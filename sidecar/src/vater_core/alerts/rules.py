@@ -95,6 +95,11 @@ class NewHighLow(_Params):
     direction: Literal["high", "low"] = "high"
 
 
+class AvgPricePct(_Params):
+    pct: float = Field(10.0, gt=0, le=100)
+    direction: Literal["up", "down"] = "down"
+
+
 RuleParams = (
     PriceAbove
     | PriceBelow
@@ -106,6 +111,7 @@ RuleParams = (
     | Bollinger
     | VolumeSpike
     | NewHighLow
+    | AvgPricePct
 )
 
 # kind → (파라미터 모델, 기본 확인 시점)
@@ -120,6 +126,7 @@ KINDS: dict[str, tuple[type[_Params], Timing]] = {
     "bollinger": (Bollinger, "close"),
     "volume_spike": (VolumeSpike, "realtime"),
     "new_high_low": (NewHighLow, "realtime"),
+    "avg_price_pct": (AvgPricePct, "realtime"),
 }
 
 
@@ -224,7 +231,10 @@ def _last(series: pd.Series) -> float | None:
 UNKNOWN = "데이터가 부족해 계산할 수 없습니다"
 
 
-def condition(params: RuleParams, history: History, live: Live | None) -> Reading:
+def condition(
+    params: RuleParams, history: History, live: Live | None, avg_price: float | None = None
+) -> Reading:
+    """`avg_price`는 내 합산 평단가(`avg_price_pct`만 쓴다). 알림 글에는 값을 넣지 않는다."""
     f = _frame(history, live)
     if f.close.empty:
         return Reading(None, None, UNKNOWN)
@@ -324,5 +334,15 @@ def condition(params: RuleParams, history: History, live: Live | None) -> Readin
         ok = today > float(window.max()) if high else today < float(window.min())
         word = "신고가" if high else "신저가"
         return Reading(ok, today, f"52주 {word} 경신 ({_fmt(today)})")
+
+    if isinstance(params, AvgPricePct):
+        if not avg_price or avg_price <= 0:
+            return Reading(None, None, "보유 평단가를 알 수 없습니다")
+        change = round(
+            (price / avg_price - 1) * 100, 9
+        )  # 정확히 -10%에서 부동소수 오차로 빗나가지 않게
+        up = params.direction == "up"
+        ok = change >= params.pct if up else change <= -params.pct
+        return Reading(ok, change, f"평단가 대비 {change:+.2f}%")
 
     raise _invalid(f"처리할 수 없는 알림 종류입니다: {type(params).__name__}")
