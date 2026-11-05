@@ -131,6 +131,8 @@ def search(
 ) -> tuple[list[NodeHit], list[CategoryStock]]:
     """분류 이름·테마 키워드가 q를 포함하는 분류와, 이름·코드가 맞는 종목(분류 없는 종목 포함)."""
     ql = q.strip().lower()
+    if not ql:  # 빈 문자열은 모든 이름에 포함되므로 전부 맞는 것처럼 보인다
+        return [], []
     hits: list[NodeHit] = []
     for group, mids in cat.groups:
         for n in [group, *mids]:

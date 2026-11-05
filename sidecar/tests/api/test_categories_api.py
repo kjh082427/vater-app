@@ -179,3 +179,8 @@ def test_categories_code_does_not_touch_personal_data() -> None:
     for path in (Path(service.__file__), Path(routes.__file__)):
         text = path.read_text(encoding="utf-8")
         assert "holdings" not in text and "watchlist" not in text, path.name
+
+
+async def test_blank_search_matches_nothing(client: httpx.AsyncClient) -> None:
+    got = (await client.get("/categories/search", params={"q": "   "})).json()
+    assert got["nodes"] == [] and got["stocks"] == []
