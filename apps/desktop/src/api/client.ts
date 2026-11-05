@@ -17,7 +17,7 @@ export type Query = Record<string, string | number | boolean | null | undefined>
 export interface RequestOptions {
   method?: Method;
   body?: unknown;
-  /** 주면 body(문자열)를 JSON으로 바꾸지 않고 이 형식 그대로 보낸다(CSV 미리보기: text/csv). */
+  /** 주면 body(파일 바이트나 문자열)를 JSON으로 바꾸지 않고 이 형식 그대로 보낸다(CSV 미리보기: text/csv). */
   contentType?: string;
   query?: Query;
   signal?: AbortSignal;
@@ -86,7 +86,7 @@ export function createClient(
           options.body === undefined
             ? undefined
             : options.contentType
-              ? (options.body as string)
+              ? (options.body as BodyInit)
               : JSON.stringify(options.body),
         signal: options.signal,
       });

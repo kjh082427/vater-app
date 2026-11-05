@@ -138,6 +138,7 @@
   --size-progress: 0.375rem; /* 진행 막대 6 */
   --size-menu-min: 10rem; /* 메뉴·목록 최소 너비 160 */
   --size-dialog: 30rem; /* 대화 상자 너비 480 */
+  --size-dialog-wide: 44rem; /* 표가 든 대화 상자 704 */
 
   /* 선 굵기와 모서리 */
   --rule-hair: 1px;

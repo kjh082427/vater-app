@@ -195,7 +195,7 @@ function previewCsv(
   text: string,
   cols: Record<'name' | 'code' | 'quantity' | 'avg_price', string | null>,
 ): CsvPreview {
-  const [head = [], ...body] = parseCsv(text);
+  const [head = [], ...table] = parseCsv(text);
   const find = (re: RegExp) => head.find((h) => re.test(h)) ?? null;
   const guess = {
     name: find(/종목명|name/i),
@@ -209,6 +209,8 @@ function previewCsv(
     quantity: cols.quantity ?? guess.quantity,
     avg_price: cols.avg_price ?? guess.avg_price,
   };
+  // 사이드카처럼: 종목(이름이나 코드)과 수량 열을 모르면 아직 행을 만들지 않는다
+  const body = (use.name || use.code) && use.quantity ? table : [];
   const at = (row: string[], col: string | null) => (col ? (row[head.indexOf(col)] ?? '') : '');
   const rows: CsvRow[] = body.map((row, i) => {
     const name = at(row, use.name);
@@ -414,7 +416,7 @@ export function holdingsHandlers(db: Db) {
         return err(422, 'CSV_INVALID', '올릴 행이 없거나 같은 종목이 두 번 있습니다.');
       }
       db.holdings = db.holdings.filter(
-        (h) => !(h.broker_id === body.broker_id && h.source === 'csv'),
+        (h) => !(h.broker_id === body.broker_id && h.source !== 'api'),
       );
       for (const r of body.rows)
         upsert(db, body.broker_id, { ...r, broker_id: body.broker_id }, 'csv');

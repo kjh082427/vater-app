@@ -21,6 +21,7 @@ import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { AlertHistory } from './AlertHistory';
 import styles from './alerts.module.css';
+import { ManualDialog } from '../holdings/ManualForm';
 import { UploadButtons, UploadDialog } from '../holdings/UploadDialog';
 import { WatchPanel } from './WatchPanel';
 
@@ -41,6 +42,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   // 업로드 확인 창: brokerId null은 연결한 증권사 모두
   const [uploading, setUploading] = useState<{ brokerId: string | null } | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
+  const [manual, setManual] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
@@ -111,7 +113,9 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                 setUploaded(null);
                 setUploading({ brokerId });
               }}
-            />
+            >
+              <Button onClick={() => setManual(true)}>보유 종목 직접 추가</Button>
+            </UploadButtons>
             {uploaded ? (
               <p role="status" className={common.meta}>
                 {uploaded}
@@ -224,6 +228,22 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               kinds={kinds.data}
               onClose={() => setUploading(null)}
               onUploaded={uploadDone}
+            />
+          ) : null}
+          {manual ? (
+            <ManualDialog
+              onClose={() => setManual(false)}
+              onChanged={() => {
+                holdings.reload();
+                connections.reload();
+              }}
+              onCsvDone={(brokerId) => {
+                setManual(false);
+                holdings.reload();
+                brokers.reload();
+                setUploaded(null);
+                setUploading({ brokerId });
+              }}
             />
           ) : null}
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
