@@ -6,6 +6,9 @@
   `BRIEFING_NO_DATA`.
 - 미국: 한투에 미국 업종·순위·수급 API가 없어서 지수·감시 종목·알림만 있다(빠진 것이 아님).
 - 지수는 국내·미국 모두 현재값과 최근 30거래일 종가(미니 차트용)를 함께 둔다.
+- **여기서 만든 `data`는 그대로 AI에 간다(v2 설계 8-1장).** 보유 내역을 불러오지 않고(테스트로
+  막는다), 평단가 알림처럼 보유가 드러나는 알림은 넣지 않는다.
+  내 자산 구역은 `portfolio/daily.py`가 따로 계산한다.
 """
 
 import dataclasses
@@ -19,6 +22,7 @@ from typing import Any, Literal, Protocol
 import httpx
 
 from vater_core.alerts.clock import KST, session_bounds
+from vater_core.alerts.rules import PRIVATE_KINDS
 from vater_core.alerts.store import EventRepo, WatchItem, WatchlistRepo
 from vater_core.api.errors import VaterError
 from vater_core.briefing.schedule import BriefingMarket
@@ -206,6 +210,7 @@ def _alerts(
         for e in EventRepo(db).list(EVENT_SCAN)
         if e.rule_id is not None
         and e.market == market
+        and e.kind not in PRIVATE_KINDS
         and start <= datetime.fromisoformat(e.fired_at) < until
     ]
     return [

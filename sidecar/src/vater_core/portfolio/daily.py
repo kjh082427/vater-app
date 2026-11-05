@@ -1,10 +1,11 @@
-"""자산 추이 기록 (v2 설계 12장).
+"""자산 추이 기록과 브리핑의 내 자산 구역 (v2 설계 12, 15장).
 
 - 한 행은 "그 날 16:00(KST)에 확정돼 있던 종가"로 잰 평가금액이다. 그래서 그날 기록한 행과 나중에
   채운 행이 같은 값을 쓴다. 뉴욕 세션 d는 d+1 아침에 끝나므로 d일 행에는 d-1 세션까지만 들어간다.
 - 한국이나 미국 어느 한쪽이라도 열린 날에 행을 만든다. 쉬는 시장은 마지막 세션의 종가를 그대로 둔다.
 - 값을 지어내지 않는다. 그 시장의 종가가 하나라도 없으면 그 시장 값은 NULL이고 나중에 다시 받는다
   (일부만 더하면 폭락처럼 보인다). 0은 "그 시장에 보유가 없음"이고 실패가 아니다.
+- 이 파일의 값은 저장과 표시에만 쓴다. **AI 입력에 넣지 않는다**(v2 설계 8-1장).
 """
 
 import asyncio
@@ -44,6 +45,7 @@ RETRY = timedelta(minutes=30)
 RETRY_DAYS = 14  # 그보다 오래된 빈 값은 앞으로도 오지 않는 값으로 본다
 FX_SPAN = timedelta(days=89)  # 한투 일별 조회는 한 번에 약 100행이다
 View = Literal["all", "krw", "usd"]
+_CURRENCY: dict[MarketId, str] = {"KR": "KRW", "US": "USD"}
 
 _COLUMNS = "day, kr_value, kr_cost, us_value, us_cost, usdkrw, backfilled"
 
@@ -120,6 +122,12 @@ class DailyRepo:
         r = self._conn.execute("SELECT max(day) FROM portfolio_daily").fetchone()
         return date.fromisoformat(r[0]) if r and r[0] else None
 
+    def has_before(self, day: date) -> bool:
+        r = self._conn.execute(
+            "SELECT 1 FROM portfolio_daily WHERE day < ? LIMIT 1", (day.isoformat(),)
+        ).fetchone()
+        return r is not None
+
     def incomplete(self, since: date) -> list[date]:
         """다시 받아야 할 값이 남은 날."""
         rows = self._conn.execute(
@@ -164,6 +172,56 @@ def point(row: DailyRow, view: View) -> dict[str, Any]:
         "cost": cost,
         "usdkrw": row.usdkrw,
         "backfilled": row.backfilled,
+    }
+
+
+def _section(
+    conn: sqlite3.Connection,
+    positions: dict[MarketId, list[Position]],
+    sessions: dict[MarketId, date | None],
+    market: MarketId,
+    usdkrw: float | None,
+) -> dict[str, Any]:
+    """통화별·전체 변화와 기여 최대·최소. 지금 수량 × (세션 종가 - 직전 종가)다."""
+    bars = BarRepo(conn)
+    currencies: dict[str, dict[str, float | None]] = {}
+    change: dict[MarketId, float | None] = {"KR": 0.0, "US": 0.0}
+    base: dict[MarketId, float | None] = {"KR": 0.0, "US": 0.0}
+    moves: list[tuple[float, MarketId, dict[str, Any]]] = []
+    for m, rows in positions.items():
+        session = sessions[m]
+        moved, before, complete = Decimal(0), Decimal(0), True
+        for p in rows:
+            close = bars.close_on(m, p.code, session) if session else None
+            prev = bars.close_before(m, p.code, session) if session else None
+            if not close or not prev:
+                complete = False  # 일부만 더하지 않는다
+                continue
+            amount = p.quantity * (Decimal(str(close)) - Decimal(str(prev)))
+            moved += amount
+            before += p.quantity * Decimal(str(prev))
+            entry = {
+                "code": p.code,
+                "name": p.name,
+                "amount": float(amount),
+                "currency": _CURRENCY[m],
+            }
+            moves.append((float(amount) * ((usdkrw or 1.0) if m == "US" else 1.0), m, entry))
+        change[m], base[m] = (float(moved), float(before)) if complete else (None, None)
+        currencies[_CURRENCY[m]] = {
+            "change": change[m],
+            "change_pct": float(moved / before * 100) if complete and before else None,
+        }
+    total = _combined(change["KR"], change["US"], usdkrw)
+    worth = _combined(base["KR"], base["US"], usdkrw)
+    # 환율이 없으면 원화와 달러를 견주지 않고 이 브리핑의 시장 안에서만 고른다
+    ranked = sorted((x for x in moves if usdkrw is not None or x[1] == market), key=lambda x: x[0])
+    return {
+        "change_krw": total,
+        "change_pct": total / worth * 100 if total is not None and worth else None,
+        "currencies": currencies,
+        "top": ranked[-1][2] if ranked else None,
+        "bottom": ranked[0][2] if len(ranked) > 1 else None,
     }
 
 
@@ -355,6 +413,36 @@ class DailyRecorder:
             us, us_cost = await self._market("US", positions.get("US", []), day, new)
             repo.fill(day, kr, kr_cost, us, us_cost, rates.get(day), backfilled=new and day < today)
         self._retry_at = now + RETRY if repo.incomplete(retry_since) else None
+
+    # ---- 브리핑 -------------------------------------------------------------
+
+    async def my_assets(self, market: MarketId, session: date) -> dict[str, Any] | None:
+        """브리핑의 내 자산 구역. 보유가 없으면 None이다. 저장과 표시에만 쓴다.
+
+        전일 기록이 없으면 어제 보유했는지 모르므로 변화를 말하지 않는다.
+        """
+        positions = held(self._db)
+        if not positions:
+            return None
+        today = self.today()
+        if not DailyRepo(self._db).has_before(today):
+            return {
+                "change_krw": None,
+                "change_pct": None,
+                "currencies": {
+                    _CURRENCY[m]: {"change": None, "change_pct": None} for m in positions
+                },
+                "top": None,
+                "bottom": None,
+            }
+        sessions: dict[MarketId, date | None] = {
+            m: session if m == market else await self._clock.last_closed_session(m)
+            for m in positions
+        }
+        await self._refresh_closes(positions, sessions)
+        rates = await self._rates({today, session}) if "US" in positions else {}
+        usdkrw = rates.get(today) or rates.get(session)
+        return _section(self._db, positions, sessions, market, usdkrw)
 
     async def _run(self) -> None:
         while True:

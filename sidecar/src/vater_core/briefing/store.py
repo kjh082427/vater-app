@@ -12,7 +12,7 @@ from typing import Any
 
 from vater_core.api.errors import VaterError
 
-_COLUMNS = "id, market, date, data, text, status, missing, created_at"
+_COLUMNS = "id, market, date, data, text, status, missing, created_at, my_assets"
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,7 @@ class Briefing:
     status: str  # done | partial
     missing: list[str]
     created_at: str
+    my_assets: dict[str, Any] | None = None  # 앱이 계산한 내 자산 구역. AI에 보내지 않는다
 
 
 def _row(r: tuple[Any, ...]) -> Briefing:
@@ -37,6 +38,7 @@ def _row(r: tuple[Any, ...]) -> Briefing:
         status=r[5],
         missing=json.loads(r[6]) if r[6] else [],
         created_at=r[7],
+        my_assets=json.loads(r[8]) if r[8] else None,
     )
 
 
@@ -51,14 +53,16 @@ class BriefingRepo:
         data: dict[str, Any],
         text: dict[str, str] | None,
         missing: builtins.list[str],
+        my_assets: dict[str, Any] | None = None,
     ) -> int:
         status = "partial" if missing else "done"
         with self._conn:
             self._conn.execute(
-                "INSERT INTO briefings (market, date, data, text, status, missing) "
-                "VALUES (?, ?, ?, ?, ?, ?) "
+                "INSERT INTO briefings (market, date, data, text, status, missing, my_assets) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(market, date) DO UPDATE SET data = excluded.data, "
                 "text = excluded.text, status = excluded.status, missing = excluded.missing, "
+                "my_assets = excluded.my_assets, "
                 "created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
                 (
                     market,
@@ -67,6 +71,7 @@ class BriefingRepo:
                     None if text is None else json.dumps(text, ensure_ascii=False),
                     status,
                     json.dumps(missing),
+                    None if my_assets is None else json.dumps(my_assets, ensure_ascii=False),
                 ),
             )
         found = self.find(market, day)

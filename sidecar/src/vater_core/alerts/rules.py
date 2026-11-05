@@ -130,6 +130,10 @@ KINDS: dict[str, tuple[type[_Params], Timing]] = {
 }
 
 
+# 울렸다는 사실만으로 보유가 드러나는 종류. AI 입력에 넣지 않는다 (v2 설계 8-1장).
+PRIVATE_KINDS = frozenset({"avg_price_pct"})
+
+
 def _invalid(message: str, hint: str | None = None) -> VaterError:
     return VaterError("ALERT_RULE_INVALID", message, hint=hint, status=422)
 

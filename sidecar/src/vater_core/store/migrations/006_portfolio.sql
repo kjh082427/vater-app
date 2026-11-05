@@ -13,3 +13,6 @@ CREATE TABLE portfolio_daily (
     usdkrw     REAL,
     backfilled INTEGER NOT NULL DEFAULT 0
 );
+
+-- 브리핑의 내 자산 구역(v2 설계 15장). `data`와 나눠 둔다: `data`는 AI에 가고 이 값은 가지 않는다.
+ALTER TABLE briefings ADD COLUMN my_assets TEXT;

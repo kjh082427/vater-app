@@ -1047,6 +1047,24 @@ export interface components {
       /** Status */
       status: string;
     };
+    /** AssetChange */
+    AssetChange: {
+      /** Change */
+      change: number | null;
+      /** Change Pct */
+      change_pct: number | null;
+    };
+    /** AssetMove */
+    AssetMove: {
+      /** Amount */
+      amount: number;
+      /** Code */
+      code: string;
+      /** Currency */
+      currency: string;
+      /** Name */
+      name: string;
+    };
     /** BarOut */
     BarOut: {
       /** Close */
@@ -1072,6 +1090,7 @@ export interface components {
       market: string;
       /** Missing */
       missing: string[];
+      my_assets?: components['schemas']['MyAssets'] | null;
       /**
        * Status
        * @enum {string}
@@ -1624,6 +1643,22 @@ export interface components {
        * @enum {string}
        */
       state: 'running' | 'paused' | 'offline' | 'auth_invalid' | 'closed';
+    };
+    /**
+     * MyAssets
+     * @description 앱이 계산한 내 자산 구역. AI를 거치지 않는다. 전일 기록이 없으면 변화 값은 null이다.
+     */
+    MyAssets: {
+      bottom: components['schemas']['AssetMove'] | null;
+      /** Change Krw */
+      change_krw: number | null;
+      /** Change Pct */
+      change_pct: number | null;
+      /** Currencies */
+      currencies: {
+        [key: string]: components['schemas']['AssetChange'];
+      };
+      top: components['schemas']['AssetMove'] | null;
     };
     /** OllamaStatusOut */
     OllamaStatusOut: {

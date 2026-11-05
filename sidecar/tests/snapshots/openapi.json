@@ -445,6 +445,66 @@
         "title": "AnalysisQueued",
         "type": "object"
       },
+      "AssetChange": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          }
+        },
+        "required": [
+          "change",
+          "change_pct"
+        ],
+        "title": "AssetChange",
+        "type": "object"
+      },
+      "AssetMove": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "amount",
+          "currency"
+        ],
+        "title": "AssetMove",
+        "type": "object"
+      },
       "BarOut": {
         "properties": {
           "close": {
@@ -503,6 +563,16 @@
             },
             "title": "Missing",
             "type": "array"
+          },
+          "my_assets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MyAssets"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "enum": [
@@ -2223,6 +2293,69 @@
           "feeds"
         ],
         "title": "MonitorStatus",
+        "type": "object"
+      },
+      "MyAssets": {
+        "description": "앱이 계산한 내 자산 구역. AI를 거치지 않는다. 전일 기록이 없으면 변화 값은 null이다.",
+        "properties": {
+          "bottom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetMove"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change_krw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Krw"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "currencies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AssetChange"
+            },
+            "title": "Currencies",
+            "type": "object"
+          },
+          "top": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetMove"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "change_krw",
+          "change_pct",
+          "currencies",
+          "top",
+          "bottom"
+        ],
+        "title": "MyAssets",
         "type": "object"
       },
       "OllamaStatusOut": {
