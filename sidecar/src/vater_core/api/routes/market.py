@@ -20,6 +20,7 @@ from vater_core.kis.market import (
 from vater_core.kis.models import Bar
 from vater_core.kis.services import get_kis
 from vater_core.market.indices import IndexBoard
+from vater_core.portfolio.service import get_portfolio
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -57,3 +58,18 @@ async def read_indices(deps: AppDeps = Depends(get_deps)) -> list[IndexOut]:  # 
     fetch = _KisFetch(kis.client) if kis else None
     rows = await deps.indices.rows(fetch, kis.fingerprint if kis else None)
     return [IndexOut.model_validate(r, from_attributes=True) for r in rows]
+
+
+class FxOut(BaseModel):
+    usdkrw: float | None  # 환율을 받지 못했으면 null이다
+    day: str
+
+
+@router.get("/fx")
+async def market_fx(
+    refresh: bool = False,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> FxOut:
+    """오늘의 원달러 환율. 하루 한 시점을 저장하고 `refresh=true`일 때 다시 받는다."""
+    service = get_portfolio(deps)
+    return FxOut(usdkrw=await service.usdkrw(refresh), day=service.today().isoformat())
