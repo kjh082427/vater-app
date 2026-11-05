@@ -19,7 +19,7 @@ _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 class SettingDef:
     type: type[bool] | type[int] | type[str]
     default: Any
-    choices: tuple[str, ...] | None = None
+    choices: tuple[str, ...] | tuple[int, ...] | None = None
     min: int | None = None
     max: int | None = None
     time_of_day: bool = False  # "HH:MM" 형식
@@ -44,6 +44,7 @@ SETTING_DEFS: dict[str, SettingDef] = {
     "llm.cloud_quick_model": SettingDef(str, ""),
     "llm.output_language": SettingDef(str, "Korean", choices=("Korean", "English")),
     "analysis.debate_rounds": SettingDef(int, 1, min=1, max=5),
+    "holdings.sync_minutes": SettingDef(int, 0, choices=(0, 10, 30, 60)),
     "alerts.poll_interval_sec": SettingDef(int, 30, min=10, max=600),
     "briefing.kr.enabled": SettingDef(bool, True),
     "briefing.kr.time": SettingDef(str, "16:00", time_of_day=True),
@@ -64,7 +65,7 @@ def validate(key: str, value: Any) -> None:
     if type(value) is not d.type:
         raise _invalid(key, f"{d.type.__name__} 타입이어야 합니다")
     if d.choices is not None and value not in d.choices:
-        raise _invalid(key, f"{', '.join(d.choices)} 중 하나여야 합니다")
+        raise _invalid(key, f"{', '.join(map(str, d.choices))} 중 하나여야 합니다")
     if isinstance(value, int) and d.min is not None and value < d.min:
         raise _invalid(key, f"{d.min} 이상이어야 합니다")
     if isinstance(value, int) and d.max is not None and value > d.max:
