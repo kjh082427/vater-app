@@ -853,6 +853,83 @@
         "title": "CatalogOut",
         "type": "object"
       },
+      "CategorySearchOut": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeHitOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "stocks": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryStockOut"
+            },
+            "title": "Stocks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "stocks"
+        ],
+        "title": "CategorySearchOut",
+        "type": "object"
+      },
+      "CategoryStockOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "mids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mids",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          }
+        },
+        "required": [
+          "market",
+          "code",
+          "exchange",
+          "name",
+          "name_en",
+          "kind",
+          "mids"
+        ],
+        "title": "CategoryStockOut",
+        "type": "object"
+      },
       "CheckOut": {
         "properties": {
           "deep": {
@@ -1589,6 +1666,32 @@
         "title": "GpuOut",
         "type": "object"
       },
+      "GroupOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mids": {
+            "items": {
+              "$ref": "#/components/schemas/MidOut"
+            },
+            "title": "Mids",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "mids"
+        ],
+        "title": "GroupOut",
+        "type": "object"
+      },
       "HardwareOut": {
         "properties": {
           "alternatives": {
@@ -2207,6 +2310,24 @@
         "title": "ManualKey",
         "type": "object"
       },
+      "MidOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "MidOut",
+        "type": "object"
+      },
       "ModelChoice": {
         "properties": {
           "model": {
@@ -2356,6 +2477,71 @@
           "bottom"
         ],
         "title": "MyAssets",
+        "type": "object"
+      },
+      "NodeHitOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "keyword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyword"
+          },
+          "level": {
+            "enum": [
+              "group",
+              "mid"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "match": {
+            "enum": [
+              "name",
+              "keyword"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level",
+          "parent",
+          "match",
+          "keyword",
+          "count"
+        ],
+        "title": "NodeHitOut",
         "type": "object"
       },
       "OllamaStatusOut": {
@@ -4784,6 +4970,230 @@
         "summary": "Delete Broker Data",
         "tags": [
           "holdings"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "read_tree_categories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupOut"
+                  },
+                  "title": "Response Read Tree Categories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Read Tree",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/categories/search": {
+      "get": {
+        "operationId": "search_categories_categories_search_get",
+        "parameters": [
+          {
+            "description": "분류 이름, 테마 키워드, 종목명",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "분류 이름, 테마 키워드, 종목명",
+              "maxLength": 50,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "description": "시장 (기본 통합)",
+            "in": "query",
+            "name": "market",
+            "required": false,
+            "schema": {
+              "default": "ALL",
+              "description": "시장 (기본 통합)",
+              "enum": [
+                "KR",
+                "US",
+                "ALL"
+              ],
+              "title": "Market",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategorySearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Search Categories",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/categories/stocks": {
+      "get": {
+        "operationId": "read_stocks_categories_stocks_get",
+        "parameters": [
+          {
+            "description": "대분류·중분류 id 또는 unclassified",
+            "in": "query",
+            "name": "node",
+            "required": true,
+            "schema": {
+              "description": "대분류·중분류 id 또는 unclassified",
+              "minLength": 1,
+              "title": "Node",
+              "type": "string"
+            }
+          },
+          {
+            "description": "시장 (기본 통합)",
+            "in": "query",
+            "name": "market",
+            "required": false,
+            "schema": {
+              "default": "ALL",
+              "description": "시장 (기본 통합)",
+              "enum": [
+                "KR",
+                "US",
+                "ALL"
+              ],
+              "title": "Market",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryStockOut"
+                  },
+                  "title": "Response Read Stocks Categories Stocks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Read Stocks",
+        "tags": [
+          "categories"
         ]
       }
     },

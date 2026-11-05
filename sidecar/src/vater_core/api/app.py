@@ -11,6 +11,7 @@ from vater_core.api.routes import (
     alerts,
     analyses,
     briefings,
+    categories,
     events,
     holdings,
     kis,
@@ -63,6 +64,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     authed.include_router(briefings.router)
     authed.include_router(ui.router)
     authed.include_router(market.router)
+    authed.include_router(categories.router)
     authed.include_router(holdings.router)
     authed.include_router(portfolio.router)
     app.include_router(authed)

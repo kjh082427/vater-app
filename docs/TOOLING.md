@@ -31,6 +31,7 @@
 | 2026-11-03 | GitHub Action `Swatinem/rust-cache` | v2 | `.github/workflows/desktop.yml` | Windows 러너의 Cargo 빌드 캐시 | 서드파티 액션. 그 밖에 `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `astral-sh/setup-uv@v6` |
 | 2026-11-03 | Rust (CI) | 1.99.1 (+ clippy) | Windows 러너 (`rustup toolchain install`) | `desktop.yml`의 clippy·test·Tauri 빌드 | 로컬과 같은 버전으로 고정 |
 | 2026-11-03 | `tauri-plugin-updater` | 2.14.0 (2026-10-14 배포) | `apps/desktop/src-tauri/Cargo.toml`(`=` 고정) | 앱 자동 업데이트 | `infra/release`. 2.14.1은 2026-10-28 배포라 2주 기준에 못 미쳐 쓰지 않음. 간접 의존성 openssl-probe 0.2.1, webpki-root-certs 1.0.10으로 맞춤. rustls-webpki 0.103.16은 2026-10-20 배포(딱 2주, 보안 민감) |
+| 2026-11-06 | SEC EDGAR 공개 자료 (`company_tickers.json`, `submissions/CIK*.json`의 `sic`) | 설치 없음, 요청 때마다 최신 | 개발 때만 `sidecar/tools/build_categories.py`가 받음 (앱은 부르지 않음). 받은 값은 저장소 밖 폴더에 쌓음 | 미국 종목의 SIC 코드 → 분류표 | `SEC_USER_AGENT` 환경 변수(루트 `.env`)로 요청자 표시, 초당 10회 이하. 이용 조건(2026-11-06 확인): https://www.sec.gov/about/privacy-information 의 Website Dissemination에서 "may be copied or further distributed ... without the SEC's permission", 출처 표기 권장, SEC 로고·상표 사용 금지. 한도: https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data. 거래소(KRX)·WICS·GICS 자료는 쓰지 않음 |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |

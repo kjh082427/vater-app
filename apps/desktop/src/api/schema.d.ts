@@ -300,6 +300,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/categories': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Tree */
+    get: operations['read_tree_categories_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/categories/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Search Categories */
+    get: operations['search_categories_categories_search_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/categories/stocks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Stocks */
+    get: operations['read_stocks_categories_stocks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/connections': {
     parameters: {
       query?: never;
@@ -1194,6 +1245,30 @@ export interface components {
       /** Version */
       version: string;
     };
+    /** CategorySearchOut */
+    CategorySearchOut: {
+      /** Nodes */
+      nodes: components['schemas']['NodeHitOut'][];
+      /** Stocks */
+      stocks: components['schemas']['CategoryStockOut'][];
+    };
+    /** CategoryStockOut */
+    CategoryStockOut: {
+      /** Code */
+      code: string;
+      /** Exchange */
+      exchange: string;
+      /** Kind */
+      kind: string;
+      /** Market */
+      market: string;
+      /** Mids */
+      mids: string[];
+      /** Name */
+      name: string;
+      /** Name En */
+      name_en: string | null;
+    };
     /** CheckOut */
     CheckOut: {
       deep: components['schemas']['TierChoiceOut'];
@@ -1409,6 +1484,15 @@ export interface components {
       /** Vram Mb */
       vram_mb: number;
     };
+    /** GroupOut */
+    GroupOut: {
+      /** Id */
+      id: string;
+      /** Mids */
+      mids: components['schemas']['MidOut'][];
+      /** Name */
+      name: string;
+    };
     /** HardwareOut */
     HardwareOut: {
       /** Alternatives */
@@ -1611,6 +1695,13 @@ export interface components {
        */
       market: 'KR' | 'US';
     };
+    /** MidOut */
+    MidOut: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+    };
     /** ModelChoice */
     ModelChoice: {
       /** Model */
@@ -1659,6 +1750,29 @@ export interface components {
         [key: string]: components['schemas']['AssetChange'];
       };
       top: components['schemas']['AssetMove'] | null;
+    };
+    /** NodeHitOut */
+    NodeHitOut: {
+      /** Count */
+      count: number;
+      /** Id */
+      id: string;
+      /** Keyword */
+      keyword: string | null;
+      /**
+       * Level
+       * @enum {string}
+       */
+      level: 'group' | 'mid';
+      /**
+       * Match
+       * @enum {string}
+       */
+      match: 'name' | 'keyword';
+      /** Name */
+      name: string;
+      /** Parent */
+      parent: string | null;
     };
     /** OllamaStatusOut */
     OllamaStatusOut: {
@@ -3001,6 +3115,157 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  read_tree_categories_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupOut'][];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  search_categories_categories_search_get: {
+    parameters: {
+      query: {
+        /** @description 분류 이름, 테마 키워드, 종목명 */
+        q: string;
+        /** @description 시장 (기본 통합) */
+        market?: 'KR' | 'US' | 'ALL';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategorySearchOut'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  read_stocks_categories_stocks_get: {
+    parameters: {
+      query: {
+        /** @description 대분류·중분류 id 또는 unclassified */
+        node: string;
+        /** @description 시장 (기본 통합) */
+        market?: 'KR' | 'US' | 'ALL';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CategoryStockOut'][];
+        };
       };
       /** @description 인증 실패 (AUTH_INVALID) */
       401: {
