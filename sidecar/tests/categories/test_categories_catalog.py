@@ -1,4 +1,4 @@
-"""분류표 파일의 내용 검사. groups.json·sic_map.json은 항상, catalog.json은 있을 때 검사한다."""
+"""분류표 파일의 내용 검사."""
 
 import json
 from importlib.resources import files
@@ -24,8 +24,6 @@ THEME_NAMES = [
     ),
 ]
 CATALOG = files("vater_core.categories").joinpath("catalog.json")
-# ponytail: 테마 초안 검수 전에는 catalog.json이 저장소에 없다. 검수 뒤 이 표시를 지운다.
-needs_catalog = pytest.mark.skipif(not CATALOG.is_file(), reason="catalog.json 아직 없음")
 
 
 def _groups() -> list[dict]:
@@ -57,7 +55,6 @@ def _mid(name: str) -> dict:
     return next(m for g in _catalog()["groups"] for m in g["mids"] if m["name"] == name)
 
 
-@needs_catalog
 @pytest.mark.parametrize(
     ("mid", "market", "code"),
     [
@@ -75,7 +72,6 @@ def test_known_stocks_in_their_theme(mid: str, market: str, code: str) -> None:
     assert code in _mid(mid)[market]
 
 
-@needs_catalog
 def test_every_theme_has_a_stock_and_file_is_small() -> None:
     for name in THEME_NAMES:
         m = _mid(name)
@@ -83,7 +79,6 @@ def test_every_theme_has_a_stock_and_file_is_small() -> None:
     assert len(CATALOG.read_bytes()) <= 2 * 1024 * 1024
 
 
-@needs_catalog
 def test_themes_file_has_26_themes_and_catalog_has_no_personal_fields() -> None:
     themes = json.loads((SRC / "themes.json").read_text(encoding="utf-8"))
     assert len(themes) == 26
