@@ -70,6 +70,8 @@ async def market_fx(
     refresh: bool = False,
     deps: AppDeps = Depends(get_deps),  # noqa: B008
 ) -> FxOut:
-    """오늘의 원달러 환율. 하루 한 시점을 저장하고 `refresh=true`일 때 다시 받는다."""
+    """원달러 환율과 그 값의 날짜. 오늘 값이 없으면 7일 안의 최근 값, 그것도 없으면 null과 오늘."""
     service = get_portfolio(deps)
-    return FxOut(usdkrw=await service.usdkrw(refresh), day=service.today().isoformat())
+    got = await service.fx(refresh)
+    day = got[0] if got else service.today()
+    return FxOut(usdkrw=got[1] if got else None, day=day.isoformat())

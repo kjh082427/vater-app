@@ -44,7 +44,7 @@ class PortfolioService:
         deps: AppDeps,
         *,
         fetch_price: Callable[[str, str], Awaitable[float]] | None = None,
-        fetch_fx: Callable[[], Awaitable[float | None]] | None = None,
+        fetch_fx: Callable[[], Awaitable[tuple[date, float] | None]] | None = None,
         now: Callable[[], datetime] = lambda: datetime.now(KST),
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -54,6 +54,7 @@ class PortfolioService:
         self._now = now
         self._monotonic = monotonic
         self._prices: dict[Key, tuple[float, float]] = {}
+        self._fx_tried: float | None = None
 
     @property
     def _db(self) -> Any:
@@ -71,7 +72,7 @@ class PortfolioService:
         exchange = cast(UsExchange, resolve_target(self._db, market, code).exchange)
         return (await overseas_price(client, exchange, code, Priority.BRIEFING)).price
 
-    async def _kis_fx(self) -> float | None:
+    async def _kis_fx(self) -> tuple[date, float] | None:
         return await fetch_usdkrw(require_kis(self._deps).client, self.today())
 
     async def price(self, market: str, code: str) -> float | None:
@@ -90,21 +91,32 @@ class PortfolioService:
         self._prices[(market, code)] = (value, now)
         return value
 
-    async def usdkrw(self, refresh: bool = False) -> float | None:
-        """그날 처음 필요할 때 받아 저장한다. 다시 받다 실패하면 저장된 값을 쓴다."""
-        repo, day = FxRepo(self._db), self.today()
-        saved = repo.get(day)
-        if saved is not None and not refresh:
+    async def fx(self, refresh: bool = False) -> tuple[date, float] | None:
+        """(값의 날짜, 환율). 오늘 값은 하루 한 번 받아 저장한다.
+
+        오늘 값이 없으면 7일 안의 최근 값을 쓰고, 그 날짜로 저장해 오늘 환율로 굳지 않게 한다.
+        오늘 값이 없는 동안에는 조회 주기마다 다시 묻는다.
+        """
+        repo, today = FxRepo(self._db), self.today()
+        saved = repo.latest(today)
+        now = self._monotonic()
+        ttl = int(SettingsRepo(self._db).get("quotes.refresh_sec"))
+        tried = self._fx_tried is not None and now - self._fx_tried < ttl
+        if saved is not None and not refresh and (saved[0] == today or tried):
             return saved
+        self._fx_tried = now
         try:
-            value = await self._fetch_fx()
+            got = await self._fetch_fx()
         except Exception as e:
             logger.warning("fx failed: %s", type(e).__name__)
-            return saved
-        if value is None or value <= 0:
-            return saved
-        repo.save(day, value)
-        return value
+            got = None
+        if got is not None and got[1] > 0:
+            repo.save(*got)
+        return repo.latest(today)
+
+    async def usdkrw(self, refresh: bool = False) -> float | None:
+        got = await self.fx(refresh)
+        return got[1] if got else None
 
     async def summary(self) -> dict[str, Any]:
         service = get_holdings(self._deps)
@@ -127,6 +139,7 @@ class PortfolioService:
                     "code": code,
                     "name": held[0].name,
                     "total": s["total"],
+                    "unpriced_quantity": s["unpriced_quantity"],
                     "avg_price": s["avg_price"],
                     "currency": s["currency"],
                     "price": price,
@@ -144,7 +157,7 @@ class PortfolioService:
         return {
             "symbols": symbols,
             "currencies": currencies,
-            "total_krw": _converted(currencies, usdkrw),
+            "total_krw": _converted(symbols, currencies, usdkrw),
             "usdkrw": usdkrw,
             "missing_prices": sum(1 for r in symbols if r["price"] is None),
             "unsupported": sum(1 for h in all_rows if h.market is None),
@@ -153,7 +166,9 @@ class PortfolioService:
 
 
 def _converted(
-    currencies: dict[str, dict[str, float | None]], usdkrw: float | None
+    symbols: list[dict[str, Any]],
+    currencies: dict[str, dict[str, float | None]],
+    usdkrw: float | None,
 ) -> dict[str, float | None] | None:
     if not currencies or ("USD" in currencies and usdkrw is None):
         return None
@@ -165,12 +180,14 @@ def _converted(
         ]
         return sum(known) if known else None
 
-    pl, cost = total("pl"), total("cost")
+    pl = total("pl")
+    # 수익률의 분모는 `_sum`처럼 손익을 아는 종목의 매입금액만이다
+    pl_cost = sum(r["cost"] * rate[r["currency"]] for r in symbols if r["pl"] is not None)
     return {
         "value": total("value"),
-        "cost": cost,
+        "cost": total("cost"),
         "pl": pl,
-        "pl_pct": pl / cost * 100 if pl is not None and cost else None,
+        "pl_pct": pl / pl_cost * 100 if pl is not None and pl_cost else None,
     }
 
 

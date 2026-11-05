@@ -27,6 +27,7 @@ class SymbolValue(Totals):
     code: str
     name: str
     total: str
+    unpriced_quantity: str  # 평단가를 몰라 매입금액과 손익에서 뺀 수량
     avg_price: float | None
     currency: str | None
     price: float | None

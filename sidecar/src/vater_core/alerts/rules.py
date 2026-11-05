@@ -342,6 +342,8 @@ def condition(
     if isinstance(params, AvgPricePct):
         if not avg_price or avg_price <= 0:
             return Reading(None, None, "보유 평단가를 알 수 없습니다")
+        if price <= 0:  # 시세가 없다는 뜻이다. -100%로 읽지 않는다
+            return Reading(None, None, UNKNOWN)
         change = round(
             (price / avg_price - 1) * 100, 9
         )  # 정확히 -10%에서 부동소수 오차로 빗나가지 않게

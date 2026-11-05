@@ -13,7 +13,7 @@ import asyncio
 import logging
 import sqlite3
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -84,16 +84,15 @@ class Evaluator:
             except VaterError:
                 logger.warning("alert rule %s has invalid stored params: skipped", rule.id)
                 continue
-            avg = (
-                avg_price_of(self._conn, item.market, item.code)
-                if isinstance(params, AvgPricePct)
-                else None
-            )
+            avg = None
+            if isinstance(params, AvgPricePct):
+                avg = avg_price_of(self._conn, item.market, item.code)
+                # 평단 정정, 전량 매도, 재매수: 새 평단가의 기준값부터 저장한다
+                if avg != rule.last_avg:
+                    self._rules.reset_avg(rule.id, avg)
+                    rule = replace(rule, last_state=None, last_avg=avg)
             reading = condition(params, history, live, avg)
             if reading.state is None:
-                # 평단가 규칙은 보유가 없어지면 기준을 비운다: 다시 사면 기준값부터 저장한다
-                if isinstance(params, AvgPricePct) and rule.last_state is not None:
-                    self._rules.set_state(rule.id, None)
                 continue
             if (
                 rule.last_state is False

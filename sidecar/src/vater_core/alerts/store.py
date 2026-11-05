@@ -7,7 +7,7 @@ import builtins
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from vater_core.alerts.rules import History
@@ -38,6 +38,7 @@ class Rule:
     enabled: bool
     last_state: bool | None
     last_fired_at: str | None
+    last_avg: float | None = None  # 평단가 규칙이 마지막으로 본 평단가. AI에 보내지 않는다
 
 
 @dataclass(frozen=True)
@@ -95,7 +96,9 @@ class WatchlistRepo:
             self._conn.execute("DELETE FROM watchlist WHERE id = ?", (id,))
 
 
-_RULE_COLUMNS = "id, watchlist_id, kind, params, timing, enabled, last_state, last_fired_at"
+_RULE_COLUMNS = (
+    "id, watchlist_id, kind, params, timing, enabled, last_state, last_fired_at, last_avg"
+)
 
 
 class RuleRepo:
@@ -113,6 +116,7 @@ class RuleRepo:
             enabled=bool(r[5]),
             last_state=None if r[6] is None else bool(r[6]),
             last_fired_at=r[7],
+            last_avg=r[8],
         )
 
     def list(self, watchlist_id: int | None = None, enabled_only: bool = False) -> list[Rule]:
@@ -188,6 +192,13 @@ class RuleRepo:
             self._conn.execute(
                 "UPDATE alert_rules SET last_state = ? WHERE id = ?",
                 (None if state is None else int(state), id),
+            )
+
+    def reset_avg(self, id: int, avg: float | None) -> None:
+        """평단가가 바뀌었다. 기준값을 비워 다음 평가가 새 평단가의 기준값부터 저장하게 한다."""
+        with self._conn:
+            self._conn.execute(
+                "UPDATE alert_rules SET last_avg = ?, last_state = NULL WHERE id = ?", (avg, id)
             )
 
     def mark_fired(self, id: int, at: str) -> None:
@@ -276,6 +287,15 @@ class BarRepo:
         r = self._conn.execute(
             "SELECT close FROM daily_bars WHERE market = ? AND code = ? AND day = ?",
             (market, code, day.isoformat()),
+        ).fetchone()
+        return float(r[0]) if r else None
+
+    def recent_close(self, market: str, code: str, day: date, within: int) -> float | None:
+        """그 날짜 전 `within`일 안의 가장 최근 종가(거래정지 종목용)."""
+        r = self._conn.execute(
+            "SELECT close FROM daily_bars WHERE market = ? AND code = ? AND day < ? AND day >= ? "
+            "AND close > 0 ORDER BY day DESC LIMIT 1",
+            (market, code, day.isoformat(), (day - timedelta(days=within)).isoformat()),
         ).fetchone()
         return float(r[0]) if r else None
 

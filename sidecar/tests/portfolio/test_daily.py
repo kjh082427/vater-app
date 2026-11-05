@@ -45,7 +45,7 @@ class FakeSync:
 
     async def sync(self, broker_id: str | None = None, *, skip_lost: bool = False) -> list[Any]:
         self.calls.append(skip_lost)
-        self.rig.rows_at_sync.append(self.rig.repo.last_day())
+        self.rig.rows_at_sync.append(self.rig.repo.last_day(self.rig.at.date()))
         return []
 
 
@@ -56,6 +56,7 @@ class Rig:
         self.repo = DailyRepo(self.db)
         self.kr_closed = kr_closed or set()
         self.fail: set[tuple[str, str]] = set()
+        self.halted: set[tuple[str, str]] = set()  # 조회는 되는데 봉이 없다(거래정지)
         self.fx_error: Exception | None = None
         self.fx_days: dict[date, float] | None = None  # None이면 모든 날 1400 + 일
         self.refreshes: list[tuple[str, str, date]] = []
@@ -82,6 +83,8 @@ class Rig:
         self.refreshes.append((market, code, through))
         if (market, code) in self.fail:
             raise RuntimeError("no bars")
+        if (market, code) in self.halted:
+            return
         days = [through - timedelta(days=i) for i in range(30)]
         bars = [Bar(d, 1, 1, 1, close_of(market, d), 1) for d in days if d.weekday() < 5]
         BarRepo(self.db).upsert(market, code, bars)
@@ -319,6 +322,54 @@ async def test_stale_bar_is_not_passed_off_as_that_days_close(deps: AppDeps) -> 
     assert rig.rows()[TUE.isoformat()]["kr_value"] is None  # 월요일 값으로 메우지 않는다
 
 
+async def test_halted_symbol_uses_its_last_close_within_14_days(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(WED))
+    rig.hold(SAMSUNG)
+    rig.halted.add(SAMSUNG)
+    BarRepo(rig.db).upsert("KR", "005930", [Bar(WED - timedelta(days=14), 1, 1, 1, 500.0, 1)])
+    await rig.recorder.check_once()
+    assert (
+        rig.rows()[WED.isoformat()]["kr_value"] == 5000
+    )  # 거래정지 종목의 가격은 실제로 그 값이다
+
+
+async def test_halted_symbol_older_than_14_days_is_null(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(WED))
+    rig.hold(SAMSUNG)
+    rig.halted.add(SAMSUNG)
+    BarRepo(rig.db).upsert("KR", "005930", [Bar(WED - timedelta(days=15), 1, 1, 1, 500.0, 1)])
+    await rig.recorder.check_once()
+    assert rig.rows()[WED.isoformat()]["kr_value"] is None
+
+
+async def test_zero_close_falls_back_to_the_last_real_close(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(WED))
+    rig.hold(SAMSUNG)
+    rig.halted.add(SAMSUNG)
+    BarRepo(rig.db).upsert("KR", "005930", [Bar(TUE, 1, 1, 1, 500.0, 1), Bar(WED, 1, 1, 1, 0.0, 1)])
+    await rig.recorder.check_once()
+    assert rig.rows()[WED.isoformat()]["kr_value"] == 5000
+
+
+async def test_future_row_does_not_stop_todays_record(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE))
+    rig.hold(SAMSUNG)
+    rig.seed_row(MON)
+    rig.seed_row(date(2026, 12, 25), kr=None)  # 시계가 틀렸던 때의 행
+    await rig.recorder.check_once()
+    assert rig.rows()[TUE.isoformat()]["kr_value"] == 10 * close_of("KR", TUE)
+    assert all(r[2] <= TUE for r in rig.refreshes)  # 미래 행을 다시 받으려 하지 않는다
+
+
+async def test_future_row_alone_is_not_a_first_record(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(WED))
+    rig.hold(SAMSUNG)
+    rig.seed_row(date(2026, 12, 25))
+    await rig.recorder.check_once()
+    assert TUE.isoformat() not in rig.rows()
+    assert rig.rows()[WED.isoformat()]["backfilled"] == 0
+
+
 # ---- 일부 실패 ----------------------------------------------------------------
 
 
@@ -435,6 +486,56 @@ async def test_without_kis_keys_nothing_is_written_and_sync_runs_once(deps: AppD
 async def test_start_and_stop(rig: Rig) -> None:
     rig.recorder.start()
     await rig.recorder.stop()
+
+
+async def test_retrying_a_past_row_with_todays_quantity_marks_it_backfilled(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE, 10))
+    rig.hold(SAMSUNG)
+    rig.seed_row(MON, kr=None)
+    await rig.recorder.check_once()
+    row = rig.rows()[MON.isoformat()]
+    assert row["kr_value"] == 10 * close_of("KR", MON)
+    assert row["backfilled"] == 1
+
+
+async def test_retry_that_only_adds_the_rate_is_not_backfilled(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE, 10))
+    rig.hold(APPLE)
+    rig.repo.fill(MON, 0.0, 0.0, 50.0, 40.0, None, backfilled=False)
+    await rig.recorder.check_once()
+    row = rig.rows()[MON.isoformat()]
+    assert row["usdkrw"] == 1400.0 + MON.day  # 환율은 수량과 무관하다
+    assert row["backfilled"] == 0
+
+
+async def test_retry_that_finds_nothing_is_not_backfilled(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE, 10))
+    rig.hold(SAMSUNG)
+    rig.fail.add(SAMSUNG)
+    rig.seed_row(MON, kr=None)
+    await rig.recorder.check_once()
+    assert rig.rows()[MON.isoformat()]["backfilled"] == 0
+
+
+async def test_quantity_without_an_average_blanks_that_markets_cost(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE))
+    rig.hold(SAMSUNG, avg=9000)
+    rig.hold(HYNIX, avg=None)
+    rig.hold(APPLE, avg=100)
+    await rig.recorder.check_once()
+    row = rig.rows()[TUE.isoformat()]
+    assert row["kr_value"] is not None
+    assert row["kr_cost"] is None  # 없는 수익이 그래프에 보이지 않게 한다
+    assert row["us_cost"] == 1000
+
+
+async def test_part_of_one_symbol_without_an_average_blanks_the_cost(deps: AppDeps) -> None:
+    rig = Rig(deps, kst(TUE))
+    rig.hold(SAMSUNG, avg=9000)
+    row = HoldingRow("KR", "005930", "005930", Decimal(5), None, "KRW")
+    HoldingsRepo(rig.db).manual_upsert("mirae", row, AT)
+    await rig.recorder.check_once()
+    assert rig.rows()[TUE.isoformat()]["kr_cost"] is None
 
 
 # ---- 조회 API -----------------------------------------------------------------

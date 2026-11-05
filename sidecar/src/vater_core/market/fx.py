@@ -1,13 +1,14 @@
 """원달러 환율 (v2 설계 12장). 한투 `FHKST03030100`, 시장 `X`, `FX@KRW`. 하루 한 시점만 쓴다."""
 
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 
 from vater_core.kis.client import KisClient
 from vater_core.kis.config import Priority
 from vater_core.kis.models import num, ymd
 
 FX_PATH = "/uapi/overseas-price/v1/quotations/inquire-daily-chartprice"
+LOOKBACK = timedelta(days=7)  # 오늘 값이 없을 때(주말, 휴장, 이른 아침) 쓸 수 있는 범위
 
 
 class FxRepo:
@@ -19,6 +20,15 @@ class FxRepo:
             "SELECT usdkrw FROM fx_daily WHERE day = ?", (day.isoformat(),)
         ).fetchone()
         return float(row[0]) if row else None
+
+    def latest(self, today: date) -> tuple[date, float] | None:
+        """오늘까지 7일 안에 저장된 가장 최근 값."""
+        row = self._conn.execute(
+            "SELECT day, usdkrw FROM fx_daily WHERE day <= ? AND day >= ? "
+            "ORDER BY day DESC LIMIT 1",
+            (today.isoformat(), (today - LOOKBACK).isoformat()),
+        ).fetchone()
+        return (date.fromisoformat(row[0]), float(row[1])) if row else None
 
     def save(self, day: date, usdkrw: float) -> None:
         with self._conn:
@@ -50,7 +60,8 @@ async def fetch_usdkrw_range(c: KisClient, start: date, end: date) -> dict[date,
     }
 
 
-async def fetch_usdkrw(c: KisClient, today: date) -> float | None:
-    """오늘 환율. 오늘 값이 아직 없으면 가장 최근 값을 쓴다."""
-    rows = await fetch_usdkrw_range(c, today, today)
-    return rows.get(today) or (rows[max(rows)] if rows else None)
+async def fetch_usdkrw(c: KisClient, today: date) -> tuple[date, float] | None:
+    """7일 안의 가장 최근 환율과 그 날짜. 오늘 값이 아직 없으면 그 전 값이 온다."""
+    rows = await fetch_usdkrw_range(c, today - LOOKBACK, today)
+    days = [d for d in rows if d <= today]
+    return (max(days), rows[max(days)]) if days else None

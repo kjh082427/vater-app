@@ -16,3 +16,6 @@ CREATE TABLE portfolio_daily (
 
 -- 브리핑의 내 자산 구역(v2 설계 15장). `data`와 나눠 둔다: `data`는 AI에 가고 이 값은 가지 않는다.
 ALTER TABLE briefings ADD COLUMN my_assets TEXT;
+
+-- 평단가 규칙이 마지막으로 본 평단가. 평단가만 고쳐서 알림이 울리지 않도록 바뀌면 기준값을 비운다.
+ALTER TABLE alert_rules ADD COLUMN last_avg REAL;

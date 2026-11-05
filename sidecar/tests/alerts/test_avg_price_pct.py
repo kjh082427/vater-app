@@ -92,6 +92,8 @@ def test_condition_is_pure_percent_of_average() -> None:
     assert condition(up, EMPTY, live(90), 100.0).state is False
     assert condition(p, EMPTY, live(90), None).state is None
     assert condition(p, EMPTY, live(90), 0.0).state is None
+    assert condition(p, EMPTY, live(0), 100.0).state is None  # 시세 없음은 -100%가 아니다
+    assert condition(p, EMPTY, live(-1), 100.0).state is None
 
 
 def test_fires_once_when_it_reaches_minus_ten_percent(db: sqlite3.Connection) -> None:
@@ -179,3 +181,32 @@ def test_alerts_never_reach_the_llm() -> None:
             text,
             re.M,
         ), f.name
+
+
+def test_zero_price_neither_fires_nor_loses_the_baseline(db: sqlite3.Connection) -> None:
+    hold(db, 10, 100)
+    item, rid, ev, _ = setup(db)
+    tick(db, ev, item, 95)
+    assert tick(db, ev, item, 0) == 0
+    assert RuleRepo(db).get(rid).last_state is False
+    assert tick(db, ev, item, 89) == 1
+
+
+def test_correcting_the_average_alone_does_not_fire(db: sqlite3.Connection) -> None:
+    hold(db, 10, 100)
+    item, rid, ev, _ = setup(db)
+    assert tick(db, ev, item, 95) == 0  # 거짓
+    hold(db, 10, 120)  # 시세는 그대로인데 평단가를 고쳤다: -20.8%로 참이 된다
+    assert tick(db, ev, item, 95) == 0
+    assert RuleRepo(db).get(rid).last_state is True
+    assert RuleRepo(db).get(rid).last_avg == 120
+    assert tick(db, ev, item, 110) == 0  # 새 평단가로 거짓
+    assert tick(db, ev, item, 100) == 1  # 시세가 움직여 도달하면 울린다
+
+
+def test_average_correction_while_the_app_was_off_does_not_fire(db: sqlite3.Connection) -> None:
+    hold(db, 10, 100)
+    item, _, ev, notes = setup(db)
+    tick(db, ev, item, 95)
+    hold(db, 10, 120)
+    assert tick(db, Evaluator(db, None, notes, Clock()), item, 95) == 0  # 기준은 DB에 남아 있다

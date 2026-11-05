@@ -6,7 +6,10 @@ AI에 닿는 코드는 보유 내역 모듈을 불러오지 못하고(AST 검사
 
 import ast
 import json
+import re
 import sqlite3
+import subprocess
+import sys
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -33,6 +36,13 @@ from vater_core.store.holdings import HoldingRow, HoldingsRepo
 
 SRC = Path(vater_core.__file__).parent
 FORBIDDEN = ("vater_core.holdings", "vater_core.portfolio", "vater_core.store.holdings")
+LOADED_FORBIDDEN = (*FORBIDDEN, "vater_core.alerts.evaluator")
+ATTRS = ("holdings", "portfolio", "my_assets")  # deps.holdings, deps.portfolio, briefing.my_assets
+SQL_TABLES = re.compile(
+    r"\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(holdings|connections|portfolio_daily)\b", re.IGNORECASE
+)
+# 패키지 자료를 읽는 importlib.resources 말고는 동적 import다. AST로 추적되지 않으므로 막는다
+SAFE_IMPORTLIB = "importlib.resources"
 
 
 def targets() -> list[Path]:
@@ -69,12 +79,28 @@ def imported(source: str, package: str) -> Iterator[str]:
 IMPORT_CALLS = ("import_module", "__import__")
 
 
+def _is_or_under(name: str, parents: tuple[str, ...]) -> bool:
+    return any(name == bad or name.startswith(f"{bad}.") for bad in parents)
+
+
+def _dynamic_import(name: str) -> bool:
+    return _is_or_under(name, ("importlib",)) and not _is_or_under(name, (SAFE_IMPORTLIB,))
+
+
 def violations(source: str, package: str = "vater_core.analysis") -> list[str]:
-    return [
+    found = [
         name
         for name in imported(source, package)
-        if any(name == bad or name.startswith(f"{bad}.") for bad in FORBIDDEN)
+        if _is_or_under(name, FORBIDDEN) or _dynamic_import(name)
     ]
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Attribute) and node.attr in ATTRS:
+            found.append(f".{node.attr}")
+        elif isinstance(node, ast.Name) and node.id == "__import__":
+            found.append("__import__")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            found.extend(m.group(0) for m in SQL_TABLES.finditer(node.value))
+    return found
 
 
 @pytest.mark.parametrize(
@@ -98,6 +124,18 @@ def violations(source: str, package: str = "vater_core.analysis") -> list[str]:
         "if TYPE_CHECKING:\n    from vater_core.portfolio.daily import DailyRepo\n",
         "import importlib\nimportlib.import_module('vater_core.holdings.service')",
         "__import__('vater_core.store.holdings')",
+        "import importlib",
+        "from importlib import import_module",
+        "__import__(name)",
+        "deps.holdings.repo.all()",
+        "self._deps.portfolio",
+        "x = deps.portfolio.summary()",
+        "saved.my_assets",
+        "conn.execute('SELECT * FROM holdings')",
+        "conn.execute('select quantity from holdings where code = ?')",
+        "conn.execute('SELECT 1 FROM alert_rules r JOIN connections c ON 1')",
+        "conn.execute(f'SELECT {cols} FROM portfolio_daily')",
+        "conn.execute('INSERT INTO holdings VALUES (1)')",
     ],
 )
 def test_the_check_catches_a_violation(source: str) -> None:
@@ -115,6 +153,10 @@ def test_the_check_catches_a_violation(source: str) -> None:
         "import portfolio",
         "text = 'vater_core.holdings'",
         'STAGE = {"Portfolio Manager": "portfolio"}',
+        "from importlib.resources import files",
+        "text = '보유 holdings 없음'",
+        "conn.execute('SELECT * FROM analyses')",
+        "holdings = 1",
     ],
 )
 def test_the_check_allows_other_imports(source: str) -> None:
@@ -132,6 +174,48 @@ def test_targets_are_the_real_files() -> None:
 def test_ai_facing_code_does_not_import_holdings(path: Path) -> None:
     package = ".".join(("vater_core", *path.parent.relative_to(SRC).parts))
     assert violations(path.read_text(encoding="utf-8"), package) == []
+
+
+def loaded_after_importing(*modules: str) -> list[str]:
+    """새 인터프리터에서 모듈을 불러온 뒤 올라온 금지 모듈. 간접 import까지 잡는다."""
+    code = (
+        "import importlib, json, sys\n"
+        f"for name in {list(modules)!r}:\n"
+        "    importlib.import_module(name)\n"
+        "print(json.dumps(sorted(sys.modules)))\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True, timeout=120
+    )
+    return [m for m in json.loads(done.stdout) if _is_or_under(m, LOADED_FORBIDDEN)]
+
+
+def ai_modules() -> list[str]:
+    return [
+        ".".join(("vater_core", *path.relative_to(SRC).with_suffix("").parts))
+        for path in targets()
+        if path.name != "__init__.py"
+    ]
+
+
+def test_loading_ai_code_does_not_load_holdings_even_indirectly() -> None:
+    modules = ai_modules()
+    assert {"vater_core.analysis.engine", "vater_core.briefing.interpret"} <= set(modules)
+    assert len(modules) >= 9
+    assert loaded_after_importing(*modules) == []
+
+
+@pytest.mark.parametrize(
+    ("module", "caught"),
+    [
+        ("vater_core.holdings.service", "vater_core.holdings.service"),
+        ("vater_core.store.holdings", "vater_core.store.holdings"),
+        ("vater_core.portfolio.valuation", "vater_core.portfolio.valuation"),
+        ("vater_core.alerts.evaluator", "vater_core.alerts.evaluator"),
+    ],
+)
+def test_the_loaded_module_check_catches_a_violation(module: str, caught: str) -> None:
+    assert caught in loaded_after_importing(module)
 
 
 # ---- 끝에서 끝까지 --------------------------------------------------------------

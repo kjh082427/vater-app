@@ -646,7 +646,7 @@ export interface paths {
     };
     /**
      * Market Fx
-     * @description 오늘의 원달러 환율. 하루 한 시점을 저장하고 `refresh=true`일 때 다시 받는다.
+     * @description 원달러 환율과 그 값의 날짜. 오늘 값이 없으면 7일 안의 최근 값, 그것도 없으면 null과 오늘.
      */
     get: operations['market_fx_market_fx_get'];
     put?: never;
@@ -1851,6 +1851,8 @@ export interface components {
       price: number | null;
       /** Total */
       total: string;
+      /** Unpriced Quantity */
+      unpriced_quantity: string;
       /** Value */
       value: number | null;
     };

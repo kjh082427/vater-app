@@ -90,13 +90,32 @@ async def test_biggest_and_smallest_contribution(rig: Rig) -> None:
     assert ("KR", "A", TUE) in rig.refreshed  # 감시 종목이 아니어도 그 세션 일봉을 받는다
 
 
-async def test_single_holding_is_not_both_best_and_worst(rig: Rig) -> None:
+async def test_all_gains_have_no_bottom(rig: Rig) -> None:
     rig.prior_record()
     rig.hold("KR", "A", 10, (MON, 100.0), (TUE, 110.0))
+    rig.hold("KR", "B", 10, (MON, 100.0), (TUE, 101.0))
     got = await rig.recorder.my_assets("KR", TUE)
     assert got is not None
     assert got["top"]["code"] == "A"
-    assert got["bottom"] is None
+    assert got["bottom"] is None  # 오른 종목을 "가장 많이 빠진 종목"이라 하지 않는다
+
+
+async def test_all_losses_have_no_top(rig: Rig) -> None:
+    rig.prior_record()
+    rig.hold("KR", "A", 10, (MON, 110.0), (TUE, 100.0))
+    rig.hold("KR", "B", 10, (MON, 101.0), (TUE, 100.0))
+    got = await rig.recorder.my_assets("KR", TUE)
+    assert got is not None
+    assert got["top"] is None
+    assert got["bottom"]["code"] == "A"
+
+
+async def test_flat_symbol_is_neither(rig: Rig) -> None:
+    rig.prior_record()
+    rig.hold("KR", "A", 10, (MON, 100.0), (TUE, 100.0))
+    got = await rig.recorder.my_assets("KR", TUE)
+    assert got is not None
+    assert (got["top"], got["bottom"]) == (None, None)
 
 
 async def test_no_previous_record_has_null_changes(rig: Rig) -> None:
@@ -159,8 +178,8 @@ async def test_missing_close_nulls_that_currency_and_keeps_the_rest(rig: Rig) ->
     assert got["currencies"]["KRW"] == {"change": None, "change_pct": None}
     assert got["currencies"]["USD"]["change"] == 10.0
     assert got["change_krw"] is None
-    assert got["top"]["code"] == "AAPL"
-    assert got["bottom"]["code"] == "A"
+    assert got["top"]["code"] == "AAPL"  # 환산하면 애플이 더 크다
+    assert got["bottom"] is None
 
 
 async def test_us_briefing_uses_its_own_session(rig: Rig) -> None:

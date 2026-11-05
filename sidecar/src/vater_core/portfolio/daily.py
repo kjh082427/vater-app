@@ -3,8 +3,9 @@
 - 한 행은 "그 날 16:00(KST)에 확정돼 있던 종가"로 잰 평가금액이다. 그래서 그날 기록한 행과 나중에
   채운 행이 같은 값을 쓴다. 뉴욕 세션 d는 d+1 아침에 끝나므로 d일 행에는 d-1 세션까지만 들어간다.
 - 한국이나 미국 어느 한쪽이라도 열린 날에 행을 만든다. 쉬는 시장은 마지막 세션의 종가를 그대로 둔다.
-- 값을 지어내지 않는다. 그 시장의 종가가 하나라도 없으면 그 시장 값은 NULL이고 나중에 다시 받는다
+- 값을 지어내지 않는다. 그 시장의 종가를 하나라도 못 받으면 그 시장 값은 NULL이고 나중에 다시 받는다
   (일부만 더하면 폭락처럼 보인다). 0은 "그 시장에 보유가 없음"이고 실패가 아니다.
+- 조회는 됐는데 그날 봉이 없는 종목(거래정지)은 14일 안의 마지막 종가가 실제 가격이다.
 - 이 파일의 값은 저장과 표시에만 쓴다. **AI 입력에 넣지 않는다**(v2 설계 8-1장).
 """
 
@@ -43,6 +44,7 @@ RECORD_AT = time(16, 0)
 TICK_SEC = 60.0
 RETRY = timedelta(minutes=30)
 RETRY_DAYS = 14  # 그보다 오래된 빈 값은 앞으로도 오지 않는 값으로 본다
+HALT_DAYS = 14  # 거래정지 종목의 마지막 종가를 쓰는 범위
 FX_SPAN = timedelta(days=89)  # 한투 일별 조회는 한 번에 약 100행이다
 View = Literal["all", "krw", "usd"]
 _CURRENCY: dict[MarketId, str] = {"KR": "KRW", "US": "USD"}
@@ -66,7 +68,7 @@ class Position:
     code: str
     name: str
     quantity: Decimal
-    cost: float | None
+    cost: float | None  # 평단가를 모르는 수량이 있으면 None이다
 
 
 def held(conn: sqlite3.Connection) -> dict[MarketId, list[Position]]:
@@ -76,9 +78,8 @@ def held(conn: sqlite3.Connection) -> dict[MarketId, list[Position]]:
     for market, code in sorted({(h.market, h.code) for h in repo.all() if h.market}):
         rows = repo.by_symbol(market, code)
         s = summarize(rows, [], set())
-        out.setdefault(market, []).append(
-            Position(code, rows[0].name, Decimal(s["total"]), s["cost"])
-        )
+        cost = s["cost"] if s["unpriced_quantity"] == "0" else None
+        out.setdefault(market, []).append(Position(code, rows[0].name, Decimal(s["total"]), cost))
     return out
 
 
@@ -97,7 +98,10 @@ class DailyRepo:
         *,
         backfilled: bool,
     ) -> None:
-        """없으면 넣고, 있으면 빈 값만 채운다. 이미 기록한 값과 `backfilled`는 바꾸지 않는다."""
+        """없으면 넣고, 있으면 빈 값만 채운다. 이미 기록한 값은 바꾸지 않는다.
+
+        지난 행의 금액을 나중에 채우면 그때 수량을 쓴 것이므로 `backfilled`를 켠다(환율은 무관).
+        """
         with self._conn:
             self._conn.execute(
                 f"INSERT INTO portfolio_daily ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?) "  # noqa: S608
@@ -106,7 +110,13 @@ class DailyRepo:
                 "kr_cost = COALESCE(kr_cost, excluded.kr_cost), "
                 "us_value = COALESCE(us_value, excluded.us_value), "
                 "us_cost = COALESCE(us_cost, excluded.us_cost), "
-                "usdkrw = COALESCE(usdkrw, excluded.usdkrw)",
+                "usdkrw = COALESCE(usdkrw, excluded.usdkrw), "
+                "backfilled = CASE WHEN excluded.backfilled = 1 AND ("
+                "(kr_value IS NULL AND excluded.kr_value IS NOT NULL) "
+                "OR (kr_cost IS NULL AND excluded.kr_cost IS NOT NULL) "
+                "OR (us_value IS NULL AND excluded.us_value IS NOT NULL) "
+                "OR (us_cost IS NULL AND excluded.us_cost IS NOT NULL)"
+                ") THEN 1 ELSE backfilled END",
                 (
                     day.isoformat(),
                     kr_value,
@@ -118,8 +128,11 @@ class DailyRepo:
                 ),
             )
 
-    def last_day(self) -> date | None:
-        r = self._conn.execute("SELECT max(day) FROM portfolio_daily").fetchone()
+    def last_day(self, today: date) -> date | None:
+        """마지막 기록 날짜. 시계가 틀렸을 때 생긴 미래 행은 없는 것으로 본다."""
+        r = self._conn.execute(
+            "SELECT max(day) FROM portfolio_daily WHERE day <= ?", (today.isoformat(),)
+        ).fetchone()
         return date.fromisoformat(r[0]) if r and r[0] else None
 
     def has_before(self, day: date) -> bool:
@@ -128,12 +141,12 @@ class DailyRepo:
         ).fetchone()
         return r is not None
 
-    def incomplete(self, since: date) -> list[date]:
+    def incomplete(self, since: date, until: date) -> list[date]:
         """다시 받아야 할 값이 남은 날."""
         rows = self._conn.execute(
-            "SELECT day FROM portfolio_daily WHERE day >= ? AND (kr_value IS NULL "
+            "SELECT day FROM portfolio_daily WHERE day >= ? AND day <= ? AND (kr_value IS NULL "
             "OR us_value IS NULL OR (us_value != 0 AND usdkrw IS NULL)) ORDER BY day",
-            (since.isoformat(),),
+            (since.isoformat(), until.isoformat()),
         )
         return [date.fromisoformat(r[0]) for r in rows]
 
@@ -220,8 +233,8 @@ def _section(
         "change_krw": total,
         "change_pct": total / worth * 100 if total is not None and worth else None,
         "currencies": currencies,
-        "top": ranked[-1][2] if ranked else None,
-        "bottom": ranked[0][2] if len(ranked) > 1 else None,
+        "top": ranked[-1][2] if ranked and ranked[-1][0] > 0 else None,  # 수익 난 종목 중 최대
+        "bottom": ranked[0][2] if ranked and ranked[0][0] < 0 else None,  # 손실 난 종목 중 최대
     }
 
 
@@ -319,8 +332,9 @@ class DailyRecorder:
 
     async def _refresh_closes(
         self, positions: dict[MarketId, list[Position]], through: dict[MarketId, date | None]
-    ) -> None:
-        """종목 하나의 실패는 그 종목에서 끝난다. 키가 없으면 다음에 키가 생긴 뒤에 채운다."""
+    ) -> set[tuple[str, str]]:
+        """한 종목의 실패는 그 종목에서 끝난다. 실패한 종목을 돌려준다. 키가 없으면 올린다."""
+        failed: set[tuple[str, str]] = set()
         for market, rows in positions.items():
             last = through[market]
             if last is None:
@@ -332,6 +346,8 @@ class DailyRecorder:
                     if isinstance(e, VaterError) and e.code == "KIS_NOT_CONFIGURED":
                         raise
                     logger.warning("daily: close failed: %s %s", market, type(e).__name__)
+                    failed.add((market, p.code))
+        return failed
 
     async def _rates(self, days: Iterable[date]) -> dict[date, float]:
         """하루 한 시점만 쓴다. 저장된 날은 다시 받지 않는다."""
@@ -358,26 +374,45 @@ class DailyRecorder:
             missing = [d for d in missing if d > end]
         return rates
 
-    def _value(self, market: MarketId, rows: list[Position], session: date | None) -> float | None:
+    def _value(
+        self,
+        market: MarketId,
+        rows: list[Position],
+        session: date | None,
+        failed: set[tuple[str, str]],
+    ) -> float | None:
         if session is None:
             return None
         bars, total = BarRepo(self._db), Decimal(0)
         for p in rows:
             close = bars.close_on(market, p.code, session)
             if close is None or close <= 0:
+                # 못 받았으면 지난 값으로 메우지 않고 다시 받는다. 봉이 없으면 거래정지다
+                close = (
+                    None
+                    if (market, p.code) in failed
+                    else bars.recent_close(market, p.code, session, HALT_DAYS)
+                )
+            if close is None:
                 return None
             total += p.quantity * Decimal(str(close))
         return float(total)
 
     async def _market(
-        self, market: MarketId, rows: list[Position], day: date, new: bool
+        self,
+        market: MarketId,
+        rows: list[Position],
+        day: date,
+        new: bool,
+        failed: set[tuple[str, str]],
     ) -> tuple[float | None, float | None]:
         """(평가금액, 매입금액). 보유가 없으면 0이다. 다시 시도하는 지난 행에는 0을 넣지 않는다."""
         if not rows:
             return (0.0, 0.0) if new else (None, None)
-        costs = [p.cost for p in rows if p.cost is not None]
-        value = self._value(market, rows, await self._session_at(market, day))
-        return value, sum(costs) if costs else None
+        value = self._value(market, rows, await self._session_at(market, day), failed)
+        # 평단가를 모르는 수량이 있으면 매입금액을 말하지 않는다. 없는 수익이 보이면 안 된다
+        costs = [p.cost for p in rows]
+        return value, None if None in costs else sum(c for c in costs if c is not None)
 
     # ---- 기록 ---------------------------------------------------------------
 
@@ -385,11 +420,11 @@ class DailyRecorder:
         repo = DailyRepo(self._db)
         now = self._now().astimezone(KST)
         today = now.date()
-        last = repo.last_day()
+        last = repo.last_day(today)
         new_days = await self._new_days(last, now)
         retry_since = today - timedelta(days=RETRY_DAYS)
         retry_due = self._retry_at is None or now >= self._retry_at
-        retry_days = repo.incomplete(retry_since) if retry_due else []
+        retry_days = repo.incomplete(retry_since, today) if retry_due else []
         if not new_days and not retry_days:
             return
         if new_days:
@@ -404,15 +439,15 @@ class DailyRecorder:
         for market in positions:
             sessions = [await self._session_at(market, d) for d in days]
             through[market] = max((s for s in sessions if s), default=None)
-        await self._refresh_closes(positions, through)
+        failed = await self._refresh_closes(positions, through)
         rates = await self._rates(days) if "US" in positions else {}
 
         for day in days:
             new = day in new_days
-            kr, kr_cost = await self._market("KR", positions.get("KR", []), day, new)
-            us, us_cost = await self._market("US", positions.get("US", []), day, new)
-            repo.fill(day, kr, kr_cost, us, us_cost, rates.get(day), backfilled=new and day < today)
-        self._retry_at = now + RETRY if repo.incomplete(retry_since) else None
+            kr, kr_cost = await self._market("KR", positions.get("KR", []), day, new, failed)
+            us, us_cost = await self._market("US", positions.get("US", []), day, new, failed)
+            repo.fill(day, kr, kr_cost, us, us_cost, rates.get(day), backfilled=day < today)
+        self._retry_at = now + RETRY if repo.incomplete(retry_since, today) else None
 
     # ---- 브리핑 -------------------------------------------------------------
 
