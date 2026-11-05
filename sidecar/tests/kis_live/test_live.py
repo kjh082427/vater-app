@@ -15,6 +15,9 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
+from vater_core.api.errors import VaterError
+from vater_core.brokers.base import BrokerContext, BrokerCreds
+from vater_core.brokers.kis import KisAdapter
 from vater_core.kis.auth import TokenManager
 from vater_core.kis.client import KisClient
 from vater_core.kis.config import KisServer, load_credentials
@@ -170,3 +173,26 @@ async def test_index_board_live(live: tuple[KisClient, TokenManager]) -> None:
         print(r.code, r.value, r.change_pct, len(r.closes), r.closes[-1:] if r.closes else None)
         assert r.value is not None and r.change is not None
         assert len(r.closes) >= 20
+
+
+async def test_holdings_counts_only(live: tuple[KisClient, TokenManager]) -> None:
+    """실제 계좌의 보유 조회. 값은 출력하지 않고 개수만 본다. 조회만 하며 주문하지 않는다."""
+    c, _ = live
+    account = EnvFileSecretStore(ROOT_ENV).get("KIS_TEST_ACCOUNT")
+    if not account:
+        pytest.skip("KIS_TEST_ACCOUNT is not in the root .env")
+    ctx = BrokerContext(
+        BrokerCreds(0, "", "", account),
+        DevStore(),  # type: ignore[arg-type]
+        lambda base, allowed: pytest.fail("KIS does not use ReadOnlyHttp"),
+        kis=c,
+    )
+    adapter = KisAdapter(ctx)
+    try:
+        await adapter.test()
+        rows = await adapter.holdings()
+    except VaterError as e:  # 트레이스백에는 요청 값(계좌번호)이 나온다. 코드만 보여 준다
+        pytest.fail(e.code, pytrace=False)
+    markets = {m: sum(1 for r in rows if r.market == m) for m in ("KR", "US", None)}
+    print(f"\nholdings: {len(rows)} rows, by market {markets}")
+    assert all(r.quantity >= 0 for r in rows)

@@ -5,6 +5,7 @@
 
 import asyncio
 import contextlib
+import hashlib
 import logging
 import re
 import time
@@ -20,6 +21,7 @@ from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
 from vater_core.brokers.base import ADAPTERS, BrokerContext, BrokerCreds
 from vater_core.brokers.readonly import ReadOnlyHttp
+from vater_core.kis.services import require_kis
 from vater_core.secrets.names import BrokerSecretField, SecretName, broker_secret
 from vater_core.secrets.store import SecretStore
 from vater_core.store.holdings import (
@@ -34,7 +36,7 @@ from vater_core.store.settings import SettingsRepo
 
 logger = logging.getLogger(__name__)
 
-AUTH_ERRORS = {"BROKER_AUTH_INVALID"}
+AUTH_ERRORS = {"BROKER_AUTH_INVALID", "KIS_AUTH_INVALID"}
 TICK_SEC = 60.0
 _FIELDS: tuple[BrokerSecretField, ...] = ("APP_KEY", "APP_SECRET", "ACCOUNT", "TOKEN")
 _MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
@@ -42,6 +44,11 @@ _MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
 
 def _digits(account: str | None) -> str:
     return re.sub(r"\D", "", account or "")
+
+
+def _key_hint(app_key: str | None) -> str:
+    """계좌번호를 받지 않는 증권사의 연결 구분. 해시 앞부분이라 키를 되돌릴 수 없다."""
+    return f"키 {hashlib.sha256(app_key.encode()).hexdigest()[:4]}" if app_key else ""
 
 
 def mask_account(account: str | None) -> str:
@@ -59,6 +66,15 @@ def _unknown_broker(broker_id: str) -> VaterError:
         f"연결할 수 없는 증권사입니다: {broker_id}",
         "API로 연결되는 증권사는 한국투자, 키움, 메리츠입니다. 그 밖에는 직접 입력해 주세요.",
         status=422,
+    )
+
+
+def _server_mismatch() -> VaterError:
+    return VaterError(
+        "BROKER_SERVER_MISMATCH",
+        "이 한투 연결은 다른 서버(실전·모의)에서 만든 연결입니다.",
+        "서버 설정을 되돌리거나 연결을 해제한 뒤 다시 연결해 주세요.",
+        status=409,
     )
 
 
@@ -145,7 +161,11 @@ class HoldingsService:
     def _context(self, conn: Connection) -> BrokerContext:
         s = self._secrets
         account = s.get(broker_secret(conn.id, "ACCOUNT"))
+        kis = None
         if conn.broker_id == "kis":
+            kis = require_kis(self._deps)
+            if conn.server != kis.server.value:  # 실계좌번호를 모의 서버로 보내지 않는다
+                raise _server_mismatch()
             key, secret = s.get(SecretName.KIS_APP_KEY), s.get(SecretName.KIS_APP_SECRET)
         else:
             key = s.get(broker_secret(conn.id, "APP_KEY"))
@@ -162,6 +182,7 @@ class HoldingsService:
             BrokerCreds(conn.id, key, secret, account),
             s,
             lambda base, allowed: ReadOnlyHttp(http, base, allowed),
+            kis=kis.client if kis else None,
         )
 
     def _forget_secrets(self, conn_id: int) -> None:
@@ -172,10 +193,13 @@ class HoldingsService:
 
     def _same_account(self, conn: Connection, digits: str, app_key: str | None) -> bool:
         s = self._secrets
+        stored_key = s.get(broker_secret(conn.id, "APP_KEY"))
+        if app_key and stored_key == app_key:  # 키움·메리츠의 키는 계좌에 묶인다
+            return True
         stored = _digits(s.get(broker_secret(conn.id, "ACCOUNT")))
         if stored and digits:  # 뒷자리만 같은 다른 계좌를 막지 않도록 저장된 번호로 비교한다
             return stored == digits
-        return s.get(broker_secret(conn.id, "APP_KEY")) == app_key
+        return stored_key == app_key
 
     async def connect(
         self,
@@ -208,6 +232,7 @@ class HoldingsService:
         if broker is None or broker.kind != "api" or factory is None:
             raise _unknown_broker(broker_id)
         is_kis = broker_id == "kis"
+        server = require_kis(self._deps).server.value if is_kis else None
         if not is_kis and not (app_key and app_secret):
             raise VaterError("HOLDING_INVALID", "앱키와 시크릿을 입력해 주세요.", status=422)
         old = self.repo.connection(replaces) if replaces is not None else None
@@ -228,7 +253,16 @@ class HoldingsService:
                 "다른 키로 연결하려면 먼저 연결을 해제해 주세요.",
                 status=409,
             )
-        conn = self.repo.add_connection(broker_id, mask_account(account))
+        if is_kis and any(
+            c.broker_id == "kis"
+            and c.status != "disconnected"
+            and c.id != replaces
+            and c.server != server
+            for c in self.repo.connections()
+        ):  # 실전과 모의 수량을 한 합계에 섞지 않는다
+            raise _server_mismatch()
+        label = mask_account(account) or _key_hint(key)
+        conn = self.repo.add_connection(broker_id, label, server)
         try:
             s = self._secrets
             if account:
@@ -350,12 +384,16 @@ class HoldingsService:
             return SyncResult(conn.id, conn.broker_id, False, err)
         return SyncResult(conn.id, conn.broker_id, True)
 
-    async def sync(self, broker_id: str | None = None) -> list[SyncResult]:
+    async def sync(
+        self, broker_id: str | None = None, *, skip_lost: bool = False
+    ) -> list[SyncResult]:
+        """`skip_lost`는 자동 조회용이다. 끊긴 연결은 사용자가 고칠 때까지 부르지 않는다."""
         async with self._lock:
+            skipped = {"disconnected", "lost"} if skip_lost else {"disconnected"}
             targets = [
                 c
                 for c in self.repo.connections()
-                if c.status != "disconnected" and (broker_id is None or c.broker_id == broker_id)
+                if c.status not in skipped and (broker_id is None or c.broker_id == broker_id)
             ]
             results = list(await asyncio.gather(*(self._sync_one(c) for c in targets)))
         if results:
@@ -380,11 +418,11 @@ class HoldingsService:
         if self._last_periodic is not None and now - self._last_periodic < minutes * 60:
             return
         self._last_periodic = now
-        await self.sync()
+        await self.sync(skip_lost=True)
 
     async def _run(self) -> None:
         try:
-            await self.sync()  # 앱 시작 때 한 번
+            await self.sync(skip_lost=True)  # 앱 시작 때 한 번
         except Exception:
             logger.exception("holdings startup sync failed")
         while True:

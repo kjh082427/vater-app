@@ -17,6 +17,7 @@ from vater_core.holdings import service as holdings_service
 from vater_core.secrets.names import SecretName, broker_secret
 from vater_core.store.db import open_db
 from vater_core.store.holdings import HoldingRow, HoldingsRepo
+from vater_core.store.settings import SettingsRepo
 
 KRW = "KRW"
 
@@ -68,12 +69,13 @@ async def connect(
     broker: str = "kiwoom",
     account: str | None = "81234567",
     replaces: int | None = None,
+    app_key: str = "key-a",
 ) -> Any:
     r = await c.post(
         "/connections",
         json={
             "broker_id": broker,
-            "app_key": "key-a",
+            "app_key": app_key,
             "app_secret": "sec-b",
             "account": account,
             "replaces": replaces,
@@ -246,7 +248,7 @@ async def test_two_accounts_of_a_broker_merge_into_one_entry(
     client: httpx.AsyncClient, fakes: dict[str, Fake]
 ) -> None:
     await connect(client, "kiwoom", "11110000")
-    await connect(client, "kiwoom", "22220000")
+    await connect(client, "kiwoom", "22220000", app_key="key-c")  # 키움 키는 계좌마다 따로다
     fakes["kiwoom"].rows = [sam("2", "100")]
     await client.post("/holdings/sync", json={})
     got = (await client.get("/holdings/symbol/KR/005930")).json()
@@ -354,7 +356,7 @@ async def test_periodic_sync_only_when_enabled_and_market_open(
     clock = _Clock()
     service = HoldingsService(deps, is_market_open=lambda: is_open["v"], monotonic=clock)
 
-    async def fake_sync(broker_id: str | None = None) -> list[Any]:
+    async def fake_sync(broker_id: str | None = None, **_: Any) -> list[Any]:
         calls.append(broker_id)
         return []
 
@@ -575,7 +577,7 @@ async def test_startup_sync_failure_keeps_the_periodic_loop_alive(
     service = holdings_service.HoldingsService(deps)
     ticked = asyncio.Event()
 
-    async def boom(broker_id: str | None = None) -> list[Any]:
+    async def boom(broker_id: str | None = None, **_: Any) -> list[Any]:
         raise RuntimeError("db locked")
 
     async def tick() -> None:
@@ -835,3 +837,104 @@ async def test_delete_broker_data_refused_while_connected_but_clears_a_lost_one(
 def test_account_mask_uses_digits_only() -> None:
     assert holdings_service.mask_account("12 34 56 78") == "****5678"
     assert holdings_service.mask_account("   ") == ""
+
+
+async def test_rejected_kis_key_marks_the_connection_lost(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    assert deps.secrets is not None
+    deps.secrets.set(SecretName.KIS_APP_KEY, "kis-key")
+    deps.secrets.set(SecretName.KIS_APP_SECRET, "kis-secret")
+    await connect(client, "kis", "1234567801")
+    fakes["kis"].sync_error = VaterError("KIS_AUTH_INVALID", "인증 실패", status=401)
+    await client.post("/holdings/sync", json={})
+    assert (await client.get("/connections")).json()[0]["status"] == "lost"
+
+
+def _kis_keys(deps: AppDeps) -> None:
+    assert deps.secrets is not None
+    deps.secrets.set(SecretName.KIS_APP_KEY, "kis-key")
+    deps.secrets.set(SecretName.KIS_APP_SECRET, "kis-secret")
+
+
+async def test_kis_needs_its_keys_first(client: httpx.AsyncClient, fakes: dict[str, Fake]) -> None:
+    r = await client.post("/connections", json={"broker_id": "kis", "account": "1234567801"})
+    assert r.status_code == 409 and r.json()["code"] == "KIS_NOT_CONFIGURED"
+
+
+async def test_sync_skips_a_kis_connection_made_on_the_other_server(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    _kis_keys(deps)
+    assert deps.db is not None
+    conn = await connect(client, "kis", "1234567801")
+    assert conn["server"] == "prod"
+    fakes["kis"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    SettingsRepo(deps.db).update({"kis.server": "vps"})
+    fakes["kis"].rows = []  # 모의 서버의 빈 응답이 실제 보유를 지우면 안 된다
+    r = (await client.post("/holdings/sync", json={})).json()[0]
+    assert r["ok"] is False and r["error"]["code"] == "BROKER_SERVER_MISMATCH"
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+    assert (await client.get("/connections")).json()[0]["status"] == "ok"
+
+
+async def test_real_and_mock_kis_connections_cannot_be_mixed(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    _kis_keys(deps)
+    assert deps.db is not None
+    first = await connect(client, "kis", "1234567801")
+    SettingsRepo(deps.db).update({"kis.server": "vps"})
+    body = {"broker_id": "kis", "account": "5000000001"}
+    r = await client.post("/connections", json=body)
+    assert r.status_code == 409 and r.json()["code"] == "BROKER_SERVER_MISMATCH"
+    await client.delete(f"/connections/{first['id']}", params={"delete_data": "true"})
+    assert (await client.post("/connections", json=body)).status_code == 201
+
+
+async def test_periodic_and_startup_syncs_leave_lost_connections_alone(
+    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
+) -> None:
+    """끊긴 연결을 자동으로 계속 부르면 한투는 부를 때마다 토큰을 새로 발급한다."""
+    await connect(client)
+    fakes["kiwoom"].sync_error = AUTH
+    await client.post("/holdings/sync", json={})
+    made = len(fakes["kiwoom"].contexts)
+    assert await holdings_service.get_holdings(deps).sync(skip_lost=True) == []
+    assert len(fakes["kiwoom"].contexts) == made
+    assert len((await client.post("/holdings/sync", json={})).json()) == 1  # [새로 고침]은 시도한다
+
+
+async def test_negative_quantity_fails_instead_of_counting_as_sold(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    fakes["kiwoom"].rows = [sam("-1")]
+    r = (await client.post("/holdings/sync", json={})).json()[0]
+    assert r["error"]["code"] == "BROKER_RESPONSE_INVALID"
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+
+
+async def test_same_key_with_another_account_number_is_a_duplicate(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    await connect(client, account="11111111")
+    r = await client.post(
+        "/connections",
+        json={"broker_id": "kiwoom", "app_key": "key-a", "app_secret": "s", "account": "22222222"},
+    )
+    assert r.status_code == 409 and r.json()["code"] == "BROKER_DUPLICATE"
+
+
+async def test_connection_without_an_account_shows_a_key_hint(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    first = await connect(client, account=None)
+    assert first["account_mask"].startswith("키 ") and "key-a" not in first["account_mask"]
+    r = await client.post(
+        "/connections", json={"broker_id": "kiwoom", "app_key": "key-b", "app_secret": "s"}
+    )
+    assert r.json()["account_mask"] != first["account_mask"]

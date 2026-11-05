@@ -352,3 +352,22 @@ async def test_rows_arriving_with_a_no_data_code_are_kept(secrets: SecretStore) 
     async with httpx.AsyncClient() as http:
         rows = await adapter(http, secrets).holdings()
     assert [r.code for r in rows] == ["005930"]
+
+
+@respx.mock
+async def test_codes_are_cleaned_and_blank_codes_fail(secrets: SecretStore) -> None:
+    routes(ok([kr_row("A005930 ")]), ok([{**us_row(), "ovrs_stck_symb_iscd": " AAPL "}]))
+    async with httpx.AsyncClient() as http:
+        rows = await adapter(http, secrets).holdings()
+    assert [r.code for r in rows] == ["005930", "AAPL"]
+
+
+@respx.mock
+async def test_blank_code_fails(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.get(KR_URL).mock(return_value=httpx.Response(200, json=ok([kr_row("  ")])))
+    respx.get(US_URL).mock(return_value=httpx.Response(200, json=EMPTY))
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"

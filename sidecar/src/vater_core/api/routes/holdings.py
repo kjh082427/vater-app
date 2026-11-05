@@ -46,6 +46,7 @@ class ConnectionOut(BaseModel):
     status: Literal["ok", "lost", "disconnected"]
     last_synced_at: str | None
     last_error: str | None
+    server: str | None
 
 
 class ConnectionCreate(BaseModel):

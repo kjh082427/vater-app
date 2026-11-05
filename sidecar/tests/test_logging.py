@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from vater_core.api.errors import VaterError
 from vater_core.logging_setup import refresh_secret_cache, setup_logging
 from vater_core.secrets.names import broker_secret
 from vater_core.secrets.store import EnvFileSecretStore
@@ -110,3 +111,11 @@ def test_saved_key_is_masked_without_waiting_for_the_cache(tmp_path: Path) -> No
     store.set(broker_secret(1, "TOKEN"), "fresh-token-value")
     logging.getLogger("x").info("got fresh-token-value")
     assert "fresh-token-value" not in read_log(tmp_path)
+
+
+def test_error_messages_sent_to_the_ui_are_masked(tmp_path: Path) -> None:
+    """증권사가 오류 문구에 키를 되풀이해도 화면으로 나가지 않는다."""
+    setup_logging(tmp_path, lambda: ["super-secret-key"])
+    error = VaterError("X", "거부: super-secret-key", "힌트 super-secret-key")
+    assert "super-secret-key" not in error.message
+    assert error.hint is not None and "super-secret-key" not in error.hint

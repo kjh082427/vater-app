@@ -41,6 +41,7 @@ class Connection:
     status: ConnStatus
     last_synced_at: str | None
     last_error: str | None
+    server: str | None = None  # 한투 연결의 실전(prod)·모의(vps)
 
 
 @dataclass(frozen=True)
@@ -106,7 +107,9 @@ def clean_rows(rows: Iterable[HoldingRow]) -> list[HoldingRow]:
     for row in rows:
         if not row.quantity.is_finite() or not (row.avg_price or Decimal(0)).is_finite():
             raise bad_broker_response()
-        if row.quantity <= 0:  # 전량 매도 직후의 행
+        if row.quantity < 0:
+            raise bad_broker_response()
+        if row.quantity == 0:  # 전량 매도 직후의 행
             continue
         clean = replace(
             row,
@@ -164,7 +167,7 @@ class HoldingsRepo:
 
     def connections(self) -> list[Connection]:
         rows = self._conn.execute(
-            "SELECT id, broker_id, account_mask, status, last_synced_at, last_error "
+            "SELECT id, broker_id, account_mask, status, last_synced_at, last_error, server "
             "FROM connections ORDER BY id"
         )
         return [Connection(*r) for r in rows]
@@ -172,13 +175,17 @@ class HoldingsRepo:
     def connection(self, conn_id: int) -> Connection | None:
         return next((c for c in self.connections() if c.id == conn_id), None)
 
-    def add_connection(self, broker_id: str, account_mask: str) -> Connection:
+    def add_connection(
+        self, broker_id: str, account_mask: str, server: str | None = None
+    ) -> Connection:
         with self._conn:
             cur = self._conn.execute(
-                "INSERT INTO connections (broker_id, account_mask) VALUES (?, ?)",
-                (broker_id, account_mask),
+                "INSERT INTO connections (broker_id, account_mask, server) VALUES (?, ?, ?)",
+                (broker_id, account_mask, server),
             )
-        return Connection(int(cur.lastrowid or 0), broker_id, account_mask, "ok", None, None)
+        return Connection(
+            int(cur.lastrowid or 0), broker_id, account_mask, "ok", None, None, server
+        )
 
     def set_status(self, conn_id: int, status: ConnStatus, error: str | None = None) -> None:
         with self._conn:

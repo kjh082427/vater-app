@@ -3,9 +3,13 @@
 import re
 from pathlib import Path
 
-ORDER_TR_ID = re.compile(r"\b[TV]TT[A-Z]\d{4}U\b")  # 한투 주문·정정·취소 TR ID (끝자리 U)
-ORDER_PATH = re.compile(r"/trading/order")  # 국내·해외 주문 엔드포인트 경로
-KIWOOM_ORDER = re.compile(r"/api/dostk/ordr|\bkt1000[0-9]\b|\bkt5\d{4}\b")  # 키움 주문 경로·TR
+ORDER_TR_ID = re.compile(r"\b[A-Z]{4}\d{4}U\b")  # 한투 주문·정정·취소 TR ID (끝자리 U)
+ORDER_PATH = re.compile(r"/trading/[\w-]*(order|rsvn)")  # 주문·주간주문·예약주문 경로
+# 키움 주문·신용주문·금현물·미국 주문 경로와 TR (공식 명세 kiwoom_api_spec.json으로 확인)
+KIWOOM_ORDER = re.compile(
+    r"/api/dostk/(crd)?ordr|/api/us/(ordr|exchange)|\bkt1000[0-9]\b|\bkt5000[0-3]\b"
+    r"|\bust2000[0-3]\b|\bust31490\b|\bust3130[0-2]\b"
+)
 # 메리츠 주문·예약주문·해외 주문·환전 경로와 TR (공식 카탈로그로 확인)
 MERITZ_ORDER = re.compile(
     r"/trading/v1/|/forex/v1/exchanges|\bobtr[so]_oder_\d{3}a\b|\bobtsd_fbnk_\d{3}a\b"
@@ -34,7 +38,9 @@ def test_no_order_api_in_source() -> None:
 
 
 def test_guard_patterns_catch_known_order_ids() -> None:
-    for s in ["TTTC0802U", "VTTC0801U", "TTTC0012U", "TTTT1002U", "TTTS1002U",
+    for s in ["TTTC0802U", "VTTC0801U", "TTTC0012U", "TTTT1002U", "TTTS1002U", "CTSC0008U",
+              "/uapi/overseas-stock/v1/trading/daytime-order",
+              "/uapi/overseas-stock/v1/trading/order-resv",
               "/uapi/domestic-stock/v1/trading/order-cash",
               "/uapi/overseas-stock/v1/trading/order-rvsecncl"]:  # fmt: skip
         assert ORDER_TR_ID.search(s) or ORDER_PATH.search(s), s
@@ -43,9 +49,17 @@ def test_guard_patterns_catch_known_order_ids() -> None:
 
 
 def test_guard_catches_kiwoom_order_ids(tmp_path: Path) -> None:
-    (tmp_path / "a.py").write_text('API = "kt10000"\nPATH = "/api/dostk/ordr"\n', encoding="utf-8")
-    (tmp_path / "b.py").write_text('API = "kt00018"\nPATH = "/api/dostk/acnt"\n', encoding="utf-8")
-    assert find_order_references(tmp_path) == ["a.py:1", "a.py:2"]
+    (tmp_path / "a.py").write_text(
+        'API = "kt10000"\nPATH = "/api/dostk/ordr"\nC = "/api/dostk/crdordr"\nK = "kt10009"\n'
+        'G = "kt50003"\nU = "/api/us/ordr"\nV = "ust20001"\nW = "ust31490"\n'
+        'X = "/api/us/exchange"\nY = "ust31302"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text(
+        'API = "kt00018"\nPATH = "/api/dostk/acnt"\nU = "/api/us/acnt"\nV = "ust21070"\n',
+        encoding="utf-8",
+    )
+    assert find_order_references(tmp_path) == [f"a.py:{i}" for i in range(1, 11)]
 
 
 def test_guard_scans_non_python_files(tmp_path: Path) -> None:

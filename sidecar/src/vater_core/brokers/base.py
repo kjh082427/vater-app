@@ -2,11 +2,34 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from decimal import Decimal, InvalidOperation
+from typing import Any, Protocol
 
 from vater_core.brokers.readonly import ReadOnlyHttp
+from vater_core.kis.config import KisServer, Priority
 from vater_core.secrets.store import SecretStore
-from vater_core.store.holdings import HoldingRow
+from vater_core.store.holdings import HoldingRow, bad_broker_response
+
+
+def number(raw: Any) -> Decimal:
+    """증권사 응답의 수량. 읽지 못하면 저장하지 않도록 실패한다."""
+    try:
+        return Decimal(str(raw))
+    except InvalidOperation:
+        raise bad_broker_response() from None
+
+
+def stock_code(raw: Any) -> str:
+    """증권사 응답의 종목코드. 비어 있으면 저장하지 않도록 실패한다."""
+    code = str(raw or "").strip()
+    if not code:
+        raise bad_broker_response()
+    return code
+
+
+def average(raw: Any) -> Decimal | None:
+    """증권사 응답의 평단가. 비어 있으면 모르는 값이다."""
+    return number(raw) if raw not in (None, "") else None
 
 
 @dataclass(frozen=True)
@@ -17,11 +40,22 @@ class BrokerCreds:
     account: str | None = field(repr=False)
 
 
+class KisReader(Protocol):
+    """한투 어댑터가 보는 `KisClient`의 전부. GET뿐이라 주문이 나갈 수 없다."""
+
+    server: KisServer
+
+    async def get_page(
+        self, path: str, tr_id: str, params: dict[str, str], priority: Priority, tr_cont: str
+    ) -> tuple[dict[str, Any], str]: ...
+
+
 @dataclass(frozen=True)
 class BrokerContext:
     creds: BrokerCreds
     secrets: SecretStore  # 토큰 캐시(`BROKER_{id}_TOKEN`)
     make_http: Callable[[str, frozenset[tuple[str, str]]], ReadOnlyHttp]
+    kis: KisReader | None = None  # 한투 연결에만 있다
 
 
 class BrokerAdapter(Protocol):

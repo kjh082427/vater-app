@@ -8,11 +8,10 @@
 
 import asyncio
 import uuid
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from vater_core.api.errors import VaterError
-from vater_core.brokers.base import ADAPTERS, BrokerContext
+from vater_core.brokers.base import ADAPTERS, BrokerContext, average, number, stock_code
 from vater_core.secrets.names import broker_secret
 from vater_core.store.holdings import HoldingRow, bad_broker_response
 
@@ -100,19 +99,9 @@ def _check_error(status: int, body: dict[str, Any] | None) -> None:
     raise bad_broker_response()
 
 
-def _number(raw: Any) -> Decimal:
-    try:
-        return Decimal(str(raw))
-    except InvalidOperation:
-        raise bad_broker_response() from None
-
-
-def _average(raw: Any) -> Decimal | None:
-    return _number(raw) if raw not in (None, "") else None
-
-
-def _kr_code(code: str) -> str:
+def _kr_code(raw: Any) -> str:
     """접두어 1자리 + 코드 6자리."""
+    code = stock_code(raw)
     return code[1:] if len(code) == 7 and code[0].isalpha() else code
 
 
@@ -197,24 +186,24 @@ class MeritzAdapter:
         rows = [
             HoldingRow(
                 "KR",
-                _kr_code(r["iscd"]),
-                r.get("isnm") or r["iscd"],
-                _number(r["rmnd_qty"]),
-                _average(r.get("byng_unpr")),
+                _kr_code(r.get("iscd")),
+                str(r.get("isnm") or r.get("iscd")),
+                number(r.get("rmnd_qty")),
+                average(r.get("byng_unpr")),
                 "KRW",
             )
             for r in domestic
         ]
         for r in overseas:
             currency = r.get("crcd") or ""
-            symbol = r.get("ovrs_stck_symb_iscd") or r["iscd"].split(".")[0]
+            symbol = stock_code(r.get("ovrs_stck_symb_iscd") or str(r.get("iscd")).split(".")[0])
             rows.append(
                 HoldingRow(
                     "US" if currency == "USD" else None,
                     symbol,
                     r.get("isnm") or symbol,
-                    _number(r["rmnd_dqty"]),
-                    _average(r.get("avrg_unpr")),
+                    number(r.get("rmnd_dqty")),
+                    average(r.get("avrg_unpr")),
                     currency,
                 )
             )
