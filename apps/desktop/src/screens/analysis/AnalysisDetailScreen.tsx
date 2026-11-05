@@ -58,6 +58,7 @@ function Progress({ detail, onChanged }: { detail: AnalysisDetail; onChanged: ()
         {unknownStage ? (
           <p className={styles.note}>단계 확인 중: 다음 진행 소식이 오면 바로 보입니다.</p>
         ) : null}
+        {progress.waiting ? <Banner tone="caution" title={progress.waiting} /> : null}
         <StageTimeline
           timings={progress.timings}
           current={progress.current}
@@ -95,6 +96,9 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
   const api = useApi();
   const retry = useAction();
   const failed = detail.status === 'failed';
+  const code = failed ? detail.error?.code : undefined;
+  const daily = code === 'LLM_DAILY_LIMIT'; // 오늘은 다시 해도 안 된다: 방식 바꾸기가 먼저
+  const badKey = code === 'LLM_KEY_INVALID'; // 다시 해도 안 된다: 설정에서 키를 고친다
 
   async function again() {
     const out = await retry.run(() =>
@@ -124,10 +128,19 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
         </p>
         {retry.error ? <ApiErrorNotice error={retry.error} /> : null}
         <div className={styles.actions}>
-          <Button variant="primary" busy={retry.busy} onClick={again}>
-            다시 시도
-          </Button>
-          <Button onClick={() => navigate(newAnalysisHref(detail))}>
+          {badKey ? (
+            <Button variant="primary" onClick={() => navigate({ name: 'settings' })}>
+              설정 열기
+            </Button>
+          ) : (
+            <Button variant={daily ? 'secondary' : 'primary'} busy={retry.busy} onClick={again}>
+              다시 시도
+            </Button>
+          )}
+          <Button
+            variant={daily ? 'primary' : 'secondary'}
+            onClick={() => navigate(newAnalysisHref(detail))}
+          >
             AI 사용 방식 바꿔 새로 분석
           </Button>
         </div>
