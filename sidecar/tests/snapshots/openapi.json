@@ -988,6 +988,17 @@
             ],
             "title": "Last Synced At"
           },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
           "status": {
             "enum": [
               "ok",
@@ -1004,7 +1015,8 @@
           "account_mask",
           "status",
           "last_synced_at",
-          "last_error"
+          "last_error",
+          "server"
         ],
         "title": "ConnectionOut",
         "type": "object"

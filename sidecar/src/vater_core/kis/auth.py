@@ -41,6 +41,10 @@ def _parse_kst(text: str) -> datetime:
 def _issue_error(status: int, body: dict[str, Any]) -> VaterError:
     code = str(body.get("error_code", ""))
     detail = str(body.get("error_description") or body.get("msg1") or f"HTTP {status}")
+    if status >= 500:  # 서버 장애를 키 문제로 알리지 않는다
+        return VaterError(
+            "KIS_UNREACHABLE", f"한국투자증권: {detail}", "잠시 후 다시 시도해 주세요.", 503
+        )
     if code == "EGW00133":  # 접근토큰 발급 1분당 1회
         return VaterError(
             "KIS_RATE_LIMITED", f"한국투자증권: {detail}", "1분 뒤 다시 시도해 주세요.", 429

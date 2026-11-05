@@ -6,11 +6,10 @@
 
 import asyncio
 import re
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from vater_core.api.errors import VaterError
-from vater_core.brokers.base import ADAPTERS, BrokerContext
+from vater_core.brokers.base import ADAPTERS, BrokerContext, average, number
 from vater_core.secrets.names import broker_secret
 from vater_core.store.holdings import HoldingRow, bad_broker_response
 
@@ -83,17 +82,6 @@ def _json(response: Any) -> Any:
         return None
 
 
-def _number(raw: Any) -> Decimal:
-    try:
-        return Decimal(str(raw))
-    except InvalidOperation:
-        raise bad_broker_response() from None
-
-
-def _average(raw: Any) -> Decimal | None:
-    return _number(raw) if raw not in (None, "") else None
-
-
 def _kr_code(code: str) -> str:
     """접두어 1자리 + 코드 6자리. 접두어는 A(주식), J(ELW), Q(ETN)다."""
     return code[1:] if len(code) == 7 and code[0] in "AJQ" else code
@@ -104,7 +92,7 @@ def _require_zero_total(body: dict[str, Any], field: str) -> None:
     if field not in body:
         raise bad_broker_response()
     raw = str(body[field]).strip()
-    if raw and _number(raw) != 0:
+    if raw and number(raw) != 0:
         raise bad_broker_response()
 
 
@@ -189,8 +177,8 @@ class KiwoomAdapter:
                 "KR",
                 _kr_code(r["stk_cd"]),
                 r.get("stk_nm") or r["stk_cd"],
-                _number(r["rmnd_qty"]),
-                _average(r.get("pur_pric")),
+                number(r["rmnd_qty"]),
+                average(r.get("pur_pric")),
                 "KRW",
             )
             for r in kr
@@ -202,8 +190,8 @@ class KiwoomAdapter:
                     "US" if currency == "USD" else None,
                     r["stk_cd"],
                     r.get("frgn_stk_nm") or r["stk_cd"],
-                    _number(r["poss_qty"]),
-                    _average(r.get("frgn_stk_book_uv")),
+                    number(r["poss_qty"]),
+                    average(r.get("frgn_stk_book_uv")),
                     currency,
                 )
             )

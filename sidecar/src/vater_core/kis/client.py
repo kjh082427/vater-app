@@ -62,6 +62,18 @@ class KisClient:
         priority: Priority = Priority.ALERTS,
         tr_cont: str = "",
     ) -> dict[str, Any]:
+        body, _ = await self.get_page(path, tr_id, params, priority, tr_cont)
+        return body
+
+    async def get_page(
+        self,
+        path: str,
+        tr_id: str,
+        params: dict[str, str],
+        priority: Priority = Priority.ALERTS,
+        tr_cont: str = "",
+    ) -> tuple[dict[str, Any], str]:
+        """응답 본문과 연속 조회 헤더(`F`·`M`이면 다음 쪽이 있다)."""
         retries = 0
         refreshed = False
         while True:
@@ -118,5 +130,5 @@ class KisClient:
                     401,
                 )
             if body.get("rt_cd") == "0":
-                return body
+                return body, r.headers.get("tr_cont", "")
             raise KisApiError(msg_cd, str(body.get("msg1") or f"HTTP {r.status_code}"))

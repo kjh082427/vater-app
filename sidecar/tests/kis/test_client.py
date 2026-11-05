@@ -59,6 +59,14 @@ async def test_sends_required_headers_and_params() -> None:
 
 
 @respx.mock
+async def test_get_page_also_returns_the_continuation_header() -> None:
+    respx.get(URL).mock(return_value=httpx.Response(200, headers={"tr_cont": "F"}, json=body(a=1)))
+    async with httpx.AsyncClient() as http:
+        got, more = await client(http, FakeTokens()).get_page(PATH, "TR", {}, tr_cont="N")
+    assert got["a"] == 1 and more == "F"
+
+
+@respx.mock
 async def test_business_error_maps_to_kis_api_error() -> None:
     respx.get(URL).mock(
         return_value=httpx.Response(200, json=body("1", "OPSQ2001", "종목코드 오류"))
