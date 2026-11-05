@@ -11,7 +11,7 @@ import {
 import { Feed, MissingValue, Price, StockName } from '../../screens/common/quotes';
 import { useShared } from '../shared';
 import { portfolioSummarySource, quotesSource, settingsSource } from '../sources';
-import { PanelEmpty, PanelError, styles } from './common';
+import { hasUnpriced, PanelEmpty, PanelError, styles, UNPRICED_NOTE } from './common';
 import { pick, type PanelProps } from './types';
 
 export const WATCH_MARKETS = ['all', 'KR', 'US'] as const;
@@ -155,6 +155,9 @@ export function WatchlistPanel({ options, size }: PanelProps) {
       />
       <div className={styles.foot}>
         <span className="vt-num">{`${rows.length}종목 · 상승 ${up} · 하락 ${down}`}</span>
+        {hasUnpriced(rows.flatMap((r) => (r.held ? [r.held] : []))) ? (
+          <span>{UNPRICED_NOTE}</span>
+        ) : null}
         <a href="#/alerts">+ 종목 추가</a>
       </div>
     </div>

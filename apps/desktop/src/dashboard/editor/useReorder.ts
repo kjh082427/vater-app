@@ -6,7 +6,8 @@
  * - 키보드: 손잡이에서 Space·Enter로 잡고, 방향키로 놓을 자리를 고르고, Space·Enter로 놓는다. Esc는 취소.
  * 놓을 수 없는 자리(`check`가 이유를 돌려줌)는 표시하고, 놓아도 바꾸지 않고 이유를 알린다.
  */
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { withObjectParticle } from '../../screens/common/text';
 
 const INTERACTIVE =
   'button, input, select, textarea, a, label, [role="button"], [role="combobox"], [role="listbox"], [role="option"], [role="switch"], [role="checkbox"], [role="radio"]';
@@ -20,8 +21,10 @@ export interface ReorderOptions {
   count: number;
   /** 알림에 쓰는 항목 이름. 예: "칸 1". */
   nameOf: (index: number) => string;
-  /** 놓은 뒤 알림 끝말. 예: "내용을 바꿨습니다." */
-  done: string;
+  /** 놓은 뒤 알림 끝말(맞바꾸기). 예: "내용을 바꿨습니다." */
+  done?: string;
+  /** 끼워 넣기: 옮긴 항목 뒤의 항목이 한 칸씩 밀린다. 알림은 "A를 C 자리로 옮겼습니다."로 한다. */
+  insert?: boolean;
   /** 이 자리에 놓을 수 없으면 이유. */
   check?: (from: number, to: number) => string | null;
   onDrop: (from: number, to: number) => void;
@@ -48,7 +51,8 @@ export function useReorder({
   group,
   count,
   nameOf,
-  done,
+  done = '내용을 바꿨습니다.',
+  insert = false,
   check,
   onDrop,
   announce,
@@ -57,6 +61,25 @@ export function useReorder({
   const press = useRef<{ from: number; x: number; y: number; moved: boolean } | null>(null);
 
   const reasonOf = (from: number, to: number) => (check ? check(from, to) : null);
+  const slot = insert ? '옮길 자리' : '바꿀 칸';
+  const slotObj = insert ? '옮길 자리를' : '바꿀 칸을';
+  const dragging = active !== null && !active.keyboard;
+
+  // 끄는 중 Esc는 끌기만 취소한다. 편집 화면의 Esc(취소)보다 먼저 받으려고 capture 단계에서 막는다.
+  useEffect(() => {
+    if (!dragging || !active) return;
+    const from = active.from;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      press.current = null;
+      setActive(null);
+      announce(`${nameOf(from)}: 취소했습니다.`);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  });
 
   function attempt(from: number, to: number) {
     const reason = reasonOf(from, to);
@@ -66,7 +89,11 @@ export function useReorder({
       return;
     }
     onDrop(from, to);
-    announce(`${pair} ${done}`);
+    announce(
+      insert
+        ? `${withObjectParticle(nameOf(from))} ${nameOf(to)} 자리로 옮겼습니다.`
+        : `${pair} ${done}`,
+    );
   }
 
   function onPointerDown(index: number, e: PointerEvent<HTMLElement>) {
@@ -81,6 +108,13 @@ export function useReorder({
   function onPointerMove(e: PointerEvent<HTMLElement>) {
     const p = press.current;
     if (!p) return;
+    if (e.buttons === 0) {
+      // 버튼을 이미 뗐는데 pointerup을 못 받았다(창 밖에서 놓음 등): 끌기를 끝낸다
+      press.current = null;
+      setActive(null);
+      if (p.moved) announce('');
+      return;
+    }
     if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) < THRESHOLD) return;
     p.moved = true;
     const hit = indexAt(group, e.clientX, e.clientY);
@@ -89,7 +123,7 @@ export function useReorder({
     if (over !== null) {
       const reason = reasonOf(p.from, over);
       announce(
-        reason ? `${nameOf(over)}에는 놓을 수 없습니다. ${reason}` : `바꿀 칸: ${nameOf(over)}`,
+        reason ? `${nameOf(over)}에는 놓을 수 없습니다. ${reason}` : `${slot}: ${nameOf(over)}`,
       );
     }
   }
@@ -99,9 +133,10 @@ export function useReorder({
     press.current = null;
     setActive(null);
     e.currentTarget.releasePointerCapture?.(e.pointerId);
-    if (!p || !p.moved || !drop) return;
-    const hit = indexAt(group, e.clientX, e.clientY);
+    if (!p || !p.moved) return;
+    const hit = drop ? indexAt(group, e.clientX, e.clientY) : null;
     if (hit !== null && hit !== p.from) attempt(p.from, hit);
+    else announce(''); // 빈 곳이나 제자리에 놓았다: 끄는 동안의 "바꿀 칸" 안내를 지운다
   }
 
   function onKeyDown(index: number, e: KeyboardEvent<HTMLElement>) {
@@ -112,7 +147,7 @@ export function useReorder({
       e.preventDefault();
       setActive({ from: index, over: null, keyboard: true, moved: true });
       announce(
-        `${nameOf(index)}: 잡았습니다. 방향키로 바꿀 칸을 고르고 Space로 놓으세요. Esc로 취소합니다.`,
+        `${nameOf(index)}: 잡았습니다. 방향키로 ${slotObj} 고르고 Space로 놓으세요. Esc로 취소합니다.`,
       );
       return;
     }
@@ -127,7 +162,7 @@ export function useReorder({
       setActive(null);
       if (grabbed.over !== null && grabbed.over !== grabbed.from)
         attempt(grabbed.from, grabbed.over);
-      else announce(`${nameOf(grabbed.from)}: 바꿀 칸을 고르지 않아 그대로 두었습니다.`);
+      else announce(`${nameOf(grabbed.from)}: ${slotObj} 고르지 않아 그대로 두었습니다.`);
       return;
     }
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
@@ -136,12 +171,12 @@ export function useReorder({
     const next = Math.min(Math.max((grabbed.over ?? grabbed.from) + step, 0), count - 1);
     setActive({ ...grabbed, over: next === grabbed.from ? null : next });
     if (next === grabbed.from) {
-      announce(`${nameOf(grabbed.from)}: 바꿀 칸을 고르세요.`);
+      announce(`${nameOf(grabbed.from)}: ${slotObj} 고르세요.`);
       return;
     }
     const reason = reasonOf(grabbed.from, next);
     announce(
-      reason ? `${nameOf(next)}에는 놓을 수 없습니다. ${reason}` : `바꿀 칸: ${nameOf(next)}`,
+      reason ? `${nameOf(next)}에는 놓을 수 없습니다. ${reason}` : `${slot}: ${nameOf(next)}`,
     );
   }
 

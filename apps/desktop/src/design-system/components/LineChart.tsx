@@ -192,10 +192,16 @@ export function LineChart({
       s.map((i, k) => `${k ? 'L' : 'M'}${r1(x(i))} ${r1(y(values[i] as number))}`).join(''),
     )
     .join('');
-  const secondaryD = (secondary ?? [])
-    .flatMap((v, i) => (isNum(v) ? [[i, v] as const] : []))
-    .map(([i, v], k) => `${k ? 'L' : 'M'}${r1(x(i))} ${r1(y(v))}`)
-    .join('');
+  // 두 번째 선도 null에서 끊는다(null 구간을 이어 그리면 없는 값이 있는 것처럼 보인다)
+  let secondaryD = '';
+  let open = false;
+  (secondary ?? []).forEach((v, i) => {
+    if (!isNum(v)) open = false;
+    else {
+      secondaryD += `${open ? 'L' : 'M'}${r1(x(i))} ${r1(y(v))}`;
+      open = true;
+    }
+  });
   const bottom = PAD_T + plotH;
   const areaD = lines
     .map((s) => {

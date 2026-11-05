@@ -129,17 +129,26 @@ export function symbolHoldings(db: HoldingsDb, market: string, code: string): Sy
   };
 }
 
-function totals(value: number | null, cost: number | null): Totals {
-  const pl = value !== null && cost !== null ? value - cost : null;
-  return { value, cost, pl, pl_pct: pl !== null && cost ? (pl / cost) * 100 : null };
+/** 사이드카 portfolio/service.py `_sum`과 같다: 값이 있는 종목만 더하고, 하나도 없으면 null. */
+function totals(rows: SymbolValue[]): Totals {
+  const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
+  const values = rows.flatMap((r) => (r.value === null ? [] : [r.value]));
+  const costs = rows.flatMap((r) => (r.cost === null ? [] : [r.cost]));
+  const known = rows.filter((r) => r.pl !== null);
+  const pl = sum(known.map((r) => r.pl ?? 0));
+  const plCost = sum(known.map((r) => r.cost ?? 0));
+  return {
+    value: values.length ? sum(values) : null,
+    cost: sum(costs) || null,
+    pl: known.length ? pl : null,
+    pl_pct: known.length && plCost ? (pl / plCost) * 100 : null,
+  };
 }
 
 function summary(db: HoldingsDb): PortfolioSummary {
-  const keys = [
-    ...new Set(
-      db.holdings.filter((h) => h.market && h.supported).map((h) => `${h.market}:${h.code}`),
-    ),
-  ];
+  // 사이드카는 시장을 아는 보유만 평가하고, 시장을 모르는(지원 안 함) 보유는 `unsupported`로 센다
+  const evaluable = (h: HoldingOut) => Boolean(h.market) && h.supported;
+  const keys = [...new Set(db.holdings.filter(evaluable).map((h) => `${h.market}:${h.code}`))];
   const symbols: SymbolValue[] = keys.flatMap((key) => {
     const [market = '', code = ''] = key.split(':');
     const sh = symbolHoldings(db, market, code);
@@ -147,7 +156,9 @@ function summary(db: HoldingsDb): PortfolioSummary {
     const price = db.prices[key] ?? null;
     const name = db.holdings.find((h) => h.market === market && h.code === code)?.name ?? code;
     const value = price === null ? null : num(sh.total) * price;
-    const pl = value !== null && sh.cost !== null ? value - sh.cost : null;
+    // 평단가를 모르는 수량은 평가금액에는 넣고 손익에서는 뺀다(valuation.py `value_of`)
+    const priced = num(sh.total) - num(sh.unpriced_quantity);
+    const pl = price !== null && sh.cost !== null ? priced * price - sh.cost : null;
     return [
       {
         market,
@@ -167,28 +178,34 @@ function summary(db: HoldingsDb): PortfolioSummary {
   });
   const currencies: Record<string, Totals> = {};
   for (const cur of new Set(symbols.map((s) => s.currency ?? ''))) {
-    const mine = symbols.filter((s) => s.currency === cur && s.value !== null);
-    currencies[cur] = totals(
-      mine.reduce((s, x) => s + (x.value ?? 0), 0),
-      mine.reduce((s, x) => s + (x.cost ?? 0), 0),
-    );
+    currencies[cur] = totals(symbols.filter((s) => s.currency === cur));
   }
   const rate = db.fx.usdkrw;
-  const krw = (cur: string, v: number | null) => (cur === 'USD' && rate ? (v ?? 0) * rate : v);
   const all = Object.entries(currencies);
+  const toKrw = (cur: string, v: number) => (cur === 'USD' ? v * (rate ?? 0) : v);
+  const known = (field: 'value' | 'cost' | 'pl') => {
+    const xs = all.flatMap(([c, t]) => (t[field] === null ? [] : [toKrw(c, t[field])]));
+    return xs.length ? xs.reduce((s, x) => s + x, 0) : null;
+  };
+  const pl = known('pl');
+  const plCost = symbols
+    .filter((s) => s.pl !== null)
+    .reduce((s, x) => s + toKrw(x.currency ?? '', x.cost ?? 0), 0);
   return {
     at: '2026-11-06T14:05:00+09:00',
     currencies,
-    missing_prices: symbols.filter((s) => s.value === null).length,
+    missing_prices: symbols.filter((s) => s.price === null).length,
     symbols,
     total_krw:
       all.length === 0 || (currencies.USD && !rate)
         ? null
-        : totals(
-            all.reduce((s, [c, t]) => s + (krw(c, t.value) ?? 0), 0),
-            all.reduce((s, [c, t]) => s + (krw(c, t.cost) ?? 0), 0),
-          ),
-    unsupported: db.holdings.filter((h) => !h.supported).length,
+        : {
+            value: known('value'),
+            cost: known('cost'),
+            pl,
+            pl_pct: pl !== null && plCost ? (pl / plCost) * 100 : null,
+          },
+    unsupported: db.holdings.filter((h) => !evaluable(h)).length,
     usdkrw: rate,
   };
 }

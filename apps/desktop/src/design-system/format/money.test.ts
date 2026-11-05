@@ -216,6 +216,10 @@ describe('formatQuantity: 수량 (국내 정수, 미국만 소수점)', () => {
     ['2.50', 'US', '2.5'],
     ['0.12345678', 'US', '0.12345678'],
     [3, 'KR', '3'],
+    // API가 준 국내 소수 값은 반올림해 숨기지 않고 그대로 보인다
+    ['1.5', 'KR', '1.5'],
+    ['0.25', 'KR', '0.25'],
+    ['1500.0', 'KR', '1,500'],
   ] as const)('%s (%s) → %s', (value, market, expected) => {
     expect(formatQuantity(value, market)).toBe(expected);
   });

@@ -107,6 +107,8 @@ export function SymbolSearch({
             ref={inputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
+            // 이 칸을 품은 폼이 Enter로 제출되지 않게 한다(찾기는 입력하는 대로 된다)
+            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
           />
         )}
       </Field>

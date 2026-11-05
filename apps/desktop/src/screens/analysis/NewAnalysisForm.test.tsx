@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -108,5 +109,14 @@ describe('분석 창에서 감시 종목 바로 고르기(스펙 19장)', () => 
     expect(
       await within(form).findByRole('list', { name: '감시 종목에서 고르기' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('감시 종목 고르기 목록', () => {
+  it('감시 종목이 많아도 목록은 높이 제한 안에서 스크롤한다', () => {
+    const css = readFileSync('src/screens/analysis/analysis.module.css', 'utf8');
+    const rule = /\.watchChoices\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/max-height:\s*[\d.]+rem/);
+    expect(rule).toMatch(/overflow-y:\s*auto/);
   });
 });

@@ -129,6 +129,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1-5);
+  max-height: 10rem;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;

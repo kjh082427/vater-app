@@ -80,6 +80,9 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
     if (!draft.brokerId) found.broker = '증권사를 고르세요.';
     if (draft.quantity.trim() === '') found.quantity = '수량을 입력하세요.';
     else if (!quantity) found.quantity = '수량은 0보다 큰 숫자여야 합니다.';
+    else if (draft.stock?.market === 'KR' && !/^\d+$/.test(quantity)) {
+      found.quantity = '국내 종목 수량은 정수여야 합니다.';
+    }
     if (draft.avgPrice.trim() === '') found.avg = '평균 매수가를 입력하세요.';
     else if (!avg) found.avg = '평균 매수가는 0보다 큰 숫자여야 합니다.';
     setErrors(found);

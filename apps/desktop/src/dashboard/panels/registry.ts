@@ -129,8 +129,7 @@ export const PANELS: PanelRegistry = {
   'asset-trend': {
     label: '자산 추이',
     description: '주식 평가금액과 매입금액 두 선',
-    describe: (o) =>
-      `주식 평가금액(예수금 제외) · ${TREND_VIEW_LABEL[pick(o, 'view', TREND_VIEWS, 'all')]} 보기`,
+    describe: () => '주식 평가금액(예수금 제외)',
     min: PANEL_MINS['asset-trend'],
     options: [
       {

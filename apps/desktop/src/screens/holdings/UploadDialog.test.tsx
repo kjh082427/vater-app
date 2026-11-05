@@ -146,6 +146,53 @@ describe('업로드 확인 창', () => {
     expect(await screen.findByRole('button', { name: /^NAVER/ })).toBeInTheDocument();
   });
 
+  it('전부 해제하고 [확인만 하기]를 누르면 items 없이 본 종목을 seen으로만 보낸다', async () => {
+    setup();
+    const watches = capture('POST', '/holdings/watch');
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: '연결한 증권사 모두' }));
+    const d = await screen.findByRole('dialog');
+    await userEvent.click(await within(d).findByRole('checkbox', { name: '전체 선택' }));
+    await userEvent.click(within(d).getByRole('button', { name: '확인만 하기' }));
+    await waitFor(() => expect(watches).toHaveLength(1));
+    expect(watches[0]?.body).toEqual({
+      items: [],
+      seen: [
+        { market: 'KR', code: '035420' },
+        { market: 'US', code: 'NVDA' },
+      ],
+    });
+    expect(screen.queryByText('새 종목 2개')).not.toBeInTheDocument();
+  });
+
+  it('증권사 목록을 받는 중이거나 받지 못했을 때는 연결 안내를 보이지 않는다', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.get('*/brokers', async () => {
+        await gate;
+        return HttpResponse.json(mock.db.brokers);
+      }),
+    );
+    render();
+    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
+    expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
+    release();
+    expect(await screen.findByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).toBeInTheDocument();
+  });
+
+  it('증권사 목록 요청이 실패해도 연결 안내를 보이지 않는다', async () => {
+    server.use(
+      http.get('*/brokers', () =>
+        HttpResponse.json({ code: 'INTERNAL', message: '실패', hint: null }, { status: 500 }),
+      ),
+    );
+    render();
+    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
+  });
+
   it('전체 해제·전체 선택, 올릴 종목이 없으면 버튼이 막힌다', async () => {
     setup();
     render();
@@ -156,7 +203,9 @@ describe('업로드 확인 창', () => {
     expect(all).toBeChecked();
     await userEvent.click(all);
     expect(within(d).getByRole('checkbox', { name: /NAVER/ })).not.toBeChecked();
-    expect(within(d).getByRole('button', { name: /감시 종목에 올리기/ })).toBeDisabled();
+    // 전부 해제해도 본 종목을 seen으로 보낼 수 있다: 버튼은 [확인만 하기]
+    expect(within(d).queryByRole('button', { name: /감시 종목에 올리기/ })).not.toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: '확인만 하기' })).toBeEnabled();
     await userEvent.click(all);
     expect(within(d).getByRole('checkbox', { name: /엔비디아/ })).toBeChecked();
     expect(within(d).getByText('2종목 선택')).toBeInTheDocument();

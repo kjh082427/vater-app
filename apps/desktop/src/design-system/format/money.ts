@@ -126,13 +126,14 @@ export function formatPriceChange(value: MaybeNumber, currency: Currency): strin
 }
 
 /**
- * 보유 수량. 국내는 정수, 미국만 소수점(필요한 만큼, 최대 8자리): `1,500`, `0.5`.
+ * 보유 수량. 국내는 보통 정수(API가 소수를 주면 그대로), 미국은 소수점(필요한 만큼, 최대 8자리): `1,500`, `0.5`.
  * 입력은 사이드카의 십진 문자열이나 숫자다. 단위 "주"는 부르는 쪽이 붙인다.
  */
 export function formatQuantity(value: string | number | null | undefined, market: string): string {
   const n = typeof value === 'string' ? Number(value) : value;
   if (value === '' || !isPresent(n)) return MISSING;
-  if (market !== 'US') return grouped(Math.abs(Math.round(n)), 0);
+  // 국내도 API가 소수를 주면 숨기지 않는다(입력은 정수만 받지만 증권사가 소수를 줄 수 있다)
+  if (market !== 'US' && Number.isInteger(n)) return signOf(n, false) + grouped(Math.abs(n), 0);
   const text = grouped(Math.abs(n), 8).replace(/\.?0+$/, '');
   return signOf(n, false) + text;
 }

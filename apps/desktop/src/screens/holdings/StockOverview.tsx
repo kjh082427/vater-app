@@ -6,13 +6,13 @@ import { useSymbolValue } from './useSymbolValue';
 
 export interface StockOverviewProps {
   item: WatchItem;
-  /** 이 종목의 평단가 알림 규칙. */
-  rule: AlertRule | undefined;
+  /** 이 종목의 평단가 알림 규칙 전부(꺼 둔 것 포함). */
+  rules: AlertRule[];
   onRulesChanged: () => void;
 }
 
 /** 종목 화면의 주가 그래프와 바로 아래 "내 보유" 카드(스펙 4-2). 보유하지 않으면 그래프만. */
-export function StockOverview({ item, rule, onRulesChanged }: StockOverviewProps) {
+export function StockOverview({ item, rules, onRulesChanged }: StockOverviewProps) {
   const sym = useSymbolValue(item.market, item.code);
   return (
     <>
@@ -36,7 +36,7 @@ export function StockOverview({ item, rule, onRulesChanged }: StockOverviewProps
           holdings={sym.holdings}
           value={sym.value}
           at={sym.at}
-          rule={rule}
+          rules={rules}
           onRulesChanged={onRulesChanged}
           onRefreshed={sym.reload}
         />

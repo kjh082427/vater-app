@@ -305,3 +305,108 @@ describe('감시 종목 표의 보유 열', () => {
     expect(heads).not.toContain('보유');
   });
 });
+
+describe('리뷰 지적: 금액 표시', () => {
+  const etn = () =>
+    holding({ code: '530031', name: '삼성 레버리지 ETN', supported: false, market: null });
+  /** 삼성전자: 평단가를 아는 5주(64,000)와 모르는 10주. 현재가 71,400. */
+  const partial = () => {
+    mock.db.holdings = [
+      holding({ code: '005930', name: '삼성전자', quantity: '5' }),
+      holding({
+        code: '005930',
+        name: '삼성전자',
+        quantity: '10',
+        broker_id: 'meritz',
+        connection_id: 2,
+        avg_price: null,
+      }),
+    ];
+    mock.db.prices['KR:005930'] = 71400;
+  };
+  const NOTE = /평단가를 모르는 수량은 손익에서 뺐습니다/;
+
+  it('지원 안 함 종목만 있으면 "보유 내역이 없습니다"가 아니라 지원 안 함을 알린다', async () => {
+    mock.db.holdings = [etn()];
+    renderPanel('holdings');
+    const card = section('내 보유 종목');
+    expect(await within(card).findByText(/지원하지 않는 1종목/)).toBeInTheDocument();
+    expect(within(card).queryByText(/보유 내역이 없습니다/)).not.toBeInTheDocument();
+  });
+
+  it('시세 누락과 지원 안 함 안내를 따로 보인다', async () => {
+    held();
+    mock.db.holdings.push(etn());
+    delete mock.db.prices['US:AAPL'];
+    renderPanel('holdings');
+    const card = section('내 보유 종목');
+    expect(await within(card).findByText(/시세를 받지 못한 1종목/)).toBeInTheDocument();
+    expect(within(card).getByText(/지원하지 않는 1종목/)).toBeInTheDocument();
+  });
+
+  it('평단가를 모르는 수량이 있으면 손익에서 뺐다고 알리고, 손익은 아는 수량만으로 계산한다', async () => {
+    partial();
+    renderPanel('holdings');
+    const card = section('내 보유 종목');
+    const row = await within(card).findByRole('row', { name: /삼성전자/ });
+    expect(within(row).getByText('1,071,000원')).toBeInTheDocument();
+    expect(within(row).getByText('+37,000 (+11.56%)')).toBeInTheDocument();
+    expect(within(card).getByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('감시 종목 칸과 총 평가손익 카드도 같은 안내를 한다', async () => {
+    partial();
+    renderPanel('watchlist');
+    expect(await within(section('감시 종목')).findByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('총 평가손익 카드에 평단가 모르는 수량 안내', async () => {
+    partial();
+    renderPanel('kpi', { metrics: ['total-pl'] });
+    expect(await within(section('숫자 카드')).findByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('시세가 모두 없으면 총 평가금액·손익은 —이다(0원이 아니다)', async () => {
+    held();
+    mock.db.prices = {};
+    renderPanel('kpi', { metrics: ['total-value', 'total-pl'] });
+    const card = section('숫자 카드');
+    await within(card).findAllByText(/시세 없는 2종목 제외/);
+    expect(within(card).queryByText('0원')).not.toBeInTheDocument();
+    expect(within(card).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('환율이 없으면 총 평가손익은 원화만이라고 밝히고, 지원 안 함도 알린다', async () => {
+    held();
+    mock.db.holdings.push(etn());
+    mock.db.fx = { day: '2026-11-06', usdkrw: null };
+    renderPanel('kpi', { metrics: ['total-value', 'total-pl'] });
+    const card = section('숫자 카드');
+    expect(await within(card).findAllByText(/환율 없음/)).toHaveLength(2);
+    expect(within(card).getAllByText(/지원하지 않는 1종목 제외/)).toHaveLength(2);
+  });
+
+  it('미국 비중은 요약의 환율로 계산하고, 표시 기간 중 환율 없는 날이 있으면 알린다', async () => {
+    held();
+    mock.db.history = [
+      point('2026-11-04', null, null, { usdkrw: null }),
+      point('2026-11-05', 1100000, 960000),
+      point('2026-11-06', 1230236, 1100000),
+    ];
+    renderPanel('asset-trend');
+    const card = section('자산 추이');
+    expect(await within(card).findByText(/환율 없음/)).toBeInTheDocument();
+    expect(within(card).getByText(/미국 비중 12.9%/)).toBeInTheDocument();
+  });
+
+  it('미국 비중은 마지막 날 기록의 환율이 비어도 요약의 환율로 보인다', async () => {
+    held();
+    mock.db.history = [point('2026-11-06', 1230236, 1100000, { usdkrw: null })];
+    renderPanel('asset-trend');
+    expect(await within(section('자산 추이')).findByText(/미국 비중 12.9%/)).toBeInTheDocument();
+  });
+
+  it('칸 부제에는 보기 이름을 쓰지 않는다', () => {
+    expect(PANELS['asset-trend'].describe?.({ view: 'all' })).not.toContain('전체');
+  });
+});

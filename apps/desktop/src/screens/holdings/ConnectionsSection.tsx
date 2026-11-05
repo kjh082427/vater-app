@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
@@ -56,6 +56,7 @@ function ConnectForm({
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [ask, setAsk] = useState<ConnectionOut | null>(null);
+  const inFlight = useRef(false);
   const set = (changes: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...changes }));
     setProblem(null);
@@ -64,6 +65,8 @@ function ConnectForm({
   const broker = brokers.find((b) => b.id === draft.brokerId);
 
   async function post(replacesId: number | null) {
+    if (inFlight.current) return; // 같은 연결 요청을 두 번 보내지 않는다(이중 클릭)
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -81,6 +84,7 @@ function ConnectForm({
       setError(toApiError(e));
       setAsk(null);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -221,6 +225,10 @@ function ReleaseDialog({
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const name = broker?.name ?? '';
+  const close = () => {
+    setError(null); // 닫을 때 지워 다음에 열 때 지난 오류가 남지 않게 한다
+    onClose();
+  };
 
   async function release(deleteData: boolean) {
     if (!conn) return;
@@ -243,10 +251,10 @@ function ReleaseDialog({
     <Dialog
       open={conn !== null}
       title={`${name} 연결 해제`}
-      onClose={onClose}
+      onClose={close}
       footer={
         <>
-          <Button onClick={onClose}>취소</Button>
+          <Button onClick={close}>취소</Button>
           <Button busy={busy} onClick={() => void release(true)}>
             데이터 삭제
           </Button>
@@ -279,12 +287,14 @@ export function ConnectionsSection() {
   const brokers = useResource<BrokerOut[]>('/brokers');
   const [adding, setAdding] = useState<{ replaces: ConnectionOut | null } | null>(null);
   const [releasing, setReleasing] = useState<ConnectionOut | null>(null);
+  const [purging, setPurging] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const list = conns.data ?? [];
   const brokerOf = (id: string) => brokers.data?.find((b) => b.id === id);
   const nameOf = (id: string) => brokerOf(id)?.name ?? id;
 
   async function deleteData(brokerId: string) {
+    setPurging(null);
     setError(null);
     try {
       await api.request(`/brokers/${brokerId}/data`, { method: 'DELETE' });
@@ -347,7 +357,7 @@ export function ConnectionsSection() {
                       >
                         다시 연결
                       </Button>
-                      <Button size="sm" onClick={() => void deleteData(c.broker_id)}>
+                      <Button size="sm" onClick={() => setPurging(c.broker_id)}>
                         데이터 삭제
                       </Button>
                     </>
@@ -363,7 +373,7 @@ export function ConnectionsSection() {
                         <Button size="sm" onClick={() => setAdding({ replaces: c })}>
                           다시 연결
                         </Button>
-                        <Button size="sm" onClick={() => void deleteData(c.broker_id)}>
+                        <Button size="sm" onClick={() => setPurging(c.broker_id)}>
                           데이터 삭제
                         </Button>
                       </>
@@ -394,6 +404,26 @@ export function ConnectionsSection() {
           <Button onClick={() => setAdding({ replaces: null })}>연결 추가</Button>
         </div>
       )}
+      <Dialog
+        open={purging !== null}
+        title={`${purging ? nameOf(purging) : ''} 데이터 삭제`}
+        onClose={() => setPurging(null)}
+        footer={
+          <>
+            <Button onClick={() => setPurging(null)}>취소</Button>
+            <Button variant="primary" onClick={() => purging && void deleteData(purging)}>
+              삭제
+            </Button>
+          </>
+        }
+      >
+        <div className={styles.dialogBody}>
+          <p>
+            {`${purging ? nameOf(purging) : ''}의 모든 연결과 보유 내역이 지워집니다. 종목 합계와 칩을 바로 다시 계산합니다.`}
+          </p>
+          <p>자산 추이의 지난 기록과 감시 종목은 남습니다.</p>
+        </div>
+      </Dialog>
       <ReleaseDialog
         conn={releasing}
         broker={releasing ? brokerOf(releasing.broker_id) : undefined}

@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import type { BrokerOut, CsvPreview, CsvRow, HoldingOut } from '../../api/types';
-import { Button, DataTable, formatPrice, formatQuantity, type Column } from '../../design-system';
+import {
+  Button,
+  DataTable,
+  formatNumber,
+  formatPrice,
+  formatQuantity,
+  type Column,
+} from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { Field } from '../common/Field';
 import form from '../common/form.module.css';
@@ -111,7 +118,10 @@ export function CsvImport({ brokers, holdings, onBrokersChanged, onDone }: CsvIm
 
   const current = result?.key === key ? result : null;
   const busy = key !== null && current === null;
-  const preview = current?.preview ?? null;
+  // 열·증권사를 바꾸면 새 결과가 올 때까지 이전 미리보기를 둔다(열 선택 칸이 사라져 포커스를 잃지 않게).
+  // 파일이 바뀌면 이전 파일의 결과는 쓰지 않는다.
+  const shown = current ?? (result && file && result.key.startsWith(`${file.id}|`) ? result : null);
+  const preview = shown?.preview ?? null;
   const error = commitError ?? current?.error ?? fileError;
   const picks = picked?.key === key ? picked.map : NO_PICKS;
 
@@ -195,7 +205,10 @@ export function CsvImport({ brokers, holdings, onBrokersChanged, onDone }: CsvIm
       cell: (j) =>
         j.row.avg_price === null
           ? '—'
-          : formatPrice(j.row.avg_price, currencyOf(j.target?.market ?? 'KR')),
+          : j.target
+            ? formatPrice(j.row.avg_price, currencyOf(j.target.market))
+            : // 종목을 모르면 통화도 모른다: 원·달러를 붙이지 않는다
+              formatNumber(j.row.avg_price, Number.isInteger(j.row.avg_price) ? 0 : 2),
     },
     {
       key: 'state',
@@ -254,7 +267,10 @@ export function CsvImport({ brokers, holdings, onBrokersChanged, onDone }: CsvIm
       <BrokerPicker
         brokers={brokers}
         value={brokerId}
-        onChange={setBrokerId}
+        onChange={(id) => {
+          setBrokerId(id);
+          setCommitError(null);
+        }}
         onAdded={onBrokersChanged}
         error={file && !brokerId ? '증권사를 고르세요.' : undefined}
       />
@@ -265,7 +281,10 @@ export function CsvImport({ brokers, holdings, onBrokersChanged, onDone }: CsvIm
               key={c.key}
               label={c.label}
               value={cols[c.key] ?? preview.guess[c.guess] ?? AUTO}
-              onChange={(v) => setCols((prev) => ({ ...prev, [c.key]: v }))}
+              onChange={(v) => {
+                setCols((prev) => ({ ...prev, [c.key]: v }));
+                setCommitError(null);
+              }}
               options={[
                 { value: AUTO, label: '(자동 추정)' },
                 ...preview.columns.map((name) => ({ value: name, label: name })),
@@ -303,7 +322,7 @@ export function CsvImport({ brokers, holdings, onBrokersChanged, onDone }: CsvIm
         <Button
           variant="primary"
           busy={committing}
-          disabled={!preview || good.length === 0}
+          disabled={!preview || busy || good.length === 0}
           onClick={() => void commit()}
         >
           {`올리기${good.length > 0 ? ` (${good.length}종목)` : ''}`}

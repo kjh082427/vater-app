@@ -16,6 +16,10 @@ export function PanelError({
   return <ApiErrorNotice error={error} title={title} onRetry={onRetry} />;
 }
 
+export const UNPRICED_NOTE = '평단가를 모르는 수량은 손익에서 뺐습니다';
+export const hasUnpriced = (rows: { unpriced_quantity: string }[]) =>
+  rows.some((r) => Number(r.unpriced_quantity) > 0);
+
 export function PanelEmpty({ children }: { children: ReactNode }) {
   return <p className={styles.empty}>{children}</p>;
 }

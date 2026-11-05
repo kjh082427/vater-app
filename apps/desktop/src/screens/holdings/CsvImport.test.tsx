@@ -115,6 +115,66 @@ describe('CSV 가져오기', () => {
     });
   });
 
+  it('열을 바꾸는 동안 새 결과가 올 때까지 이전 미리보기와 열 선택 칸을 그대로 둔다', async () => {
+    const d = await openCsv();
+    await upload(d, '종목명,수량,평단,매입가\n삼성전자,10,64000,1\n');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    await within(d).findByRole('table', { name: '미리보기' });
+    const before = within(d).getByRole('button', { name: /^평균 매수가 열/ });
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.post('*/holdings/csv/preview', async () => {
+        await gate;
+        return HttpResponse.json({
+          columns: [],
+          guess: { name: null, code: null, quantity: null, avg_price: null },
+          rows: [],
+          changes: { added: 0, updated: 0, removed: 0 },
+        } satisfies CsvPreview);
+      }),
+    );
+    await choose(d, '평균 매수가 열', '매입가');
+    expect(await within(d).findByText(/파일을 읽는 중/)).toBeInTheDocument();
+    expect(within(d).getByRole('table', { name: '미리보기' })).toBeInTheDocument();
+    expect(before).toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: /올리기/ })).toBeDisabled();
+    release();
+    await waitFor(() => expect(within(d).queryByText(/파일을 읽는 중/)).not.toBeInTheDocument());
+  });
+
+  it('찾지 못한 종목 행의 평균 매수가에는 "원"을 붙이지 않는다', async () => {
+    const d = await openCsv();
+    await upload(d, '종목명,수량,평균단가\n없는종목,3,1000\n');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    const row = within(await within(d).findByRole('table', { name: '미리보기' })).getByRole('row', {
+      name: /없는종목/,
+    });
+    expect(within(row).getByText('1,000')).toBeInTheDocument();
+    expect(within(row).queryByText(/원/)).not.toBeInTheDocument();
+  });
+
+  it('올리기가 실패한 뒤 열을 바꾸면 그 오류는 지운다', async () => {
+    server.use(
+      http.post('*/holdings/csv/commit', () =>
+        HttpResponse.json(
+          { code: 'CSV_INVALID', message: '올릴 수 없는 파일입니다.', hint: null },
+          { status: 422 },
+        ),
+      ),
+    );
+    const d = await openCsv();
+    await upload(d, '종목명,수량,평단,매입가\n삼성전자,10,64000,1\n');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    await within(d).findByRole('table', { name: '미리보기' });
+    await userEvent.click(within(d).getByRole('button', { name: /올리기/ }));
+    expect(await within(d).findByText('올릴 수 없는 파일입니다.')).toBeInTheDocument();
+    await choose(d, '평균 매수가 열', '매입가');
+    await waitFor(() =>
+      expect(within(d).queryByText('올릴 수 없는 파일입니다.')).not.toBeInTheDocument(),
+    );
+  });
+
   it('후보에서 고르면 그 행이 올릴 수 있게 된다(이름이 맞지 않을 때도 후보가 온다)', async () => {
     const preview: CsvPreview = {
       columns: ['종목명', '수량', '평균단가'],

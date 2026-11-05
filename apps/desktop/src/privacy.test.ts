@@ -52,4 +52,22 @@ describe('AI에 닿는 화면 코드는 보유 내역을 모른다', () => {
     const keys = [...form.matchAll(/body\.(\w+) =/g)].map((m) => m[1]);
     expect(keys.sort()).toEqual(['as_of', 'preset']);
   });
+
+  it('/analyses로 POST하는 호출은 소스 전체에서 찾아 보유 필드가 없는지 본다', () => {
+    // 화면 폴더가 아니어도(대시보드, 앱 껍데기 등) 분석을 시작·재시도·취소하는 코드는 같은 기준을 받는다
+    const posting = sources('.').filter((f) =>
+      /['"`]\/analyses[^'"`]*['"`][^;]{0,200}method:\s*['"]POST['"]/s.test(f.text),
+    );
+    expect(posting.map((f) => f.name)).toEqual(
+      expect.arrayContaining([
+        './screens/analysis/NewAnalysisForm.tsx',
+        './screens/analysis/AnalysisDetailScreen.tsx',
+      ]),
+    );
+    for (const [what, pattern] of FORBIDDEN) {
+      expect(posting.filter((f) => pattern.test(f.text)).map((f) => `${f.name}: ${what}`)).toEqual(
+        [],
+      );
+    }
+  });
 });

@@ -239,3 +239,28 @@ describe('보유 종목 직접 추가', () => {
     expect(within(d).getByLabelText('수량')).toHaveValue('10');
   });
 });
+
+describe('리뷰 지적: 입력 흐름', () => {
+  it('종목 검색칸과 분류 검색칸에서 Enter를 눌러도 폼이 제출되지 않는다', async () => {
+    open();
+    const d = await dialog();
+    await userEvent.type(within(d).getByLabelText('종목 검색'), '삼성{Enter}');
+    expect(within(d).queryByText('종목을 고르세요.')).not.toBeInTheDocument();
+    await userEvent.click(within(d).getByRole('button', { name: '분류로 찾기' }));
+    await userEvent.type(await within(d).findByLabelText('분류 검색'), '반도체{Enter}');
+    expect(within(d).queryByText('종목을 고르세요.')).not.toBeInTheDocument();
+  });
+
+  it('국내 종목 수량은 정수만 받는다(미국은 소수 가능)', async () => {
+    const puts = capture('PUT', '/holdings/manual');
+    open();
+    const d = await dialog();
+    await pickStock(d, '삼성전자', '삼성전자');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    await userEvent.type(within(d).getByLabelText('수량'), '1.5');
+    await userEvent.type(within(d).getByLabelText(/평균 매수가/), '70000');
+    await userEvent.click(within(d).getByRole('button', { name: '저장' }));
+    expect(await within(d).findByText('국내 종목 수량은 정수여야 합니다.')).toBeInTheDocument();
+    expect(puts).toEqual([]);
+  });
+});

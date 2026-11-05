@@ -194,7 +194,7 @@ export function WatchPanel({
         <div id={panelId} role="region" aria-labelledby={buttonId} className={styles.panel}>
           <StockOverview
             item={item}
-            rule={rules.find((r) => r.kind === 'avg_price_pct')}
+            rules={rules.filter((r) => r.kind === 'avg_price_pct')}
             onRulesChanged={onRulesChanged}
           />
           {count === 0 ? (

@@ -58,6 +58,20 @@ describe('LineChart: 선 + 영역 차트', () => {
     expect(container.querySelectorAll('[data-role="point"]')).toHaveLength(2);
   });
 
+  it('두 번째 선도 null 구간을 잇지 않는다', () => {
+    const { container } = render(
+      <LineChart
+        values={[1, 2, 3, 4]}
+        secondary={[1, null, 3, 4]}
+        direction="up"
+        format={fmt}
+        aria-label="끊긴 매입금액"
+      />,
+    );
+    const d = container.querySelector('[data-role="secondary"]')?.getAttribute('d') ?? '';
+    expect(d.match(/M/g)).toHaveLength(2);
+  });
+
   it('마지막 값 표지의 글자는 format(마지막 값), 방향 색은 data-direction', () => {
     const { container } = render(
       <LineChart

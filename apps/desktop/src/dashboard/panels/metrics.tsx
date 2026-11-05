@@ -30,7 +30,9 @@ import {
   portfolioSummarySource,
   quotesSource,
 } from '../sources';
+import type { PortfolioSummary } from '../../api/types';
 import { chartSeries, type IndexCode } from './IndexChartPanel';
+import { hasUnpriced, UNPRICED_NOTE } from './common';
 import styles from './panels.module.css';
 
 export interface MetricValue {
@@ -159,26 +161,41 @@ function useForeignNet(): MetricValue {
   };
 }
 
+/** 합계에서 빠졌거나 믿기 어려운 부분을 문장으로(환율 없음, 시세 제외, 지원 안 함). */
+function caveats(data: PortfolioSummary): string[] {
+  return [
+    ...(data.currencies.USD && data.total_krw === null ? ['환율 없음(원화만 합산)'] : []),
+    ...(data.missing_prices > 0 ? [`시세 없는 ${data.missing_prices}종목 제외`] : []),
+    ...(data.unsupported > 0 ? [`지원하지 않는 ${data.unsupported}종목 제외`] : []),
+  ];
+}
+
+const noHoldings = (data: PortfolioSummary): MetricValue => ({
+  value: <MissingValue />,
+  change: (
+    <Muted>
+      {data.unsupported > 0 ? `지원하지 않는 ${data.unsupported}종목만 있습니다` : '보유 내역 없음'}
+    </Muted>
+  ),
+});
+
 /** 총 평가금액: 환율이 있으면 원화 환산 합계, 없으면 원화 합계만(달러는 따로). 통화별 값을 함께 보인다. */
 function useTotalValue(): MetricValue {
   const { data, error } = useShared(portfolioSummarySource);
   if (!data) return { value: <MissingValue />, error };
   const krw = data.currencies.KRW;
   const usd = data.currencies.USD;
-  if (!krw && !usd) {
-    return { value: <MissingValue />, change: <Muted>보유 내역 없음</Muted>, error };
-  }
-  const converted = data.total_krw !== null;
-  const shown = converted ? data.total_krw?.value : krw?.value;
+  if (!krw && !usd) return { ...noHoldings(data), error };
+  const shown = data.total_krw !== null ? data.total_krw.value : krw?.value;
+  const notes = caveats(data);
   const parts = [
-    ...(krw ? [`원화 ${formatWon(krw.value)}`] : []),
+    ...(krw && (usd || notes.length > 0) ? [`원화 ${formatWon(krw.value)}`] : []),
     ...(usd ? [`달러 ${formatUsd(usd.value)}`] : []),
-    ...(usd && !converted ? ['환율 없음'] : []),
+    ...notes,
   ];
-  const note = data.missing_prices > 0 ? ` · 시세 없는 ${data.missing_prices}종목 제외` : '';
   return {
     value: shown === null || shown === undefined ? <MissingValue /> : formatWon(shown),
-    change: <Muted>{usd || note ? `${parts.join(' · ')}${note}` : '주식 평가금액'}</Muted>,
+    change: <Muted>{parts.length > 0 ? parts.join(' · ') : '주식 평가금액'}</Muted>,
     error,
   };
 }
@@ -189,13 +206,13 @@ function useTotalPl(): MetricValue {
   if (!data) return { value: <MissingValue />, error };
   const krw = data.currencies.KRW;
   const usd = data.currencies.USD;
-  if (!krw && !usd) {
-    return { value: <MissingValue />, change: <Muted>보유 내역 없음</Muted>, error };
-  }
+  if (!krw && !usd) return { ...noHoldings(data), error };
   const basis = data.total_krw ?? krw;
+  const notes = [...caveats(data), ...(hasUnpriced(data.symbols) ? [UNPRICED_NOTE] : [])];
   const parts = [
     ...(krw && usd ? [`원화 ${formatWonChange(krw.pl, { unit: true })}`] : []),
     ...(usd ? [`달러 ${formatUsdChange(usd.pl)}`] : []),
+    ...notes,
   ];
   return {
     value: <SignedNumber value={basis?.pl} format="won" unit />,

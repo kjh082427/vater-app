@@ -28,6 +28,8 @@ export interface UploadButtonsProps {
   connections: ConnectionOut[];
   holdings: HoldingOut[];
   watchedKeys: ReadonlySet<string>;
+  /** 증권사·연결·보유를 모두 받았다. 받는 중이거나 실패했으면 연결 안내를 보이지 않는다. */
+  ready: boolean;
   onOpen: (brokerId: string | null) => void;
   /** 이 버튼 줄 뒤에 붙는 것(보유 종목 직접 추가). */
   children?: ReactNode;
@@ -39,6 +41,7 @@ export function UploadButtons({
   connections,
   holdings,
   watchedKeys,
+  ready,
   onOpen,
   children,
 }: UploadButtonsProps) {
@@ -51,9 +54,11 @@ export function UploadButtons({
   return (
     <div className={styles.uploadBar}>
       {shown.length === 0 ? (
-        <p className={styles.empty}>
-          증권사를 연결하면 보유 종목을 불러옵니다. <a href="#/settings">설정 &gt; 증권사 연결</a>
-        </p>
+        ready ? (
+          <p className={styles.empty}>
+            증권사를 연결하면 보유 종목을 불러옵니다. <a href="#/settings">설정 &gt; 증권사 연결</a>
+          </p>
+        ) : null
       ) : (
         <>
           {shown.map((b) => (
@@ -196,7 +201,7 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
         body: {
           items: selected.map(target),
           seen: selectable.filter((r) => !checked.has(r.key)).map(target),
-          ...(rule ? { rule } : {}),
+          ...(rule && selected.length > 0 ? { rule } : {}),
         },
       });
       onUploaded(result);
@@ -226,10 +231,10 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
           <Button
             variant="primary"
             busy={busy}
-            disabled={!loaded || selected.length === 0}
+            disabled={!loaded || selectable.length === 0}
             onClick={() => void upload()}
           >
-            {`감시 종목에 올리기${selected.length > 0 ? ` (${selected.length})` : ''}`}
+            {selected.length > 0 ? `감시 종목에 올리기 (${selected.length})` : '확인만 하기'}
           </Button>
         </>
       }

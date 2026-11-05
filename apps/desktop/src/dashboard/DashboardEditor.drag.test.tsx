@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithServices } from '../test/render';
 import { DashboardEditor } from './DashboardEditor';
@@ -70,7 +71,7 @@ function drag(from: HTMLElement, to: HTMLElement, opts: { grabAt?: HTMLElement }
   const start = opts.grabAt ?? from;
   fireEvent.pointerDown(start, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
   pointAt(to);
-  fireEvent.pointerMove(from, { pointerId: 1, clientX: 200, clientY: 120 });
+  fireEvent.pointerMove(from, { pointerId: 1, buttons: 1, clientX: 200, clientY: 120 });
   fireEvent.pointerUp(from, { pointerId: 1, clientX: 200, clientY: 120 });
 }
 
@@ -131,10 +132,10 @@ describe('끌어서 칸 바꾸기(스펙 18장)', () => {
     open(tight);
     fireEvent.pointerDown(cell(1), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
     pointAt(cell(2));
-    fireEvent.pointerMove(cell(1), { pointerId: 1, clientX: 300, clientY: 100 });
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 1, clientX: 300, clientY: 100 });
     expect(cell(2)).toHaveAttribute('data-reorder-state', 'blocked');
     pointAt(cell(3));
-    fireEvent.pointerMove(cell(1), { pointerId: 1, clientX: 300, clientY: 300 });
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 1, clientX: 300, clientY: 300 });
     expect(cell(3)).toHaveAttribute('data-reorder-state', 'blocked');
     fireEvent.pointerUp(cell(1), { pointerId: 1 });
   });
@@ -230,5 +231,70 @@ describe('끌어서 숫자 줄 순서 바꾸기', () => {
     windowSize(1280, 800);
     open({ ...grid, kpi: { enabled: true, items: ['kospi'] } });
     expect(screen.queryByRole('list', { name: '숫자 줄 순서' })).not.toBeInTheDocument();
+  });
+});
+
+describe('리뷰 지적: 끌기 중 Esc·버튼 뗌·빈 곳·문구', () => {
+  it('끄는 중 Esc는 끌기만 취소하고 편집 화면 취소로 올라가지 않는다', async () => {
+    windowSize(1280, 800);
+    const { onCancel, saved } = open(grid);
+    handle(1).focus();
+    fireEvent.pointerDown(handle(1), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+    pointAt(cell(4));
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 1, clientX: 200, clientY: 120 });
+    expect(cell(1)).toHaveAttribute('data-reorder-state', 'from');
+    await userEvent.keyboard('{Escape}');
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(cell(1)).not.toHaveAttribute('data-reorder-state', 'from');
+    expect(screen.getByRole('status')).toHaveTextContent('취소했습니다');
+    // 이어서 버튼을 놓아도 바뀌지 않는다
+    fireEvent.pointerUp(cell(1), { pointerId: 1, clientX: 200, clientY: 120 });
+    await save();
+    await waitFor(() => expect(saved).toHaveLength(1));
+    expect((saved[0] as DashboardDoc).panels).toEqual(grid.panels);
+  });
+
+  it('끄는 중 버튼이 이미 떼어져 있으면(buttons가 0) 끌기를 끝낸다', () => {
+    windowSize(1280, 800);
+    open(grid);
+    fireEvent.pointerDown(cell(1), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+    pointAt(cell(4));
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 1, clientX: 200, clientY: 120 });
+    expect(cell(4)).toHaveAttribute('data-reorder-state', 'over');
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 0, clientX: 210, clientY: 130 });
+    expect(cell(4)).not.toHaveAttribute('data-reorder-state');
+    expect(cell(1)).not.toHaveAttribute('data-reorder-state', 'from');
+  });
+
+  it('빈 곳에 놓으면 상태 문구를 지운다', () => {
+    windowSize(1280, 800);
+    open(grid);
+    fireEvent.pointerDown(cell(1), { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+    pointAt(cell(4));
+    fireEvent.pointerMove(cell(1), { pointerId: 1, buttons: 1, clientX: 200, clientY: 120 });
+    expect(screen.getByRole('status')).toHaveTextContent('바꿀 칸: 칸 4');
+    pointAt(null);
+    fireEvent.pointerUp(cell(1), { pointerId: 1, clientX: 900, clientY: 900 });
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
+
+  it('숫자 줄은 끼워 넣기라서 "A를 C 자리로 옮겼습니다"로 알린다', () => {
+    windowSize(1280, 800);
+    open(grid);
+    const items = within(screen.getByRole('list', { name: '숫자 줄 순서' })).getAllByRole(
+      'listitem',
+    );
+    drag(items[2] as HTMLElement, items[0] as HTMLElement);
+    expect(screen.getByRole('status')).toHaveTextContent('감시 종목을 코스피 자리로 옮겼습니다.');
+  });
+
+  it('칸은 끌 때만 터치 스크롤·글자 선택을 막고 입력칸은 막지 않는다', () => {
+    const css = readFileSync('src/dashboard/editor/editor.module.css', 'utf8');
+    const rule = (sel: string) => css.match(new RegExp(`${sel}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(rule('\\.cell')).toMatch(/touch-action:\s*none/);
+    expect(rule('\\.cell')).toMatch(/user-select:\s*none/);
+    expect(css).toMatch(
+      /\.cell\s+(input|:where\([^)]*input[^)]*\))[^{]*\{[^}]*user-select:\s*text/,
+    );
   });
 });

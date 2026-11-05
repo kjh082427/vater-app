@@ -92,8 +92,9 @@ export function AssetTrendPanel({ options }: PanelProps) {
   const filled = points.flatMap((p, i) => (p.backfilled ? [i] : []));
   const usd = summary.data?.currencies.USD;
   const total = summary.data?.total_krw;
-  const rate = last?.usdkrw ?? null;
-  const rateMissing = view === 'all' && last !== undefined && last.value === null && rate === null;
+  const rate = summary.data?.usdkrw ?? null;
+  // 마지막 날만이 아니라 표시 기간 어디든 환율이 없어 비어 있는 날이 있으면 알린다
+  const rateMissing = view === 'all' && points.some((p) => p.value === null && p.usdkrw === null);
   const share =
     view === 'all' && usd?.value && total?.value && rate
       ? ((usd.value * rate) / total.value) * 100

@@ -246,8 +246,82 @@ describe('연결 해제와 끊김', () => {
     expect(screen.getByText(/저장된 수량은 마지막 갱신/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 연결' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '데이터 삭제' }));
+    // 바로 지우지 않고 먼저 묻는다
+    const dialog = await screen.findByRole('dialog', { name: '키움 데이터 삭제' });
+    expect(dels).toEqual([]);
+    expect(within(dialog).getByText(/모든 연결과 보유 내역이 지워집니다/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/자산 추이의 지난 기록과 감시 종목은 남습니다/),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: '삭제' }));
     await waitFor(() => expect(dels).toEqual([{ path: '/brokers/kiwoom/data', body: null }]));
     await waitFor(() => expect(mock.db.connections).toEqual([]));
+  });
+
+  it('데이터 삭제 확인에서 취소하면 아무것도 지우지 않는다', async () => {
+    mock.db.connections = [
+      conn({ id: 3, broker_id: 'kiwoom', account_mask: '키 ab12', status: 'disconnected' }),
+    ];
+    const dels = capture('DELETE', '/brokers/');
+    renderSection();
+    await userEvent.click(await screen.findByRole('button', { name: '데이터 삭제' }));
+    const dialog = await screen.findByRole('dialog', { name: '키움 데이터 삭제' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(dels).toEqual([]);
+    expect(mock.db.connections).toHaveLength(1);
+  });
+
+  it('해제 창의 오류는 닫으면 지워져 다시 열 때 남지 않는다', async () => {
+    const { http, HttpResponse } = await import('msw');
+    mock.db.connections = [conn({ id: 1, broker_id: 'kiwoom', account_mask: '키 ab12' })];
+    server.use(
+      http.delete('*/connections/:id', () =>
+        HttpResponse.json(
+          { code: 'INTERNAL', message: '해제하지 못했습니다.', hint: null },
+          { status: 500 },
+        ),
+      ),
+    );
+    renderSection();
+    const open = async () =>
+      userEvent.click(await screen.findByRole('button', { name: '키움 키 ab12 연결 해제' }));
+    await open();
+    const dialog = await screen.findByRole('dialog', { name: '키움 연결 해제' });
+    await userEvent.click(within(dialog).getByRole('button', { name: '데이터 유지' }));
+    expect(await within(dialog).findByText('해제하지 못했습니다.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    await open();
+    const again = await screen.findByRole('dialog', { name: '키움 연결 해제' });
+    expect(within(again).queryByText('해제하지 못했습니다.')).not.toBeInTheDocument();
+  });
+
+  it('연결 요청이 진행 중이면 같은 요청을 다시 보내지 않는다', async () => {
+    const { http, HttpResponse } = await import('msw');
+    mock.db.connections = [
+      conn({ id: 7, broker_id: 'kis', account_mask: '****7801', status: 'disconnected' }),
+    ];
+    let hits = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.post('*/connections', async () => {
+        hits += 1;
+        await gate;
+        return HttpResponse.json(
+          { code: 'BROKER_AUTH', message: '거절', hint: null },
+          { status: 401 },
+        );
+      }),
+    );
+    renderSection();
+    await userEvent.click(await screen.findByRole('button', { name: '연결 추가' }));
+    await userEvent.type(screen.getByLabelText('계좌번호'), '1234567801');
+    await userEvent.click(screen.getByRole('button', { name: '연결' }));
+    const dialog = await screen.findByRole('dialog', { name: '이전 내역을 이 연결로 바꿀까요?' });
+    await userEvent.dblClick(within(dialog).getByRole('button', { name: '새로 추가' }));
+    release();
+    await screen.findByText('거절');
+    expect(hits).toBe(1);
   });
 
   it('연결 중인 증권사에는 [데이터 삭제]를 주지 않는다(409 BROKER_CONNECTED)', async () => {

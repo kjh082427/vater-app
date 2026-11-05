@@ -11,7 +11,7 @@ import {
 import { MissingValue, Price, StockName } from '../../screens/common/quotes';
 import { useShared } from '../shared';
 import { portfolioSummarySource } from '../sources';
-import { PanelEmpty, PanelError, styles } from './common';
+import { hasUnpriced, PanelEmpty, PanelError, styles, UNPRICED_NOTE } from './common';
 import type { PanelProps } from './types';
 
 const currencyOf = (s: SymbolValue): Currency => (s.currency === 'USD' ? 'USD' : 'KRW');
@@ -78,6 +78,9 @@ export function HoldingsPanel({ size }: PanelProps) {
   }
   if (!summary.data) return <div className={styles.body} aria-busy="true" />;
   const { symbols, missing_prices: missing, unsupported } = summary.data;
+  if (symbols.length === 0 && unsupported > 0) {
+    return <PanelEmpty>{`지원하지 않는 ${unsupported}종목만 있어 평가하지 않습니다`}</PanelEmpty>;
+  }
   if (symbols.length === 0) {
     return (
       <PanelEmpty>
@@ -99,11 +102,11 @@ export function HoldingsPanel({ size }: PanelProps) {
       />
       <div className={styles.foot}>
         <span className="vt-num">{`${symbols.length}종목`}</span>
-        {missing > 0 ? (
-          <span>{`시세를 받지 못한 ${missing}종목은 합계에서 뺐습니다`}</span>
-        ) : unsupported > 0 ? (
+        {missing > 0 ? <span>{`시세를 받지 못한 ${missing}종목은 합계에서 뺐습니다`}</span> : null}
+        {unsupported > 0 ? (
           <span>{`지원하지 않는 ${unsupported}종목은 평가하지 않습니다`}</span>
         ) : null}
+        {hasUnpriced(symbols) ? <span>{UNPRICED_NOTE}</span> : null}
       </div>
     </div>
   );

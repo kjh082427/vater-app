@@ -104,6 +104,7 @@ function Browser({
             autoComplete="off"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
           />
         )}
       </Field>
@@ -132,14 +133,21 @@ function Browser({
             </ul>
           ) : null}
           {found.data.stocks.length > 0 ? (
-            <SymbolResultList
-              label="찾은 종목"
-              symbols={found.data.stocks.slice(0, PAGE)}
-              actionLabel={actionLabel}
-              onPick={onPick}
-              marked={marked}
-              busyKey={busyKey}
-            />
+            <>
+              <SymbolResultList
+                label="찾은 종목"
+                symbols={found.data.stocks.slice(0, PAGE)}
+                actionLabel={actionLabel}
+                onPick={onPick}
+                marked={marked}
+                busyKey={busyKey}
+              />
+              {found.data.stocks.length > PAGE ? (
+                <span
+                  className={styles.stockMeta}
+                >{`상위 ${PAGE}개만 표시, 이름으로 검색해 주세요`}</span>
+              ) : null}
+            </>
           ) : null}
           {found.data.nodes.length === 0 && found.data.stocks.length === 0 ? (
             <p className={styles.empty}>맞는 분류나 종목이 없습니다. 다른 낱말로 찾아 보세요.</p>

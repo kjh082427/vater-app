@@ -52,9 +52,9 @@ function held() {
   mock.db.bars['KR:005930'] = bars(30);
 }
 
-function view(item = samsung, rule?: AlertRule) {
+function view(item = samsung, rules: AlertRule[] = []) {
   return renderWithServices(
-    <StockOverview item={item} rule={rule} onRulesChanged={() => undefined} />,
+    <StockOverview item={item} rules={rules} onRulesChanged={() => undefined} />,
   );
 }
 const card = () => screen.findByRole('region', { name: '내 보유' });
@@ -237,13 +237,47 @@ describe('내 보유 카드', () => {
     server.events.on('request:start', ({ request }) => {
       if (request.method === 'DELETE') dels.push(new URL(request.url).pathname);
     });
-    view(samsung, rule);
+    view(samsung, [rule]);
     const c = await card();
     const sw = await within(c).findByRole('switch', { name: '평단가 대비 알림' });
     expect(sw).toHaveAttribute('aria-checked', 'true');
     expect(within(c).getByText(/내 평단가 대비 −10% 이하 하락/)).toBeInTheDocument();
     await userEvent.click(sw);
     await waitFor(() => expect(dels).toEqual(['/alerts/rules/40']));
+  });
+});
+
+describe('평단가 알림 스위치와 규칙', () => {
+  const avgRule = (id: number, enabled: boolean): AlertRule => ({
+    id,
+    watchlist_id: 1,
+    kind: 'avg_price_pct',
+    params: { pct: 10, direction: 'down' },
+    timing: 'realtime',
+    enabled,
+    last_state: null,
+    last_fired_at: null,
+  });
+
+  it('꺼 둔 규칙만 있으면 스위치는 꺼짐으로 보인다', async () => {
+    held();
+    view(samsung, [avgRule(41, false)]);
+    const sw = await within(await card()).findByRole('switch', { name: '평단가 대비 알림' });
+    expect(sw).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('끄면 그 종목의 평단가 규칙을 전부 지운다', async () => {
+    held();
+    mock.db.rules.push(avgRule(41, false), avgRule(42, true));
+    const dels: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'DELETE') dels.push(new URL(request.url).pathname);
+    });
+    view(samsung, [avgRule(41, false), avgRule(42, true)]);
+    const sw = await within(await card()).findByRole('switch', { name: '평단가 대비 알림' });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(sw);
+    await waitFor(() => expect(dels.sort()).toEqual(['/alerts/rules/41', '/alerts/rules/42']));
   });
 });
 

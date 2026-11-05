@@ -37,8 +37,8 @@ export interface MyHoldingsCardProps {
   value: SymbolValue | undefined;
   /** 시세 시각. */
   at: string | undefined;
-  /** 이 종목의 평단가 알림 규칙(없으면 꺼짐). */
-  rule: AlertRule | undefined;
+  /** 이 종목의 평단가 알림 규칙 전부(없거나 모두 꺼 두었으면 스위치는 꺼짐). */
+  rules: AlertRule[];
   onRulesChanged: () => void;
   onRefreshed: () => void;
 }
@@ -50,7 +50,7 @@ export function MyHoldingsCard({
   holdings,
   value,
   at,
-  rule,
+  rules,
   onRulesChanged,
   onRefreshed,
 }: MyHoldingsCardProps) {
@@ -63,6 +63,7 @@ export function MyHoldingsCard({
   const percents = formatShares(shares.map((b) => b.ratio));
   const priced = value?.price !== null && value?.price !== undefined;
   const unpriced = Number(holdings.unpriced_quantity);
+  const rule = rules.find((r) => r.enabled);
 
   function flip() {
     const next: Mode = mode === 'quantity' ? 'ratio' : 'quantity';
@@ -104,8 +105,11 @@ export function MyHoldingsCard({
             enabled: true,
           },
         });
-      } else if (rule) {
-        await api.request(`/alerts/rules/${rule.id}`, { method: 'DELETE' });
+      } else {
+        // 꺼 둔 규칙이 남아 있으면 규칙 목록에 규칙이 계속 보인다: 평단가 규칙을 전부 지운다
+        await Promise.all(
+          rules.map((r) => api.request(`/alerts/rules/${r.id}`, { method: 'DELETE' })),
+        );
       }
       onRulesChanged();
     });

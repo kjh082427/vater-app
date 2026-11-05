@@ -23,7 +23,7 @@ export function KpiStripSettings({
     group: 'strip',
     count: items.length,
     nameOf: (i) => METRICS[items[i] as MetricId].label,
-    done: '자리를 바꿨습니다.',
+    insert: true,
     announce,
     onDrop: (from, to) => {
       const next = [...items];

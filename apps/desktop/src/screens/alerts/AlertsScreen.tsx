@@ -74,7 +74,9 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   function uploadDone(result: WatchResult) {
     setUploading(null);
     setUploaded(
-      `${result.added}종목을 감시 종목에 올렸습니다.${result.skipped > 0 ? ` ${result.skipped}종목은 이미 있거나 찾지 못해 건너뛰었습니다.` : ''}${result.rules > 0 ? ` 알림 규칙 ${result.rules}개를 만들었습니다.` : ''}`,
+      result.added === 0 && result.skipped === 0
+        ? '확인했습니다. 감시 종목에는 올리지 않았습니다.'
+        : `${result.added}종목을 감시 종목에 올렸습니다.${result.skipped > 0 ? ` ${result.skipped}종목은 이미 있거나 찾지 못해 건너뛰었습니다.` : ''}${result.rules > 0 ? ` 알림 규칙 ${result.rules}개를 만들었습니다.` : ''}`,
     );
     watch.reload();
     rules.reload();
@@ -109,6 +111,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               connections={connections.data ?? []}
               holdings={holdings.data ?? []}
               watchedKeys={watchedKeys}
+              ready={Boolean(brokers.data && connections.data && holdings.data)}
               onOpen={(brokerId) => {
                 setUploaded(null);
                 setUploading({ brokerId });

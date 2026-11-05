@@ -130,6 +130,18 @@ describe('분류로 찾기', () => {
     expect(screen.getByText('감시 중')).toBeInTheDocument();
   });
 
+  it('검색 결과 종목이 100개를 넘으면 잘랐다고 알린다', async () => {
+    tree();
+    mock.db.categoryStocks.semi = Array.from({ length: 130 }, (_, i) =>
+      stock(String(100000 + i), `반도체종목${i}`),
+    );
+    await view();
+    await userEvent.type(await screen.findByLabelText('분류 검색'), '반도체종목');
+    const list = await screen.findByRole('list', { name: '찾은 종목' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(100);
+    expect(screen.getByText('상위 100개만 표시, 이름으로 검색해 주세요')).toBeInTheDocument();
+  });
+
   it('미분류는 수천 개여도 처음 100개만 그리고 [더 보기]로 늘린다', async () => {
     tree();
     mock.db.categoryStocks.unclassified = Array.from({ length: 3000 }, (_, i) =>

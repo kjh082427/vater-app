@@ -97,6 +97,16 @@
   border: var(--rule-hair) dashed var(--color-accent-line);
   border-radius: var(--radius-md);
   background: var(--color-card);
+
+  /* 칸 아무 데나 눌러 끌 수 있다: 터치 스크롤과 글자 선택이 끌기를 가로채지 않게 한다 */
+  touch-action: none;
+  user-select: none;
+}
+
+/* 입력칸 조작(글자 선택, 터치)은 막지 않는다 */
+.cell :where(input, textarea, select) {
+  touch-action: auto;
+  user-select: text;
 }
 
 .cell[data-empty='true'] {
