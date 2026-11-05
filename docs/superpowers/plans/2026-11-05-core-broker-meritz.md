@@ -4,7 +4,7 @@
 
 **Goal:** 메리츠 계좌의 보유 종목을 어댑터로 불러온다.
 
-**Architecture:** `brokers/meritz.py`, `ReadOnlyHttp`로만 호출한다. 기본 주소 `https://openapi.imeritz.com`, 토큰 `POST /oauth2/token`(scope `login`, 12시간, `expires_in` 60초 전 재발급).
+**Architecture:** `brokers/meritz.py`, `ReadOnlyHttp`로만 호출한다. 기본 주소 `https://openapi.imeritz.com:9443`, 토큰 `POST /oauth2/token`(scope `login`). 만료 시각을 쓰지 않고 거부 응답을 받으면 재발급한다.
 
 **Spec:** v2 설계 0, 1, 8장. 참고: `docs/brokers/meritz.md`. 선행: `core/holdings`.
 

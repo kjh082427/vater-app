@@ -2,3 +2,4 @@
 
 from vater_core.brokers import kis as kis  # 어댑터는 불러올 때 ADAPTERS에 등록된다
 from vater_core.brokers import kiwoom as kiwoom
+from vater_core.brokers import meritz as meritz
