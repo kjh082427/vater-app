@@ -262,6 +262,15 @@ class BarRepo:
             volume=tuple(float(r[5]) for r in rows),
         )
 
+    def closes_since(self, market: str, code: str, after: date) -> list[tuple[date, float]]:
+        """그 날짜 다음 날부터의 (날짜, 종가). 오래된 것부터."""
+        rows = self._conn.execute(
+            "SELECT day, close FROM daily_bars WHERE market = ? AND code = ? AND day > ? "
+            "ORDER BY day",
+            (market, code, after.isoformat()),
+        ).fetchall()
+        return [(date.fromisoformat(r[0]), float(r[1])) for r in rows]
+
     def close_before(self, market: str, code: str, day: date) -> float | None:
         """그 날짜 전의 가장 최근 종가(실시간 틱의 전일 대비 계산용)."""
         r = self._conn.execute(

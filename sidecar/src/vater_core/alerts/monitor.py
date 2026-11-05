@@ -239,6 +239,16 @@ class AlertMonitor:
             if self._rest_inflight.get(key) is task:
                 del self._rest_inflight[key]
 
+    async def ensure_bars(self, item: WatchItem) -> None:
+        """확정된 마지막 세션의 일봉이 없으면 받는다. 실패해도 가진 것으로 넘어간다."""
+        try:
+            day = await self._clock.last_closed_session(cast(MarketId, item.market))
+            last = BarRepo(self._db()).last_day(item.market, item.code)
+            if day is not None and (last is None or last < day):
+                await self._bars(item, day)
+        except Exception as e:
+            logger.warning("bars %s %s: refresh failed: %s", item.market, item.code, e)
+
     async def preview(
         self, item: WatchItem, kind: str, params: dict[str, Any], timing: str
     ) -> Reading:
@@ -251,14 +261,7 @@ class AlertMonitor:
         parsed = parse_rule(kind, params)
         market = cast(MarketId, item.market)
         bars = BarRepo(self._db())
-        day = await self._clock.last_closed_session(market)
-        if day is not None:
-            last = bars.last_day(item.market, item.code)
-            if last is None or last < day:
-                try:
-                    await self._bars(item, day)
-                except Exception as e:
-                    logger.warning("rule preview %s %s: bars failed: %s", item.market, item.code, e)
+        await self.ensure_bars(item)
         live: Live | None = None
         if timing == "realtime" and await self._clock.is_open(market):
             try:

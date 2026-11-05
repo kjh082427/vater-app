@@ -445,6 +445,24 @@
         "title": "AnalysisQueued",
         "type": "object"
       },
+      "BarOut": {
+        "properties": {
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "close"
+        ],
+        "title": "BarOut",
+        "type": "object"
+      },
       "BriefingDetail": {
         "properties": {
           "created_at": {
@@ -6599,6 +6617,101 @@
           }
         },
         "summary": "Symbols Search",
+        "tags": [
+          "kis"
+        ]
+      }
+    },
+    "/symbols/{market}/{code}/bars": {
+      "get": {
+        "description": "종목 일봉 종가(오래된 것부터). 한투 키가 없거나 받지 못하면 가진 만큼만 준다.",
+        "operationId": "symbol_bars_symbols__market___code__bars_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "market",
+            "required": true,
+            "schema": {
+              "enum": [
+                "KR",
+                "US"
+              ],
+              "title": "Market",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1m",
+              "enum": [
+                "1m",
+                "3m",
+                "1y"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BarOut"
+                  },
+                  "title": "Response Symbol Bars Symbols  Market   Code  Bars Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Symbol Bars",
         "tags": [
           "kis"
         ]
