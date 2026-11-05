@@ -23,8 +23,8 @@
 - **이 목록에 해외 행이 섞여 온다.** `pros_trgt_cls_code`가 `J`이면 해외 행이라 빼고 해외 조회를 쓴다 ✅
 - 해외 `GET /accounts/v1/me/overseas/holdings` ✅. 응답 `data[]`: `ovrs_stck_symb_iscd`(순수 심볼), `iscd`(`AAPL.OQ`), `isnm`, `rmnd_dqty`(소수 수량), `avrg_unpr`, `crcd`
 - 연속 조회: `rsp_cd=5762`이면 다음 쪽이 있다. 쿼리 `tr_cont=1`과 응답의 `tr_cont_key`를 공백까지 그대로 보낸다 ✅
-- 정상 코드 `0000`, `0001`. 자료 없음 `5820`, `5822`. 빈 목록은 `[]`로 온다 ✅
-- 응답에 합계가 없어서 빈 목록은 `data`가 명시적으로 `[]`이고 코드가 정상일 때만 믿는다. 국내 목록에 해외 행이 있는데 해외 조회가 비면 저장하지 않는다.
+- 성공 코드는 `5766`(조회 완료), `5820`(자료 없음), `5762`(다음 쪽 있음)이다. 다음 쪽은 `tr_cont=1`로도 알린다 ✅
+- 두 목록의 해외 종목이 일치해야 저장한다. 두 목록이 모두 비면 `GET /accounts/v1/me/valuation/by-asset`(`aset_cls_code` 01, 02)의 `vltn_amt`가 0일 때만 보유 없음으로 믿는다. `pros_trgt_cls_code`가 `1`이면 국내, `J`면 해외, 그 밖은 지원하지 않는 행이다 ✅
 
 ## 오류
 - 업무 오류도 HTTP 500으로 온다. `rsp_cd`를 먼저 본다 ✅
@@ -45,7 +45,8 @@
 
 ## 확인할 것 (실제 키 필요)
 - [ ] 빈 계좌, 해외 거래 없는 계좌의 실제 응답
-- [ ] 국내 목록의 해외 행과 해외 조회의 일치
+- [ ] 국내 목록의 해외 행과 해외 조회의 `iscd`가 실제로 일치하는지. 다르면 동기화가 실패한다(내역은 지키는 쪽으로 정했다)
+- [ ] 빈 계좌에서 `by-asset` 응답 모양
 - [ ] MAC 주소가 바뀌면(다른 네트워크 장치) 토큰이나 호출이 거부되는지
 - [ ] 실연동: 루트 `.env`에 `MERITZ_TEST_APP_KEY`, `MERITZ_TEST_APP_SECRET`을 넣고 `cd sidecar && uv run pytest -m broker_live -k meritz -q -s`
 

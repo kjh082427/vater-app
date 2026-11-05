@@ -19,12 +19,17 @@ BASE_URL = "https://openapi.imeritz.com:9443"
 TOKEN_PATH = "/oauth2/token"  # noqa: S105  (경로이지 비밀값이 아니다)
 KR_PATH = "/accounts/v1/me/holdings"
 US_PATH = "/accounts/v1/me/overseas/holdings"
-_ALLOWED = frozenset({("POST", TOKEN_PATH), ("GET", KR_PATH), ("GET", US_PATH)})
+ASSET_PATH = "/accounts/v1/me/valuation/by-asset"  # 두 목록이 다 빌 때 합계로 확인한다
+_ALLOWED = frozenset(
+    {("POST", TOKEN_PATH), ("GET", KR_PATH), ("GET", US_PATH), ("GET", ASSET_PATH)}
+)
 MAX_PAGES = 20  # 다 못 받으면 저장하지 않는다. 일부만 저장하면 나머지를 판 것으로 알게 된다
 PAGE_DELAY_SEC = 0.15  # 초당 10건 제한
-_OK = {"0000", "0001"}
-_NO_DATA = {"5820", "5822"}
+_DONE = "5766"
+_NO_DATA = "5820"  # 자료를 담고도 올 때가 있어 data로 판단한다
 _MORE = "5762"
+_ASSET_CLASSES = ("01", "02")  # 국내주식, 해외주식
+_DOMESTIC_ROW = "1"
 _TOKEN_DEAD = {"EGW00121", "EGW00123"}
 _RATE_LIMITED = "EGW00200"
 _NO_MAC = "IGW50024"
@@ -44,7 +49,7 @@ def _mac_error() -> VaterError:
 
 def mac_address() -> str:
     node = uuid.getnode()
-    if node >> 40 & 1:  # 장치를 못 읽으면 멀티캐스트 비트가 켜진 임의 값이 온다
+    if not node or node >> 40 & 1:  # 장치를 못 읽으면 멀티캐스트 비트가 켜진 임의 값이 온다
         raise _mac_error()
     return f"{node:012X}"
 
@@ -74,6 +79,8 @@ def _detail(body: dict[str, Any]) -> str:
 def _check_error(status: int, body: dict[str, Any] | None) -> None:
     """성공 코드가 아니면 알맞은 오류를 낸다."""
     code = str(body.get("rsp_cd") or "") if body else ""
+    if body and body.get("error"):  # 토큰 발급의 OAuth 오류 형식
+        raise _auth_error(str(body.get("error_description") or body["error"]))
     if code == _RATE_LIMITED or status == 429:
         raise VaterError(
             "BROKER_RATE_LIMITED",
@@ -102,7 +109,7 @@ def _check_error(status: int, body: dict[str, Any] | None) -> None:
 def _kr_code(raw: Any) -> str:
     """접두어 1자리 + 코드 6자리."""
     code = stock_code(raw)
-    return code[1:] if len(code) == 7 and code[0].isalpha() else code
+    return code[1:] if len(code) == 7 and code[0] in "AJQ" else code
 
 
 class MeritzAdapter:
@@ -150,7 +157,7 @@ class MeritzAdapter:
                 self._secrets.delete(self._token_name)
                 reissued = True
                 continue
-            if body is not None and r.status_code == 200 and code in {*_OK, *_NO_DATA, _MORE}:
+            if body is not None and r.status_code == 200 and code in {_DONE, _NO_DATA, _MORE}:
                 return body
             _check_error(r.status_code, body)
             raise bad_broker_response()
@@ -163,8 +170,13 @@ class MeritzAdapter:
             page = body.get("data")
             if not isinstance(page, list) or any(r in rows for r in page):
                 raise bad_broker_response()
+            if not page and body.get("rsp_sub_msg"):  # 비어 있는 이유가 따로 적혀 있다
+                raise bad_broker_response()
             rows += page
-            if body["rsp_cd"] != _MORE:
+            more_code, more_flag = body["rsp_cd"] == _MORE, body.get("tr_cont") == "1"
+            if more_code and body.get("tr_cont") == "0":
+                raise bad_broker_response()
+            if not more_code and not more_flag:
                 return rows
             key = body.get("tr_cont_key")
             if not key or key == query.get("tr_cont_key"):
@@ -177,31 +189,58 @@ class MeritzAdapter:
         """국내·해외를 모두 불러 본다. 한쪽만 안 되는 키를 저장한 뒤 매번 실패하지 않게."""
         await self.holdings()
 
+    async def _require_no_stock_value(self) -> None:
+        """두 목록이 다 비면 자산군 합계로 확인한다. 저장된 내역을 지우는 일이라 그렇다."""
+        for asset in _ASSET_CLASSES:
+            body = await self._page(ASSET_PATH, {"aset_cls_code": asset})
+            data = body.get("data")
+            if not isinstance(data, dict) or number(data.get("vltn_amt")) != 0:
+                raise bad_broker_response()
+
     async def holdings(self) -> list[HoldingRow]:
         mixed = await self._rows(KR_PATH, {"nthn_rmnd_incu_yn": "N"})
         overseas = await self._rows(US_PATH, {})
-        domestic = [r for r in mixed if r.get("pros_trgt_cls_code") != _OVERSEAS_ROW]
-        if len(domestic) != len(mixed) and not overseas:
+        if not mixed and not overseas:
+            await self._require_no_stock_value()
+            return []
+        # 국내 목록에 해외 행이 함께 온다. 두 조회가 어긋나면 어느 쪽을 믿을지 알 수 없다
+        listed = {
+            stock_code(r.get("iscd"))
+            for r in mixed
+            if r.get("pros_trgt_cls_code") == _OVERSEAS_ROW
+            and number(r.get("rmnd_qty")) + number(r.get("hldn_issu_rmnd_qty") or 0) != 0
+        }
+        if listed != {
+            stock_code(r.get("iscd")) for r in overseas if number(r.get("rmnd_dqty")) != 0
+        }:
             raise bad_broker_response()
-        rows = [
-            HoldingRow(
-                "KR",
-                _kr_code(r.get("iscd")),
-                str(r.get("isnm") or r.get("iscd")),
-                number(r.get("rmnd_qty")),
-                average(r.get("byng_unpr")),
-                "KRW",
+        rows: list[HoldingRow] = []
+        for r in mixed:
+            kind = r.get("pros_trgt_cls_code")
+            if kind == _OVERSEAS_ROW:
+                continue
+            domestic = kind == _DOMESTIC_ROW
+            code = _kr_code(r.get("iscd")) if domestic else stock_code(r.get("iscd"))
+            rows.append(
+                HoldingRow(
+                    "KR" if domestic else None,
+                    code,
+                    str(r.get("isnm") or code),
+                    number(r.get("rmnd_qty")),
+                    average(r.get("byng_unpr")),
+                    "KRW" if domestic else "",
+                )
             )
-            for r in domestic
-        ]
         for r in overseas:
-            currency = r.get("crcd") or ""
-            symbol = stock_code(r.get("ovrs_stck_symb_iscd") or str(r.get("iscd")).split(".")[0])
+            currency = stock_code(r.get("crcd"))
+            symbol = stock_code(
+                r.get("ovrs_stck_symb_iscd") or stock_code(r.get("iscd")).split(".")[0]
+            )
             rows.append(
                 HoldingRow(
                     "US" if currency == "USD" else None,
                     symbol,
-                    r.get("isnm") or symbol,
+                    str(r.get("isnm") or symbol),
                     number(r.get("rmnd_dqty")),
                     average(r.get("avrg_unpr")),
                     currency,

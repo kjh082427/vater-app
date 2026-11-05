@@ -1,7 +1,9 @@
 """증권사 실연동 테스트 공용. 토큰은 메모리에만 둔다."""
 
+import pytest
 
-class MemoryTokens:
+
+class _MemoryTokens:
     def __init__(self) -> None:
         self.values: dict[str, str] = {}
 
@@ -16,3 +18,8 @@ class MemoryTokens:
 
     def known_values(self) -> list[str]:
         return list(self.values.values())
+
+
+@pytest.fixture
+def memory_tokens() -> _MemoryTokens:
+    return _MemoryTokens()

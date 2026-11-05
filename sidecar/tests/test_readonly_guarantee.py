@@ -12,7 +12,7 @@ KIWOOM_ORDER = re.compile(
 )
 # 메리츠 주문·예약주문·해외 주문·환전 경로와 TR (공식 카탈로그로 확인)
 MERITZ_ORDER = re.compile(
-    r"/trading/v1/|/forex/v1/exchanges|\bobtr[so]_oder_\d{3}a\b|\bobtsd_fbnk_\d{3}a\b"
+    r"/oauth2/revoke|/trading/v1/|/forex/v1/exchanges|\bobtr[so]_oder_\d{3}a\b|\bobtsd_fbnk_\d{3}a\b"
 )
 SCANNED = {".py", ".json", ".sql", ".toml", ".yaml", ".yml"}
 SRC = Path(__file__).parents[1] / "src"

@@ -12,6 +12,7 @@ from vater_core.api.errors import VaterError
 from vater_core.brokers import meritz
 from vater_core.brokers.base import ADAPTERS, BrokerContext, BrokerCreds
 from vater_core.brokers.meritz import (
+    ASSET_PATH,
     BASE_URL,
     KR_PATH,
     MAX_PAGES,
@@ -31,11 +32,20 @@ KR_URL = BASE_URL + KR_PATH
 US_URL = BASE_URL + US_PATH
 MAC = "AABBCCDDEEFF"
 ISSUED = {"access_token": "tok-1", "token_type": "Bearer", "expires_in": 43200, "scope": "login"}
-EMPTY = {"rsp_cd": "5820", "rsp_msg": "해당 자료가 없습니다.", "data": []}
+EMPTY = {"rsp_cd": "5820", "rsp_msg": "조회할 자료 없음", "data": [], "tr_cont": "0"}
+ASSET_URL = BASE_URL + ASSET_PATH
+NO_ASSET = {"rsp_cd": "5766", "data": {"vltn_amt": 0, "byng_amt": 0}, "tr_cont": "0"}
 
 
 def ok(data: Any, **extra: Any) -> dict[str, Any]:
-    return {"rsp_cd": "0000", "rsp_msg": "정상", "data": data, **extra}
+    """공식 명세의 성공 응답. 5766이 조회 완료, tr_cont 0이 마지막 쪽이다."""
+    return {
+        "rsp_cd": "5766",
+        "rsp_msg": "조회가 완료되었습니다.",
+        "data": data,
+        "tr_cont": "0",
+        **extra,
+    }
 
 
 def kr_row(code: str = "A005930", qty: Any = 10, kind: str = "1") -> dict[str, Any]:
@@ -87,6 +97,7 @@ def adapter(http: httpx.AsyncClient, secrets: SecretStore) -> MeritzAdapter:
 def routes(
     kr: dict[str, Any] = EMPTY, us: dict[str, Any] = EMPTY
 ) -> tuple[respx.Route, respx.Route, respx.Route]:
+    respx.get(ASSET_URL).mock(return_value=httpx.Response(200, json=NO_ASSET))
     return (
         respx.post(TOKEN_URL).mock(return_value=httpx.Response(200, json=ISSUED)),
         respx.get(KR_URL).mock(return_value=httpx.Response(200, json=kr)),
@@ -121,6 +132,7 @@ async def test_fields_headers_and_token(secrets: SecretStore) -> None:
                 kr_row(),
                 kr_row("A0088M0", 3),
                 kr_row("AAPL.OQ", 2, "J"),  # 국내 목록에 함께 오는 해외 행은 빼고 해외 조회를 쓴다
+                kr_row("7203.OQ", 2, "J"),
             ]
         ),
         ok([us_row(), us_row("7203", "JPY")]),
@@ -171,6 +183,7 @@ async def test_dead_token_is_reissued_once(secrets: SecretStore, rejected: dict[
         side_effect=[httpx.Response(**rejected), httpx.Response(200, json=EMPTY)]
     )
     respx.get(US_URL).mock(return_value=httpx.Response(200, json=EMPTY))
+    respx.get(ASSET_URL).mock(return_value=httpx.Response(200, json=NO_ASSET))
     async with httpx.AsyncClient() as http:
         assert await adapter(http, secrets).holdings() == []
     assert token.call_count == 1
@@ -274,9 +287,17 @@ async def test_bad_continuation_key_fails(secrets: SecretStore, key: str | None)
     secrets.set(TOKEN_NAME, "tok")
     respx.get(KR_URL).mock(
         side_effect=[
-            httpx.Response(200, json={**ok([kr_row()]), "rsp_cd": "5762", "tr_cont_key": "K0"}),
             httpx.Response(
-                200, json={**ok([kr_row("A000660")]), "rsp_cd": "5762", "tr_cont_key": key}
+                200, json={**ok([kr_row()]), "rsp_cd": "5762", "tr_cont": "1", "tr_cont_key": "K0"}
+            ),
+            httpx.Response(
+                200,
+                json={
+                    **ok([kr_row("A000660")]),
+                    "rsp_cd": "5762",
+                    "tr_cont": "1",
+                    "tr_cont_key": key,
+                },
             ),
         ]
     )
@@ -293,7 +314,12 @@ async def test_repeated_rows_and_endless_paging_fail(secrets: SecretStore) -> No
 
     def page(request: httpx.Request) -> httpx.Response:
         n = next(pages)
-        body = {**ok([kr_row(f"A{n:06d}")]), "rsp_cd": "5762", "tr_cont_key": f"K{n}"}
+        body = {
+            **ok([kr_row(f"A{n:06d}")]),
+            "rsp_cd": "5762",
+            "tr_cont": "1",
+            "tr_cont_key": f"K{n}",
+        }
         return httpx.Response(200, json=body)
 
     route = respx.get(KR_URL).mock(side_effect=page)
@@ -307,9 +333,10 @@ async def test_repeated_rows_and_endless_paging_fail(secrets: SecretStore) -> No
 @pytest.mark.parametrize(
     "body",
     [
-        {"rsp_cd": "0000", "rsp_msg": "정상"},  # data 없음
-        {"rsp_cd": "0000", "data": None},
-        {"rsp_cd": "0000", "data": {}},
+        {"rsp_cd": "5766", "rsp_msg": "정상"},  # data 없음
+        {"rsp_cd": "5766", "data": None},
+        {"rsp_cd": "5766", "data": {}},
+        {"rsp_cd": "5766", "data": [], "rsp_sub_msg": "조회시작일"},  # 왜 비었는지 적혀 있다
         {"data": []},  # 코드 없음
     ],
 )
@@ -342,7 +369,8 @@ async def test_connection_test_covers_both_lists(secrets: SecretStore) -> None:
 
 
 def test_only_read_calls_are_allowed() -> None:
-    assert {("POST", TOKEN_PATH), ("GET", KR_PATH), ("GET", US_PATH)} == meritz._ALLOWED
+    expected = {("POST", TOKEN_PATH), ("GET", KR_PATH), ("GET", US_PATH), ("GET", ASSET_PATH)}
+    assert expected == meritz._ALLOWED
 
 
 @respx.mock
@@ -356,7 +384,10 @@ async def test_rows_arriving_with_a_no_data_code_are_kept(secrets: SecretStore) 
 
 @respx.mock
 async def test_codes_are_cleaned_and_blank_codes_fail(secrets: SecretStore) -> None:
-    routes(ok([kr_row("A005930 ")]), ok([{**us_row(), "ovrs_stck_symb_iscd": " AAPL "}]))
+    routes(
+        ok([kr_row("A005930 "), kr_row("AAPL.OQ", 1, "J")]),
+        ok([{**us_row(), "ovrs_stck_symb_iscd": " AAPL "}]),
+    )
     async with httpx.AsyncClient() as http:
         rows = await adapter(http, secrets).holdings()
     assert [r.code for r in rows] == ["005930", "AAPL"]
@@ -371,3 +402,127 @@ async def test_blank_code_fails(secrets: SecretStore) -> None:
         with pytest.raises(VaterError) as e:
             await adapter(http, secrets).holdings()
     assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@pytest.mark.parametrize("code", ["0000", "0001", "5822"])
+@respx.mock
+async def test_codes_outside_the_spec_never_mean_sold(secrets: SecretStore, code: str) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.get(KR_URL).mock(
+        return_value=httpx.Response(200, json={"rsp_cd": code, "data": [], "tr_cont": "0"})
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError):
+            await adapter(http, secrets).holdings()
+
+
+@pytest.mark.parametrize(
+    ("kr", "us"),
+    [
+        (
+            ok([kr_row("AAPL.OQ", 2, "J"), kr_row("MU.OQ", 2, "J")]),
+            ok([us_row()]),
+        ),  # 해외 1종목 누락
+        (EMPTY, ok([us_row()])),  # 국내 목록이 비었는데 해외만 있다
+    ],
+)
+@respx.mock
+async def test_the_two_lists_must_agree(
+    secrets: SecretStore, kr: dict[str, Any], us: dict[str, Any]
+) -> None:
+    routes(kr, us)
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_both_lists_empty_needs_zero_stock_value(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.get(KR_URL).mock(return_value=httpx.Response(200, json=EMPTY))
+    respx.get(US_URL).mock(return_value=httpx.Response(200, json=EMPTY))
+    asset = respx.get(ASSET_URL).mock(
+        return_value=httpx.Response(200, json=ok({"vltn_amt": 1000000}))
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+    assert asset.calls[0].request.url.params["aset_cls_code"] == "01"
+
+
+@respx.mock
+async def test_both_lists_empty_with_zero_value_is_zero_rows(secrets: SecretStore) -> None:
+    routes()
+    async with httpx.AsyncClient() as http:
+        assert await adapter(http, secrets).holdings() == []
+    assert respx.calls.call_count >= 4
+
+
+@respx.mock
+async def test_completed_code_with_more_pages_keeps_reading(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    kr = respx.get(KR_URL).mock(
+        side_effect=[
+            httpx.Response(200, json={**ok([kr_row()]), "tr_cont": "1", "tr_cont_key": "K1"}),
+            httpx.Response(200, json=ok([kr_row("A000660")])),
+        ]
+    )
+    respx.get(US_URL).mock(return_value=httpx.Response(200, json=EMPTY))
+    async with httpx.AsyncClient() as http:
+        assert len(await adapter(http, secrets).holdings()) == 2
+    assert kr.call_count == 2
+
+
+@respx.mock
+async def test_more_code_on_a_last_page_fails(secrets: SecretStore) -> None:
+    secrets.set(TOKEN_NAME, "tok")
+    respx.get(KR_URL).mock(
+        return_value=httpx.Response(200, json={**ok([kr_row()]), "rsp_cd": "5762", "tr_cont": "0"})
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@pytest.mark.parametrize("kind", ["", None, "2"])
+@respx.mock
+async def test_rows_of_an_unknown_kind_are_not_called_domestic(
+    secrets: SecretStore, kind: str | None
+) -> None:
+    routes(ok([kr_row("AAPL.OQ", 3, kind)]))  # type: ignore[arg-type]
+    async with httpx.AsyncClient() as http:
+        rows = await adapter(http, secrets).holdings()
+    assert (rows[0].market, rows[0].code) == (None, "AAPL.OQ")
+
+
+@respx.mock
+async def test_overseas_row_needs_a_code_and_a_currency(secrets: SecretStore) -> None:
+    for bad in ({**us_row(), "ovrs_stck_symb_iscd": "", "iscd": ""}, {**us_row(), "crcd": ""}):
+        routes(ok([]), ok([bad]))
+        async with httpx.AsyncClient() as http:
+            with pytest.raises(VaterError) as e:
+                await adapter(http, secrets).holdings()
+        assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+def test_zero_mac_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.undo()
+    monkeypatch.setattr(meritz.uuid, "getnode", lambda: 0)
+    with pytest.raises(VaterError):
+        mac_address()
+
+
+@respx.mock
+async def test_oauth_style_token_error_is_an_auth_failure(secrets: SecretStore) -> None:
+    respx.post(TOKEN_URL).mock(
+        return_value=httpx.Response(
+            400, json={"error": "invalid_client", "error_description": "앱키 오류"}
+        )
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, secrets).test()
+    assert e.value.code == "BROKER_AUTH_INVALID" and "앱키 오류" in e.value.message
