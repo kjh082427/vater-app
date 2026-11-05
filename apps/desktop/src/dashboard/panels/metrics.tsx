@@ -4,7 +4,17 @@
  */
 import type { ReactNode } from 'react';
 import type { ApiError } from '../../api/errors';
-import { directionOf, formatNumber, KpiTile, SignedNumber, Sparkline } from '../../design-system';
+import {
+  directionOf,
+  formatUsd,
+  formatUsdChange,
+  formatWon,
+  formatWonChange,
+  formatNumber,
+  KpiTile,
+  SignedNumber,
+  Sparkline,
+} from '../../design-system';
 import { KIND_GROUP } from '../../screens/alerts/kinds';
 import { parseFlows } from '../../screens/briefing/data';
 import { MissingValue } from '../../screens/common/quotes';
@@ -17,6 +27,7 @@ import {
   analysesSource,
   briefingSource,
   indicesSource,
+  portfolioSummarySource,
   quotesSource,
 } from '../sources';
 import { chartSeries, type IndexCode } from './IndexChartPanel';
@@ -148,6 +159,56 @@ function useForeignNet(): MetricValue {
   };
 }
 
+/** 총 평가금액: 환율이 있으면 원화 환산 합계, 없으면 원화 합계만(달러는 따로). 통화별 값을 함께 보인다. */
+function useTotalValue(): MetricValue {
+  const { data, error } = useShared(portfolioSummarySource);
+  if (!data) return { value: <MissingValue />, error };
+  const krw = data.currencies.KRW;
+  const usd = data.currencies.USD;
+  if (!krw && !usd) {
+    return { value: <MissingValue />, change: <Muted>보유 내역 없음</Muted>, error };
+  }
+  const converted = data.total_krw !== null;
+  const shown = converted ? data.total_krw?.value : krw?.value;
+  const parts = [
+    ...(krw ? [`원화 ${formatWon(krw.value)}`] : []),
+    ...(usd ? [`달러 ${formatUsd(usd.value)}`] : []),
+    ...(usd && !converted ? ['환율 없음'] : []),
+  ];
+  const note = data.missing_prices > 0 ? ` · 시세 없는 ${data.missing_prices}종목 제외` : '';
+  return {
+    value: shown === null || shown === undefined ? <MissingValue /> : formatWon(shown),
+    change: <Muted>{usd || note ? `${parts.join(' · ')}${note}` : '주식 평가금액'}</Muted>,
+    error,
+  };
+}
+
+/** 총 평가손익: 총 평가금액과 같은 기준(환산 또는 원화). 통화별 손익을 함께 보인다. */
+function useTotalPl(): MetricValue {
+  const { data, error } = useShared(portfolioSummarySource);
+  if (!data) return { value: <MissingValue />, error };
+  const krw = data.currencies.KRW;
+  const usd = data.currencies.USD;
+  if (!krw && !usd) {
+    return { value: <MissingValue />, change: <Muted>보유 내역 없음</Muted>, error };
+  }
+  const basis = data.total_krw ?? krw;
+  const parts = [
+    ...(krw && usd ? [`원화 ${formatWonChange(krw.pl, { unit: true })}`] : []),
+    ...(usd ? [`달러 ${formatUsdChange(usd.pl)}`] : []),
+  ];
+  return {
+    value: <SignedNumber value={basis?.pl} format="won" unit />,
+    change: (
+      <span className={styles.change}>
+        <SignedNumber value={basis?.pl_pct} format="percent" />
+        {parts.length > 0 ? <Muted>{parts.join(' · ')}</Muted> : null}
+      </span>
+    ),
+    error,
+  };
+}
+
 export const METRICS: Record<MetricId, { label: string; use: () => MetricValue }> = {
   kospi: { label: '코스피', use: () => useIndex('KOSPI') },
   kosdaq: { label: '코스닥', use: () => useIndex('KOSDAQ') },
@@ -157,6 +218,8 @@ export const METRICS: Record<MetricId, { label: string; use: () => MetricValue }
   'alerts-today': { label: '오늘 알림', use: useAlertsToday },
   'analyses-running': { label: '진행 중인 분석', use: useAnalysesRunning },
   'foreign-net': { label: '외국인 순매수', use: useForeignNet },
+  'total-value': { label: '총 평가금액', use: useTotalValue },
+  'total-pl': { label: '총 평가손익', use: useTotalPl },
 };
 
 /** 숫자 카드 1개. id가 바뀌면 훅 순서가 바뀌므로 부모는 key={id}로 그린다. */

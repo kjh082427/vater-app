@@ -152,3 +152,68 @@ describe('LineChart: 부동소수 한 칸 차이 범위 (리뷰 C1)', () => {
     expect(screen.getByRole('img', { name: /거의 같은 값/ })).toBeInTheDocument();
   });
 });
+
+describe('LineChart: 두 번째 선(secondary)과 채운 날(hollow)', () => {
+  it('두 번째 선은 중립색 선으로 따로 그리고, 눈금 범위에 함께 든다', () => {
+    const { container } = render(
+      <LineChart
+        values={[100, 110, 120]}
+        secondary={[100, 100, 100]}
+        direction="up"
+        format={fmt}
+        aria-label="자산"
+      />,
+    );
+    const second = container.querySelector('[data-role="secondary"]');
+    expect(second?.getAttribute('d')).toMatch(/^M[\d.]+ [\d.]+L/);
+    const ys = (d: string) => [...d.matchAll(/ ([\d.]+)/g)].map((m) => Number(m[1]));
+    // 100(둘째 선)이 110·120(첫째 선)보다 아래에 그려진다(y가 크다)
+    expect(Math.min(...ys(second?.getAttribute('d') ?? ''))).toBeGreaterThan(
+      Math.max(...ys(linePath(container)).slice(1)),
+    );
+  });
+
+  it('두 번째 선이 아주 낮으면 범위가 넓어져 첫째 선이 위쪽에 몰린다', () => {
+    const base = render(
+      <LineChart values={[100, 110]} direction="up" format={fmt} aria-label="a" />,
+    );
+    const baseY = Math.max(
+      ...[...linePath(base.container).matchAll(/ ([\d.]+)/g)].map((m) => Number(m[1])),
+    );
+    base.unmount();
+    const wide = render(
+      <LineChart
+        values={[100, 110]}
+        secondary={[0, 0]}
+        direction="up"
+        format={fmt}
+        aria-label="b"
+      />,
+    );
+    const wideY = Math.max(
+      ...[...linePath(wide.container).matchAll(/ ([\d.]+)/g)].map((m) => Number(m[1])),
+    );
+    expect(wideY).toBeLessThan(baseY);
+  });
+
+  it('채운 날은 속이 빈 점으로 표시한다', () => {
+    const { container } = render(
+      <LineChart
+        values={[1, 2, 3, 4]}
+        hollow={[1, 2]}
+        direction="up"
+        format={fmt}
+        aria-label="c"
+      />,
+    );
+    expect(container.querySelectorAll('[data-role="filled-point"]')).toHaveLength(2);
+  });
+
+  it('두 번째 선이 없으면 그리지 않는다', () => {
+    const { container } = render(
+      <LineChart values={[1, 2, 3]} direction="up" format={fmt} aria-label="d" />,
+    );
+    expect(container.querySelector('[data-role="secondary"]')).toBeNull();
+    expect(container.querySelector('[data-role="filled-point"]')).toBeNull();
+  });
+});

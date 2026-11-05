@@ -148,3 +148,43 @@ a.itemText:hover {
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
 }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-3);
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.legend span::before {
+  display: inline-block;
+  width: 1rem;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+  border-top: 2px solid var(--color-ink);
+  content: '';
+}
+
+.legend span + span::before {
+  border-top: 1.4px solid var(--color-ink-3);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.holdCaution {
+  color: var(--color-caution-ink);
+}

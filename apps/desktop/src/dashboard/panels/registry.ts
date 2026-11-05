@@ -1,6 +1,14 @@
 /** 칸 내용 목록(대시보드 설계 3장): 내용 1가지 = 컴포넌트 + 최소 크기 + 옵션. */
 import { MAX_PANEL_METRICS, PANEL_MINS } from '../layout/mins';
 import { AlertHistoryPanel, KIND_CHOICES, useSymbolChoices } from './AlertHistoryPanel';
+import {
+  AssetTrendPanel,
+  TREND_RANGE_LABEL,
+  TREND_RANGES,
+  TREND_VIEW_LABEL,
+  TREND_VIEWS,
+} from './AssetTrendPanel';
+import { HoldingsPanel } from './HoldingsPanel';
 import { AnalysisResultPanel, useAnalysisChoices } from './AnalysisResultPanel';
 import { BRIEF_MARKETS, BriefingPanel, MARKET_NAME } from './BriefingPanel';
 import { INDEX_CODES, INDEX_LABEL, IndexChartPanel } from './IndexChartPanel';
@@ -111,6 +119,36 @@ export const PANELS: PanelRegistry = {
       },
     ],
     Component: AlertHistoryPanel,
+  },
+  holdings: {
+    label: '내 보유 종목',
+    description: '보유 수량·평단가·평가손익 표',
+    min: PANEL_MINS.holdings,
+    Component: HoldingsPanel,
+  },
+  'asset-trend': {
+    label: '자산 추이',
+    description: '주식 평가금액과 매입금액 두 선',
+    describe: (o) =>
+      `주식 평가금액(예수금 제외) · ${TREND_VIEW_LABEL[pick(o, 'view', TREND_VIEWS, 'all')]} 보기`,
+    min: PANEL_MINS['asset-trend'],
+    options: [
+      {
+        kind: 'select',
+        key: 'view',
+        label: '보기',
+        default: 'all',
+        useChoices: fixed(TREND_VIEWS.map((v) => ({ value: v, label: TREND_VIEW_LABEL[v] }))),
+      },
+      {
+        kind: 'select',
+        key: 'range',
+        label: '기간',
+        default: '3m',
+        useChoices: fixed(TREND_RANGES.map((v) => ({ value: v, label: TREND_RANGE_LABEL[v] }))),
+      },
+    ],
+    Component: AssetTrendPanel,
   },
   kpi: {
     label: '숫자 카드',

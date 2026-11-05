@@ -5,7 +5,9 @@ import type {
   AnalysisItem,
   BriefingDetail,
   BriefingItem,
+  HistoryPoint,
   MarketCode,
+  PortfolioSummary,
   WatchQuote,
 } from '../api/types';
 import type { components } from '../api/schema';
@@ -138,3 +140,27 @@ export const settingsSource: Source<Record<string, unknown>> = {
   key: '/settings',
   load: (api) => api.request<Record<string, unknown>>('/settings'),
 };
+
+/** 보유 평가(종목별 평가금액·손익, 통화별 합계, 환율). 시세는 사이드카가 쓰는 한투 시세다. */
+export const portfolioSummarySource: Source<PortfolioSummary> = {
+  key: '/portfolio/summary',
+  load: (api) => api.request<PortfolioSummary>('/portfolio/summary'),
+};
+
+export type HistoryRange = '1m' | '3m' | '1y' | 'all';
+export type HistoryView = 'all' | 'krw' | 'usd';
+
+/** 자산 추이: 기간·보기마다 따로 불러온다. */
+const historySources = new Map<string, Source<HistoryPoint[]>>();
+export function historySource(range: HistoryRange, view: HistoryView): Source<HistoryPoint[]> {
+  const key = `/portfolio/history?range=${range}&view=${view}`;
+  let s = historySources.get(key);
+  if (!s) {
+    s = {
+      key,
+      load: (api) => api.request<HistoryPoint[]>('/portfolio/history', { query: { range, view } }),
+    };
+    historySources.set(key, s);
+  }
+  return s;
+}

@@ -12,6 +12,8 @@ export const PANEL_MINS = {
   'running-analyses': { w: 280, h: 140 },
   'analysis-result': { w: 360, h: 240 },
   'alert-history': { w: 360, h: 220 },
+  holdings: { w: 360, h: 200 },
+  'asset-trend': { w: 360, h: 240 },
   kpi: { w: 260, h: 96 },
 } as const satisfies Record<string, Size>;
 
@@ -34,6 +36,8 @@ export const METRIC_IDS = [
   'alerts-today',
   'analyses-running',
   'foreign-net',
+  'total-value',
+  'total-pl',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
