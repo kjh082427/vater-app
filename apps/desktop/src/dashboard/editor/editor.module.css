@@ -97,6 +97,16 @@
   border: var(--rule-hair) dashed var(--color-accent-line);
   border-radius: var(--radius-md);
   background: var(--color-card);
+
+  /* 칸 아무 데나 눌러 끌 수 있다: 터치 스크롤과 글자 선택이 끌기를 가로채지 않게 한다 */
+  touch-action: none;
+  user-select: none;
+}
+
+/* 입력칸 조작(글자 선택, 터치)은 막지 않는다 */
+.cell :where(input, textarea, select) {
+  touch-action: auto;
+  user-select: text;
 }
 
 .cell[data-empty='true'] {
@@ -400,4 +410,71 @@ p.stepMeta {
   border: var(--rule-hair) solid var(--color-line);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
+}
+
+/* 끌어서 바꾸기: 손잡이, 끄는 중·놓을 자리 표시, 숫자 줄 순서 */
+.grab {
+  display: inline-grid;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-3);
+  cursor: grab;
+}
+
+.grab:hover {
+  background: var(--color-hover);
+}
+
+.cell[data-reorder-state='from'],
+.orderItem[data-reorder-state='from'] {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.cell[data-reorder-state='over'],
+.orderItem[data-reorder-state='over'] {
+  border-style: solid;
+  border-color: var(--color-accent);
+  background: var(--color-accent-weak);
+}
+
+.cell[data-reorder-state='blocked'],
+.orderItem[data-reorder-state='blocked'] {
+  border-style: solid;
+  border-color: var(--color-caution);
+  background: var(--color-caution-bg);
+}
+
+.dragStatus {
+  min-height: var(--leading-sm);
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+}
+
+.order {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orderItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: var(--space-0-5) var(--space-2) var(--space-0-5) var(--space-1);
+  border: var(--rule-hair) dashed var(--color-line);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  touch-action: none;
 }

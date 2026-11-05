@@ -1,0 +1,276 @@
+/* 보유·연결 화면. 색은 토큰만 쓴다. 증권사 색은 BrokerChip·BrokerBar가 맡는다. */
+
+.stack {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2-5) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.itemMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+.brokerName {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.meta {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.itemBanner {
+  grid-column: 1 / -1;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 32rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-md);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dialogBody {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+}
+
+/* 업로드 창 */
+.uploadBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.newCount {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-weak);
+  color: var(--color-accent-strong);
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.pick {
+  display: grid;
+  max-height: 40vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-control);
+}
+
+.pickRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-2-5);
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.pickRow:last-child {
+  border-bottom: 0;
+}
+
+.pickLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-md);
+}
+
+.pickLabel b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-medium);
+}
+
+.pickDisabled {
+  color: var(--color-ink-3);
+}
+
+.pickState {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  text-align: right;
+}
+
+.pickHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+}
+
+.inline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* 주가 그래프와 내 보유 카드 */
+.chart {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chartHead {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.holdingsBody {
+  display: grid;
+  gap: var(--space-2-5);
+  padding-top: var(--space-2);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+
+.figures dt {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.figures dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-xl);
+  line-height: var(--leading-xl);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.holdingsBody .meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.chipButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.chipButton:hover {
+  background: var(--color-hover);
+}
+
+.alertRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* 직접 입력과 CSV */
+.brokerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.addBroker {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 20rem;
+}
+
+.picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--color-ink);
+}
+
+.candidate {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 12rem;
+}

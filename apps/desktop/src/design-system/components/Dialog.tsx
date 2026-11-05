@@ -8,6 +8,8 @@ export interface DialogProps {
   open: boolean;
   title: string;
   onClose: () => void;
+  /** 표나 긴 목록이 든 창(44rem). 기본은 30rem. */
+  wide?: boolean;
   /** 아래 버튼 줄. 보통 [취소] [확인]. 주 버튼은 하나. */
   footer?: ReactNode;
   children: ReactNode;
@@ -21,7 +23,7 @@ const FOCUSABLE =
  * Esc나 닫기 버튼은 onClose를 부른다. 닫히면 초점은 연 요소로 돌아간다.
  * 뒤 바탕을 눌러도 닫지 않는다(편집 중인 내용을 실수로 잃지 않게).
  */
-export function Dialog({ open, title, onClose, footer, children }: DialogProps) {
+export function Dialog({ open, title, onClose, wide = false, footer, children }: DialogProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -84,6 +86,7 @@ export function Dialog({ open, title, onClose, footer, children }: DialogProps) 
         tabIndex={-1}
         onKeyDown={onKeyDown}
         className={styles.dialog}
+        data-wide={wide ? 'true' : undefined}
       >
         <div className={styles.head}>
           <h2 id={titleId} className={styles.title}>

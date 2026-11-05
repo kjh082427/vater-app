@@ -66,6 +66,20 @@
   stroke-linecap: round;
 }
 
+.secondary {
+  fill: none;
+  stroke: var(--color-ink-3);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hollow {
+  fill: var(--color-card);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
 .point {
   fill: currentColor;
 }

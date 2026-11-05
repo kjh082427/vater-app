@@ -121,3 +121,20 @@ describe('Dialog 안의 Select (리뷰 I1)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Dialog: 넓은 창', () => {
+  it('wide면 표용 너비 표시를 단다(기본은 달지 않는다)', () => {
+    const { rerender } = render(
+      <Dialog open title="표" onClose={() => undefined}>
+        <p>내용</p>
+      </Dialog>,
+    );
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-wide');
+    rerender(
+      <Dialog open wide title="표" onClose={() => undefined}>
+        <p>내용</p>
+      </Dialog>,
+    );
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-wide', 'true');
+  });
+});

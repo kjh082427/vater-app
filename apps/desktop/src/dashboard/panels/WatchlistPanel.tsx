@@ -1,11 +1,17 @@
 import { useStreamStatus } from '../../api/services';
-import type { WatchQuote } from '../../api/types';
+import type { SymbolValue, WatchQuote } from '../../api/types';
 import { navigate } from '../../app/router';
-import { DataTable, SignedNumber, type Column } from '../../design-system';
-import { Feed, Price, StockName } from '../../screens/common/quotes';
+import {
+  DataTable,
+  formatQuantity,
+  PriceChange,
+  SignedNumber,
+  type Column,
+} from '../../design-system';
+import { Feed, MissingValue, Price, StockName } from '../../screens/common/quotes';
 import { useShared } from '../shared';
-import { quotesSource, settingsSource } from '../sources';
-import { PanelEmpty, PanelError, styles } from './common';
+import { portfolioSummarySource, quotesSource, settingsSource } from '../sources';
+import { hasUnpriced, PanelEmpty, PanelError, styles, UNPRICED_NOTE } from './common';
 import { pick, type PanelProps } from './types';
 
 export const WATCH_MARKETS = ['all', 'KR', 'US'] as const;
@@ -15,8 +21,11 @@ export const WATCH_MARKET_LABEL: Record<(typeof WATCH_MARKETS)[number], string> 
   US: '미국',
 };
 
-function columns(width: number, pollSeconds: number): Column<WatchQuote>[] {
-  const cols: Column<WatchQuote>[] = [
+/** 보유 열이 있는 표의 한 줄: 감시 종목 + 그 종목의 보유(없으면 undefined). */
+type Row = WatchQuote & { held?: SymbolValue };
+
+function columns(width: number, pollSeconds: number, withHoldings: boolean): Column<Row>[] {
+  const cols: Column<Row>[] = [
     {
       key: 'name',
       header: '종목',
@@ -52,6 +61,43 @@ function columns(width: number, pollSeconds: number): Column<WatchQuote>[] {
       cell: (r) => <Feed feed={r.feed} pollSeconds={pollSeconds} />,
     });
   }
+  if (withHoldings) {
+    // 좁아지면 평단가부터, 다음 보유, 마지막으로 평가손익이 빠진다
+    if (width >= 520) {
+      cols.push({
+        key: 'pl',
+        header: '평가손익',
+        numeric: true,
+        cell: (r) =>
+          r.held && r.held.pl !== null ? (
+            <PriceChange
+              change={r.held.pl}
+              percent={r.held.pl_pct}
+              currency={r.held.currency === 'USD' ? 'USD' : 'KRW'}
+            />
+          ) : (
+            <MissingValue />
+          ),
+      });
+    }
+    if (width >= 600) {
+      cols.push({
+        key: 'qty',
+        header: '보유',
+        numeric: true,
+        cell: (r) => (r.held ? `${formatQuantity(r.held.total, r.market)}주` : <MissingValue />),
+      });
+    }
+    if (width >= 700) {
+      cols.push({
+        key: 'avg',
+        header: '평단가',
+        numeric: true,
+        cell: (r) =>
+          r.held ? <Price value={r.held.avg_price} market={r.market} /> : <MissingValue />,
+      });
+    }
+  }
   return cols;
 }
 
@@ -60,6 +106,7 @@ export function WatchlistPanel({ options, size }: PanelProps) {
   const market = pick(options, 'market', WATCH_MARKETS, 'all');
   const quotes = useShared(quotesSource);
   const settings = useShared(settingsSource);
+  const portfolio = useShared(portfolioSummarySource);
   const stale = useStreamStatus() === 'disconnected';
   const poll = settings.data?.['alerts.poll_interval_sec'];
 
@@ -76,7 +123,13 @@ export function WatchlistPanel({ options, size }: PanelProps) {
   // SSE가 끊긴 동안은 수신 상태를 모른다: 마지막 상태(실시간 등)를 그대로 두지 않는다
   const rows = quotes.data
     .filter((r) => market === 'all' || r.market === market)
-    .map((r) => (stale && r.feed !== 'closed' ? { ...r, feed: 'offline' as const } : r));
+    .map((r): Row => (stale && r.feed !== 'closed' ? { ...r, feed: 'offline' as const } : r))
+    .map((r) => ({
+      ...r,
+      held: portfolio.data?.symbols.find((s) => s.market === r.market && s.code === r.code),
+    }));
+  // 보유 내역이 하나도 없으면 보유 열을 더하지 않는다(빈 열 세 개가 표를 좁히지 않게)
+  const withHoldings = (portfolio.data?.symbols.length ?? 0) > 0;
   if (rows.length === 0) {
     return (
       <PanelEmpty>
@@ -93,7 +146,7 @@ export function WatchlistPanel({ options, size }: PanelProps) {
     <div className={styles.body}>
       <DataTable
         caption="감시 종목"
-        columns={columns(size.w, typeof poll === 'number' ? poll : 30)}
+        columns={columns(size.w, typeof poll === 'number' ? poll : 30, withHoldings)}
         rows={rows}
         rowKey={(r) => `${r.market}:${r.code}`}
         onRowActivate={(r) =>
@@ -102,6 +155,9 @@ export function WatchlistPanel({ options, size }: PanelProps) {
       />
       <div className={styles.foot}>
         <span className="vt-num">{`${rows.length}종목 · 상승 ${up} · 하락 ${down}`}</span>
+        {hasUnpriced(rows.flatMap((r) => (r.held ? [r.held] : []))) ? (
+          <span>{UNPRICED_NOTE}</span>
+        ) : null}
         <a href="#/alerts">+ 종목 추가</a>
       </div>
     </div>

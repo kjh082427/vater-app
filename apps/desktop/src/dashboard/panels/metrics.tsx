@@ -4,7 +4,17 @@
  */
 import type { ReactNode } from 'react';
 import type { ApiError } from '../../api/errors';
-import { directionOf, formatNumber, KpiTile, SignedNumber, Sparkline } from '../../design-system';
+import {
+  directionOf,
+  formatUsd,
+  formatUsdChange,
+  formatWon,
+  formatWonChange,
+  formatNumber,
+  KpiTile,
+  SignedNumber,
+  Sparkline,
+} from '../../design-system';
 import { KIND_GROUP } from '../../screens/alerts/kinds';
 import { parseFlows } from '../../screens/briefing/data';
 import { MissingValue } from '../../screens/common/quotes';
@@ -17,9 +27,12 @@ import {
   analysesSource,
   briefingSource,
   indicesSource,
+  portfolioSummarySource,
   quotesSource,
 } from '../sources';
+import type { PortfolioSummary } from '../../api/types';
 import { chartSeries, type IndexCode } from './IndexChartPanel';
+import { hasUnpriced, UNPRICED_NOTE } from './common';
 import styles from './panels.module.css';
 
 export interface MetricValue {
@@ -148,6 +161,71 @@ function useForeignNet(): MetricValue {
   };
 }
 
+/** 합계에서 빠졌거나 믿기 어려운 부분을 문장으로(환율 없음, 시세 제외, 지원 안 함). */
+function caveats(data: PortfolioSummary): string[] {
+  return [
+    ...(data.currencies.USD && data.total_krw === null ? ['환율 없음(원화만 합산)'] : []),
+    ...(data.missing_prices > 0 ? [`시세 없는 ${data.missing_prices}종목 제외`] : []),
+    ...(data.unsupported > 0 ? [`지원하지 않는 ${data.unsupported}종목 제외`] : []),
+  ];
+}
+
+const noHoldings = (data: PortfolioSummary): MetricValue => ({
+  value: <MissingValue />,
+  change: (
+    <Muted>
+      {data.unsupported > 0 ? `지원하지 않는 ${data.unsupported}종목만 있습니다` : '보유 내역 없음'}
+    </Muted>
+  ),
+});
+
+/** 총 평가금액: 환율이 있으면 원화 환산 합계, 없으면 원화 합계만(달러는 따로). 통화별 값을 함께 보인다. */
+function useTotalValue(): MetricValue {
+  const { data, error } = useShared(portfolioSummarySource);
+  if (!data) return { value: <MissingValue />, error };
+  const krw = data.currencies.KRW;
+  const usd = data.currencies.USD;
+  if (!krw && !usd) return { ...noHoldings(data), error };
+  const shown = data.total_krw !== null ? data.total_krw.value : krw?.value;
+  const notes = caveats(data);
+  const parts = [
+    ...(krw && (usd || notes.length > 0) ? [`원화 ${formatWon(krw.value)}`] : []),
+    ...(usd ? [`달러 ${formatUsd(usd.value)}`] : []),
+    ...notes,
+  ];
+  return {
+    value: shown === null || shown === undefined ? <MissingValue /> : formatWon(shown),
+    change: <Muted>{parts.length > 0 ? parts.join(' · ') : '주식 평가금액'}</Muted>,
+    error,
+  };
+}
+
+/** 총 평가손익: 총 평가금액과 같은 기준(환산 또는 원화). 통화별 손익을 함께 보인다. */
+function useTotalPl(): MetricValue {
+  const { data, error } = useShared(portfolioSummarySource);
+  if (!data) return { value: <MissingValue />, error };
+  const krw = data.currencies.KRW;
+  const usd = data.currencies.USD;
+  if (!krw && !usd) return { ...noHoldings(data), error };
+  const basis = data.total_krw ?? krw;
+  const notes = [...caveats(data), ...(hasUnpriced(data.symbols) ? [UNPRICED_NOTE] : [])];
+  const parts = [
+    ...(krw && usd ? [`원화 ${formatWonChange(krw.pl, { unit: true })}`] : []),
+    ...(usd ? [`달러 ${formatUsdChange(usd.pl)}`] : []),
+    ...notes,
+  ];
+  return {
+    value: <SignedNumber value={basis?.pl} format="won" unit />,
+    change: (
+      <span className={styles.change}>
+        <SignedNumber value={basis?.pl_pct} format="percent" />
+        {parts.length > 0 ? <Muted>{parts.join(' · ')}</Muted> : null}
+      </span>
+    ),
+    error,
+  };
+}
+
 export const METRICS: Record<MetricId, { label: string; use: () => MetricValue }> = {
   kospi: { label: '코스피', use: () => useIndex('KOSPI') },
   kosdaq: { label: '코스닥', use: () => useIndex('KOSDAQ') },
@@ -157,6 +235,8 @@ export const METRICS: Record<MetricId, { label: string; use: () => MetricValue }
   'alerts-today': { label: '오늘 알림', use: useAlertsToday },
   'analyses-running': { label: '진행 중인 분석', use: useAnalysesRunning },
   'foreign-net': { label: '외국인 순매수', use: useForeignNet },
+  'total-value': { label: '총 평가금액', use: useTotalValue },
+  'total-pl': { label: '총 평가손익', use: useTotalPl },
 };
 
 /** 숫자 카드 1개. id가 바뀌면 훅 순서가 바뀌므로 부모는 key={id}로 그린다. */

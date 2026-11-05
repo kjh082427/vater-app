@@ -55,6 +55,7 @@ export const MISSING_LABEL: Record<string, string> = {
   watchlist: '감시 종목',
   alerts: '알림',
   interpretation: 'AI 해석',
+  my_assets: '내 자산',
 };
 
 export const missingLabel = (key: string) => MISSING_LABEL[key] ?? key;

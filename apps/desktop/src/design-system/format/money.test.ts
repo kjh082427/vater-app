@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatQuantity,
+  formatShares,
   directionOf,
   formatEok,
   formatEokChange,
@@ -202,5 +204,45 @@ describe('formatEok: 부호 없는 억 표기 (금액 자체, 입력은 원)', (
     [Number.NaN, '—'],
   ])('%s → %s', (value, expected) => {
     expect(formatEok(value)).toBe(expected);
+  });
+});
+
+describe('formatQuantity: 수량 (국내 정수, 미국만 소수점)', () => {
+  it.each([
+    ['10', 'KR', '10'],
+    ['1500', 'KR', '1,500'],
+    ['10', 'US', '10'],
+    ['0.5', 'US', '0.5'],
+    ['2.50', 'US', '2.5'],
+    ['0.12345678', 'US', '0.12345678'],
+    [3, 'KR', '3'],
+    // API가 준 국내 소수 값은 반올림해 숨기지 않고 그대로 보인다
+    ['1.5', 'KR', '1.5'],
+    ['0.25', 'KR', '0.25'],
+    ['1500.0', 'KR', '1,500'],
+  ] as const)('%s (%s) → %s', (value, market, expected) => {
+    expect(formatQuantity(value, market)).toBe(expected);
+  });
+
+  it('값 없음·숫자가 아님은 —', () => {
+    expect(formatQuantity(null, 'KR')).toBe('—');
+    expect(formatQuantity('abc', 'US')).toBe('—');
+  });
+});
+
+describe('formatShares: 비율 합이 100.0이 되게 소수점 1자리로', () => {
+  it('2/3와 1/3은 66.7과 33.3', () => {
+    expect(formatShares([200 / 3, 100 / 3])).toEqual(['66.7%', '33.3%']);
+  });
+
+  it('셋으로 나누면 33.4/33.3/33.3(가장 큰 나머지에 더함)이라 합이 100.0', () => {
+    const out = formatShares([100 / 3, 100 / 3, 100 / 3]);
+    expect(out.map((t) => Number.parseFloat(t)).reduce((a, b) => a + b, 0)).toBeCloseTo(100, 5);
+    expect([...out].sort()).toEqual(['33.3%', '33.3%', '33.4%']);
+  });
+
+  it('하나뿐이면 100.0%, 빈 목록은 빈 목록', () => {
+    expect(formatShares([100])).toEqual(['100.0%']);
+    expect(formatShares([])).toEqual([]);
   });
 });

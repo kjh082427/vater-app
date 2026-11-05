@@ -197,3 +197,13 @@ describe('첫 실행 마법사', () => {
     expect(await view.shell.platform.getAutostart()).toBe(true);
   });
 });
+
+describe('다른 증권사 안내', () => {
+  it('한투만 필수이고 키움·메리츠는 나중에 설정에서 연결한다고 알린다', async () => {
+    renderWizard();
+    await toKisStep();
+    expect(
+      await screen.findByText(/키움·메리츠 연결과 보유 종목 입력은 시작한 뒤/),
+    ).toBeInTheDocument();
+  });
+});

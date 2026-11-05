@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { AnalysisCreate, AnalysisQueued, SymbolOut } from '../../api/types';
+import type { AnalysisCreate, AnalysisQueued, SymbolOut, WatchItem } from '../../api/types';
 import { Button } from '../../design-system';
 import { navigate } from '../../app/router';
 import { PRESET_LABEL } from '../../app/status';
@@ -31,6 +31,7 @@ function prefillFromHash(): { market: string; code: string; asOf: string } | nul
 export function NewAnalysisForm() {
   const api = useApi();
   const settings = useResource<Record<string, unknown>>('/settings');
+  const watch = useResource<WatchItem[]>('/watchlist');
   const [prefill] = useState(prefillFromHash);
   const [picked, setPicked] = useState<Picked | null>(null);
   const [asOf, setAsOf] = useState(prefill?.asOf ?? '');
@@ -93,6 +94,30 @@ export function NewAnalysisForm() {
         </div>
       ) : (
         <div className={styles.search}>
+          {/* 앱 안에서만 보여 주는 목록이다. AI로는 고른 한 종목만 간다(스펙 19장). 보유 여부는 표시하지 않는다 */}
+          {watch.data && watch.data.length > 0 ? (
+            <div className={styles.watchPick}>
+              <span className={form.legend}>감시 종목에서 고르기</span>
+              <ul className={styles.watchChoices} aria-label="감시 종목에서 고르기">
+                {watch.data.map((w) => (
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      className={styles.watchChoice}
+                      aria-label={`감시 종목 ${w.name}`}
+                      onClick={() => {
+                        setPicked({ market: w.market, code: w.code, name: w.name });
+                        setMissingSymbol(false);
+                      }}
+                    >
+                      <b>{w.name}</b>
+                      <span className="vt-num">{w.code}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <SymbolSearch
             actionLabel="선택"
             onPick={(s) => {

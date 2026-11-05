@@ -5,17 +5,25 @@ import type {
   AnalysisItem,
   BriefingDetail,
   BriefingItem,
+  HistoryPoint,
   MarketCode,
+  MonitorStatus,
+  PortfolioSummary,
   WatchQuote,
 } from '../api/types';
 import type { components } from '../api/schema';
 import { isActiveStatus } from '../screens/analysis/stages';
+import type { ApiClient } from '../api/client';
 import type { Source } from './shared';
 
 export type IndexQuote = components['schemas']['IndexOut'];
 
-/** 장중이지만 실시간 규칙이 없는(idle) 종목은 SSE 시세가 오지 않아 이 간격으로 다시 받는다. */
-const IDLE_REFRESH_MS = 30_000;
+/**
+ * 규칙이 없는(idle) 종목은 SSE 시세가 오지 않아 설정(quotes.refresh_sec, 기본 10분)마다 다시 받는다.
+ * 장이 열린 시간에만 받고, 설정을 바꾸면 이 간격 안에 반영된다. 알림 시간은 이 설정과 무관하다.
+ */
+const POLICY_TICK_MS = 15_000;
+const DEFAULT_QUOTE_SEC = 600;
 /** 지수: 사이드카가 30초 캐시한다. 칸이 떠 있는 동안 같은 간격으로 다시 받는다. */
 const INDEX_REFRESH_MS = 30_000;
 
@@ -24,11 +32,45 @@ function every(ms: number, tick: () => void): () => void {
   return () => clearInterval(timer);
 }
 
+/** 설정 주기와 장중 여부. 읽지 못하면 null(이번에는 다시 부르지 않는다). */
+async function quotePolicy(api: ApiClient): Promise<{ ms: number; open: boolean } | null> {
+  try {
+    const [settings, status] = await Promise.all([
+      api.request<Record<string, unknown>>('/settings'),
+      api.request<MonitorStatus>('/alerts/status'),
+    ]);
+    const sec = settings['quotes.refresh_sec'];
+    return {
+      ms: (typeof sec === 'number' && sec > 0 ? sec : DEFAULT_QUOTE_SEC) * 1000,
+      open: Object.values(status.markets).includes('open'),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 설정한 주가 주기가 지났고 장이 열려 있으면 run을 부른다. 해제 함수를 돌려준다. */
+function onQuotePeriod(api: ApiClient, run: () => void): () => void {
+  let last = Date.now();
+  let stopped = false;
+  const timer = setInterval(() => {
+    void quotePolicy(api).then((policy) => {
+      if (stopped || !policy?.open || Date.now() - last < policy.ms) return;
+      last = Date.now();
+      run();
+    });
+  }, POLICY_TICK_MS);
+  return () => {
+    stopped = true;
+    clearInterval(timer);
+  };
+}
+
 /** 감시 종목 시세: GET /watchlist/quotes + SSE quote(시세)·alerts.state(수신 상태). */
 export const quotesSource: Source<WatchQuote[]> = {
   key: '/watchlist/quotes',
   load: (api) => api.request<WatchQuote[]>('/watchlist/quotes'),
-  live: ({ events, get, mutate, reload }) => {
+  live: ({ api, events, get, mutate, reload }) => {
     const offs = [
       events.subscribe('quote', (q) =>
         mutate((rows) =>
@@ -54,7 +96,7 @@ export const quotesSource: Source<WatchQuote[]> = {
           }),
         ),
       ),
-      every(IDLE_REFRESH_MS, () => {
+      onQuotePeriod(api, () => {
         if (get()?.some((r) => r.feed === 'idle')) reload();
       }),
     ];
@@ -138,3 +180,29 @@ export const settingsSource: Source<Record<string, unknown>> = {
   key: '/settings',
   load: (api) => api.request<Record<string, unknown>>('/settings'),
 };
+
+/** 보유 평가(종목별 평가금액·손익, 통화별 합계, 환율). 시세는 사이드카가 쓰는 한투 시세다. */
+export const portfolioSummarySource: Source<PortfolioSummary> = {
+  key: '/portfolio/summary',
+  load: (api) => api.request<PortfolioSummary>('/portfolio/summary'),
+  // 평가는 시세로 계산한다: 주가 주기마다(장중만) 다시 받는다
+  live: ({ api, reload }) => onQuotePeriod(api, reload),
+};
+
+export type HistoryRange = '1m' | '3m' | '1y' | 'all';
+export type HistoryView = 'all' | 'krw' | 'usd';
+
+/** 자산 추이: 기간·보기마다 따로 불러온다. */
+const historySources = new Map<string, Source<HistoryPoint[]>>();
+export function historySource(range: HistoryRange, view: HistoryView): Source<HistoryPoint[]> {
+  const key = `/portfolio/history?range=${range}&view=${view}`;
+  let s = historySources.get(key);
+  if (!s) {
+    s = {
+      key,
+      load: (api) => api.request<HistoryPoint[]>('/portfolio/history', { query: { range, view } }),
+    };
+    historySources.set(key, s);
+  }
+  return s;
+}

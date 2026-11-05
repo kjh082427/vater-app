@@ -124,3 +124,36 @@ export function formatPrice(value: MaybeNumber, currency: Currency): string {
 export function formatPriceChange(value: MaybeNumber, currency: Currency): string {
   return currency === 'KRW' ? formatWonChange(value) : formatUsdChange(value);
 }
+
+/**
+ * 보유 수량. 국내는 보통 정수(API가 소수를 주면 그대로), 미국은 소수점(필요한 만큼, 최대 8자리): `1,500`, `0.5`.
+ * 입력은 사이드카의 십진 문자열이나 숫자다. 단위 "주"는 부르는 쪽이 붙인다.
+ */
+export function formatQuantity(value: string | number | null | undefined, market: string): string {
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (value === '' || !isPresent(n)) return MISSING;
+  // 국내도 API가 소수를 주면 숨기지 않는다(입력은 정수만 받지만 증권사가 소수를 줄 수 있다)
+  if (market !== 'US' && Number.isInteger(n)) return signOf(n, false) + grouped(Math.abs(n), 0);
+  const text = grouped(Math.abs(n), 8).replace(/\.?0+$/, '');
+  return signOf(n, false) + text;
+}
+
+/**
+ * 비율(퍼센트 값) 여러 개를 소수점 1자리로 보이되 합이 100.0이 되게 한다(가장 큰 나머지부터 0.1을 더함).
+ * 칩을 수량에서 비율로 바꿔도 33.3 / 66.7처럼 어색하지 않게 하려는 것이다.
+ */
+export function formatShares(percents: number[]): string[] {
+  const tenths = percents.map((p) => Math.floor(p * 10 + 1e-9));
+  let left =
+    Math.round(percents.reduce((a, b) => a + b, 0) * 10) - tenths.reduce((a, b) => a + b, 0);
+  const order = percents
+    .map((p, i) => [p * 10 - (tenths[i] as number), i] as const)
+    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[0] - a[0]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    tenths[i] = (tenths[i] as number) + 1;
+    left -= 1;
+  }
+  return tenths.map((t) => `${(t / 10).toFixed(1)}%`);
+}

@@ -9,6 +9,10 @@ export interface LineChartProps {
   labels?: string[];
   /** 기준값(예: 전일 종가). 점선과 오른쪽 회색 값 표지. */
   baseline?: number;
+  /** 두 번째 선(예: 매입금액). values와 같은 길이, 중립색 얇은 선이다. 눈금 범위에 함께 든다. */
+  secondary?: (number | null)[];
+  /** 속이 빈 점으로 표시할 values의 위치(예: 앱이 꺼져 있어 채운 날). */
+  hollow?: number[];
   /** 선·영역·마지막 값 표지의 색. 옆에 놓인 숫자와 같은 자료의 방향이어야 한다. */
   direction: 'up' | 'down' | 'flat';
   /** 눈금·표지·요약 문장의 숫자 표기(format/money.ts). */
@@ -98,6 +102,8 @@ export function LineChart({
   values,
   labels,
   baseline,
+  secondary,
+  hollow,
   direction,
   format,
   height,
@@ -138,7 +144,10 @@ export function LineChart({
       : `${ariaLabel}: 처음 ${format(first)}${at(firstIndex)}, 끝 ${format(last)}${at(lastIndex)}, ${WORD[direction]}`;
 
   // 범위: 값과 기준값을 모두 담고 위아래 12% 여유. 모두 같으면 값의 1%(0이면 1)만큼 벌린다.
-  const all = points.map((i) => values[i] as number).concat(isNum(baseline) ? [baseline] : []);
+  const all = points
+    .map((i) => values[i] as number)
+    .concat(isNum(baseline) ? [baseline] : [])
+    .concat((secondary ?? []).filter(isNum));
   let lo = Math.min(...all);
   let hi = Math.max(...all);
   if (hi - lo <= Math.abs(hi) * 1e-9) {
@@ -183,6 +192,16 @@ export function LineChart({
       s.map((i, k) => `${k ? 'L' : 'M'}${r1(x(i))} ${r1(y(values[i] as number))}`).join(''),
     )
     .join('');
+  // 두 번째 선도 null에서 끊는다(null 구간을 이어 그리면 없는 값이 있는 것처럼 보인다)
+  let secondaryD = '';
+  let open = false;
+  (secondary ?? []).forEach((v, i) => {
+    if (!isNum(v)) open = false;
+    else {
+      secondaryD += `${open ? 'L' : 'M'}${r1(x(i))} ${r1(y(v))}`;
+      open = true;
+    }
+  });
   const bottom = PAD_T + plotH;
   const areaD = lines
     .map((s) => {
@@ -276,7 +295,24 @@ export function LineChart({
           />
         ) : null}
         {areaD ? <path className={styles.area} d={areaD} fill={`url(#${gradientId})`} /> : null}
+        {secondaryD ? (
+          <path data-role="secondary" className={styles.secondary} d={secondaryD} />
+        ) : null}
         {lineD ? <path data-role="line" className={styles.line} d={lineD} /> : null}
+        {(hollow ?? []).flatMap((i) =>
+          isNum(values[i]) && i !== lastIndex ? (
+            <circle
+              key={i}
+              data-role="filled-point"
+              className={styles.hollow}
+              cx={r1(x(i))}
+              cy={r1(y(values[i] as number))}
+              r={3}
+            />
+          ) : (
+            []
+          ),
+        )}
         {lone.map((i) => (
           <circle
             key={i}

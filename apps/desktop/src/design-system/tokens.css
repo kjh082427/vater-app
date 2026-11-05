@@ -19,9 +19,9 @@
   --color-card-shadow: rgba(22, 28, 42, 0.07);
   --color-pop-shadow: rgba(22, 28, 42, 0.18);
   --color-scrim: rgba(22, 28, 42, 0.42);
-  --color-row-alt: #f6f7f9;
+  --color-row-alt: #f8f9fb;
   --color-hover: #eef0f4;
-  --color-selection: #e3dafa;
+  --color-selection: #ecdcf6;
 
   /* 표 머리줄: 짙은 남색 바탕 + 밝은 글자 */
   --color-table-head: #262d3b;
@@ -38,19 +38,29 @@
   --color-ink-2: #3b4456;
   --color-ink-3: #5a6275;
 
-  /* 강조(인디고-바이올렛) 하나: 선택, 주 버튼, 활성 탭, 링크, 포커스. 빨강·파랑과 색상이 40도 이상 떨어진다 */
-  --color-accent: #7a45d8;
-  --color-accent-strong: #6232c4;
-  --color-accent-weak: #f1ecfd;
-  --color-accent-line: #cdbff5; /* 장식 선(AI 문장 왼쪽 선, 편집 중 칸 테두리). 정보를 싣지 않는다 */
+  /* 강조(자주-보라) 하나: 선택, 주 버튼, 활성 탭, 링크, 포커스. 하락 파랑 #0000FF와 색상이 40도 이상 떨어지도록 282도로 옮겼다 */
+  --color-accent: #962ec2;
+  --color-accent-strong: #7f27a5;
+  --color-accent-weak: #f8eefc;
+  --color-accent-line: #dcc0ec; /* 장식 선(AI 문장 왼쪽 선, 편집 중 칸 테두리). 정보를 싣지 않는다 */
   --color-on-accent: #ffffff;
 
   /* 분류 표지(지수 이름 옆 네모 등): 중립 회색. 빨강·파랑으로 분류하지 않는다 */
   --color-tag: #7a8294;
 
   /* 값의 방향 전용: 상승 빨강, 하락 파랑(미국 종목도 같음). 다른 뜻으로 쓰지 않는다 */
-  --color-up: #d02c2c;
-  --color-down: #1d5cd2;
+  --color-up: #e60000;
+  --color-down: #0000ff;
+
+  /* 증권사 색(스펙 7장): 막대의 칸과 칩의 점에만 쓴다. 증권사 이름은 늘 잉크색 글자로 함께 쓴다 */
+  --color-broker-kis: #7b634f;
+  --color-broker-meritz: #d14c34;
+  --color-broker-kiwoom: #d4467d;
+  --color-broker-samsung: #1c2fa7;
+  --color-broker-mirae: #d97a00;
+  --broker-color: var(
+    --color-control-strong
+  ); /* 막대·칩이 증권사마다 덮어쓰는 자리. 모르는 증권사는 회색 */
 
   /* 주의(황토): 폴링, 끊김, 오프라인, 오류, 검토 필요. 오류에 빨강을 쓰지 않는다 */
   --color-caution: #b8730b;
@@ -128,6 +138,7 @@
   --size-progress: 0.375rem; /* 진행 막대 6 */
   --size-menu-min: 10rem; /* 메뉴·목록 최소 너비 160 */
   --size-dialog: 30rem; /* 대화 상자 너비 480 */
+  --size-dialog-wide: 44rem; /* 표가 든 대화 상자 704 */
 
   /* 선 굵기와 모서리 */
   --rule-hair: 1px;

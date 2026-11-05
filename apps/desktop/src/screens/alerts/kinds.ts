@@ -49,6 +49,10 @@ const DIRECTION: Record<string, Option[]> = {
     { value: 'high', label: '52주 신고가' },
     { value: 'low', label: '52주 신저가' },
   ],
+  avg_price_pct: [
+    { value: 'down', label: '평단가보다 하락' },
+    { value: 'up', label: '평단가보다 상승' },
+  ],
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -62,6 +66,7 @@ const KIND_LABEL: Record<string, string> = {
   bollinger: '볼린저밴드 이탈',
   volume_spike: '거래량 급증',
   new_high_low: '52주 신고가·신저가',
+  avg_price_pct: '평단가 대비 ±N%',
 };
 
 /** 선택 목록의 묶음(스펙 4-1의 분류). */
@@ -76,6 +81,7 @@ export const KIND_GROUP: Record<string, string> = {
   bollinger: '변동성',
   volume_spike: '거래량',
   new_high_low: '신고가',
+  avg_price_pct: '내 보유',
 };
 
 export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
@@ -94,6 +100,7 @@ const PARAM_LABEL: Record<string, Record<string, string>> = {
   bollinger: { period: '기간(일)', k: '표준편차 배수(σ)', direction: '방향' },
   volume_spike: { period: '평균 기간(일)', multiple: '평균 대비 배수' },
   new_high_low: { direction: '조건' },
+  avg_price_pct: { pct: '평단가 대비(%)', direction: '방향' },
 };
 
 export interface ParamField {
@@ -213,6 +220,10 @@ export function ruleSummary(kind: string, params: Record<string, unknown>, marke
       return `볼린저밴드(${plain(p.period)}일, ${plain(p.k)}σ) ${p.direction === 'lower' ? '하단' : '상단'} 이탈`;
     case 'volume_spike':
       return `거래량이 ${plain(p.period)}일 평균의 ${plain(p.multiple)}배 이상`;
+    case 'avg_price_pct':
+      return p.direction === 'up'
+        ? `내 평단가 대비 +${plain(p.pct)}% 이상 상승`
+        : `내 평단가 대비 ${MINUS}${plain(p.pct)}% 이하 하락`;
     case 'new_high_low':
       return `52주 ${p.direction === 'low' ? '신저가' : '신고가'} 경신`;
     default: {

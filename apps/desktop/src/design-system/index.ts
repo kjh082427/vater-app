@@ -7,6 +7,8 @@ export * from './format/money';
 export { AiText, type AiTextProps } from './components/AiText';
 export { AppShell, type AppShellProps } from './components/AppShell';
 export { Banner, type BannerProps } from './components/Banner';
+export { BrokerBar, type BrokerBarProps, type BrokerBarShare } from './components/BrokerBar';
+export { BrokerChip, type BrokerChipProps } from './components/BrokerChip';
 export { Button, type ButtonProps } from './components/Button';
 export { Card, type CardProps } from './components/Card';
 export { DataTable, type Column, type DataTableProps } from './components/DataTable';

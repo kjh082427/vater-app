@@ -48,6 +48,16 @@ const PATHS = {
       <circle cx="18.5" cy="12" r="1.25" fill="currentColor" />
     </>
   ),
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1.25" fill="currentColor" />
+      <circle cx="15" cy="6" r="1.25" fill="currentColor" />
+      <circle cx="9" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="15" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="9" cy="18" r="1.25" fill="currentColor" />
+      <circle cx="15" cy="18" r="1.25" fill="currentColor" />
+    </>
+  ),
   'chevron-down': <path d="m7 10 5 5 5-5" />,
   check: <path d="m5.5 12.5 4 4 9-9" />,
   close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,

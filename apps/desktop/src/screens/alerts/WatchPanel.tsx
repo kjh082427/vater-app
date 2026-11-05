@@ -11,6 +11,7 @@ import { withObjectParticle } from '../common/text';
 import { formatDayTime } from '../common/time';
 import styles from './alerts.module.css';
 import { ruleSummary, TIMING_LABEL, type Timing } from './kinds';
+import { StockOverview } from '../holdings/StockOverview';
 import { RuleEditor } from './RuleEditor';
 
 export interface WatchPanelProps {
@@ -191,6 +192,11 @@ export function WatchPanel({
       </h3>
       {expanded ? (
         <div id={panelId} role="region" aria-labelledby={buttonId} className={styles.panel}>
+          <StockOverview
+            item={item}
+            rules={rules.filter((r) => r.kind === 'avg_price_pct')}
+            onRulesChanged={onRulesChanged}
+          />
           {count === 0 ? (
             <p className={common.empty}>
               아직 규칙이 없습니다. 규칙 추가를 눌러 알림 조건을 만드세요.

@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "gen:api": "openapi-typescript ../../sidecar/tests/snapshots/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts",
     "e2e": "playwright test",
-    "e2e:acceptance": "playwright test -c playwright.acceptance.config.ts"
+    "e2e:acceptance": "playwright test -c playwright.acceptance.config.ts",
+    "e2e:holdings": "playwright test -c playwright.holdings.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",

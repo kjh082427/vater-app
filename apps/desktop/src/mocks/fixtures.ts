@@ -165,6 +165,12 @@ export const alertKinds: AlertKindInfo[] = [
   },
   { kind: 'volume_spike', params: { period: 20, multiple: 3 }, required: [], timing: 'realtime' },
   { kind: 'new_high_low', params: { direction: 'high' }, required: [], timing: 'realtime' },
+  {
+    kind: 'avg_price_pct',
+    params: { pct: 10, direction: 'down' },
+    required: [],
+    timing: 'realtime',
+  },
 ];
 
 export const alertRules: AlertRule[] = [

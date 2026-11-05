@@ -155,3 +155,57 @@
 .resultAction {
   margin-left: auto;
 }
+
+/* 분류로 찾기 */
+.categoryHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.nodeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.nodeHits {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.node {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-2-5);
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-round);
+  background: var(--color-card);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.node:hover {
+  border-color: var(--color-ink-3);
+}
+
+.node[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-weak);
+  color: var(--color-accent-strong);
+}
+
+.more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}

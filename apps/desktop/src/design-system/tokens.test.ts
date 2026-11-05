@@ -149,11 +149,12 @@ describe('색 토큰', () => {
       textPairs.push([fg, bg]);
     }
   }
-  for (const fg of ['--color-up', '--color-down']) {
-    for (const bg of ['--color-card', '--color-row-alt', '--color-hover', '--color-canvas']) {
-      textPairs.push([fg, bg]);
-    }
+  for (const bg of ['--color-card', '--color-row-alt', '--color-hover', '--color-canvas']) {
+    textPairs.push(['--color-down', bg]);
   }
+  // 상승 #E60000은 스펙이 정한 값이다(스펙 7장). 흰 카드와 교차 행 위에서 4.5:1 이상이고,
+  // 호버 행·캔버스 위에서는 4.2~4.3:1이라 그 두 곳에는 방향 숫자를 놓지 않는다(DESIGN.md).
+  for (const bg of ['--color-card', '--color-row-alt']) textPairs.push(['--color-up', bg]);
   textPairs.push(
     ['--color-accent', '--color-card'],
     ['--color-accent-strong', '--color-card'],
@@ -198,6 +199,53 @@ describe('색 토큰', () => {
     expect(luminance(hex('--color-canvas'))).toBeLessThan(luminance(hex('--color-card')));
     expect(luminance(hex('--color-row-alt'))).toBeLessThan(luminance(hex('--color-card')));
     expect(hex('--color-card')).toBe('#ffffff');
+  });
+});
+
+describe('상승·하락과 증권사 색(스펙 7장)', () => {
+  it('상승 #E60000, 하락 #0000FF', () => {
+    expect(hex('--color-up')).toBe('#e60000');
+    expect(hex('--color-down')).toBe('#0000ff');
+  });
+
+  const brokers = {
+    kis: '#7b634f',
+    meritz: '#d14c34',
+    kiwoom: '#d4467d',
+    samsung: '#1c2fa7',
+    mirae: '#d97a00',
+  };
+
+  it.each(Object.entries(brokers))(
+    '증권사 색 %s는 %s이고 카드 위에서 3:1 이상(막대·점)',
+    (id, color) => {
+      expect(hex(`--color-broker-${id}`)).toBe(color);
+      expect(contrast(color, hex('--color-card'))).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it('증권사 색은 글자에 쓰지 않는다: 칩 CSS의 color는 잉크색뿐', () => {
+    const css = readFileSync(join(here, 'components/BrokerChip.module.css'), 'utf8');
+    const colors = [...css.matchAll(/(?<![-\w])color:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(colors.length).toBeGreaterThan(0);
+    expect(colors.every((c) => /--color-ink/.test(c as string))).toBe(true);
+  });
+
+  it('증권사 색은 막대·칩 부품에서만 쓴다', () => {
+    const allowed = new Set(['internal/brokerColor.ts']);
+    const offenders = readdirSync(here, { recursive: true, encoding: 'utf8' })
+      .filter(
+        (name) =>
+          /\.(css|tsx?)$/.test(name) && !name.includes('.test.') && !name.startsWith('gallery'),
+      )
+      .filter((name) => name !== 'tokens.css' && !allowed.has(name))
+      .filter((name) => /--color-broker-/.test(readFileSync(join(here, name), 'utf8')));
+    expect(offenders).toEqual([]);
+  });
+
+  it('막대는 칸 사이에 틈을 둔다', () => {
+    const css = readFileSync(join(here, 'components/BrokerBar.module.css'), 'utf8');
+    expect(css).toMatch(/gap:\s*var\(--space-0-5\)/);
   });
 });
 

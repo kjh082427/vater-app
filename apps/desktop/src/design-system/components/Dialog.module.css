@@ -20,6 +20,10 @@
   box-shadow: var(--shadow-pop);
 }
 
+.dialog[data-wide='true'] {
+  width: min(var(--size-dialog-wide), 100%);
+}
+
 .dialog:focus-visible {
   outline: none;
 }

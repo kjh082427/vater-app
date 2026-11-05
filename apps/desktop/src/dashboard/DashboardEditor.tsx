@@ -10,10 +10,11 @@ import { Button, Dialog, Icon } from '../design-system';
 import { ApiErrorNotice } from '../screens/common/ApiErrorNotice';
 import { ContentPicker } from './editor/ContentPicker';
 import { CountPicker } from './editor/CountPicker';
-import { firstFitting, labelOf, realRects, useWindowArea } from './editor/fit';
+import { contentBlock, firstFitting, labelOf, realRects, useWindowArea } from './editor/fit';
 import { KpiStripSettings } from './editor/KpiStripSettings';
 import { OptionFields } from './editor/OptionFields';
 import { TemplatePicker } from './editor/TemplatePicker';
+import { useReorder } from './editor/useReorder';
 import { defaultDashboard } from './layout/defaults';
 import { GAP, withCount } from './layout/geometry';
 import { isMetricId, minOf } from './layout/mins';
@@ -41,12 +42,14 @@ function EditorCell({
   real,
   onPick,
   onOptions,
+  reorder,
 }: {
   board: DashboardDoc;
   index: number;
   real: Rect | undefined;
   onPick: () => void;
   onOptions: (options: Record<string, unknown>) => void;
+  reorder: ReturnType<typeof useReorder>;
 }) {
   const panel = board.panels[index];
   if (!panel) return null;
@@ -60,8 +63,18 @@ function EditorCell({
       aria-label={`칸 ${n}: ${name}`}
       className={styles.cell}
       data-empty={empty ? 'true' : 'false'}
+      {...reorder.itemProps(index)}
     >
       <div className={styles.cellHead}>
+        <button
+          type="button"
+          className={styles.grab}
+          aria-label={`칸 ${n} 위치 바꾸기`}
+          title="끌어서 다른 칸과 내용을 바꿉니다. 키보드는 Space로 잡고 방향키로 고른 뒤 Space로 놓습니다."
+          {...reorder.handleProps(index)}
+        >
+          <Icon name="grip" size="sm" />
+        </button>
         <span className={styles.cellNo} aria-hidden="true">
           {n}
         </span>
@@ -87,6 +100,7 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const reasonId = useId();
+  const [message, setMessage] = useState('');
   const area = useWindowArea(draft.kpi.enabled);
 
   const count = draft.panels.length;
@@ -99,6 +113,24 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
     setDraft(next);
     setError(null);
   };
+  // 두 칸의 내용(종류와 옵션)을 맞바꾼다. 틀과 비율은 그대로고, 옮겨 간 내용이 그 칸 최소 크기에 맞아야 한다.
+  const swap = useReorder({
+    group: 'cells',
+    count,
+    nameOf: (i) => `칸 ${i + 1}`,
+    done: '내용을 바꿨습니다.',
+    announce: setMessage,
+    check: (a, b) =>
+      contentBlock(draft.panels[b]?.type ?? 'empty', rects[a]) ??
+      contentBlock(draft.panels[a]?.type ?? 'empty', rects[b]),
+    onDrop: (a, b) =>
+      change({
+        ...draft,
+        panels: draft.panels.map((p, k) =>
+          k === a ? (draft.panels[b] as typeof p) : k === b ? (draft.panels[a] as typeof p) : p,
+        ),
+      }),
+  });
   const cancel = () => (dirty ? setConfirm(true) : onCancel());
   const save = async () => {
     if (empties > 0 || saving) return;
@@ -146,6 +178,10 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
         </div>
       </header>
       {error ? <ApiErrorNotice error={error} title="화면 배치를 저장하지 못했습니다" /> : null}
+      {/* 끌어서 바꾸기의 결과와 놓을 수 없는 이유(화면 읽기 프로그램에도 읽힌다) */}
+      <p role="status" className={styles.dragStatus}>
+        {message}
+      </p>
       <div className={styles.body}>
         <div className={styles.stage}>
           {draft.kpi.enabled ? (
@@ -176,6 +212,7 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
                 board={draft}
                 index={i}
                 real={rects[i]}
+                reorder={swap}
                 onPick={() => setPicking(i)}
                 onOptions={(options) =>
                   change({
@@ -205,11 +242,15 @@ export function DashboardEditor({ board, initialPanel, onCancel, onSave }: Dashb
               change({ ...draft, layout: { template, root: templateRoot(template) } })
             }
           />
-          <KpiStripSettings kpi={draft.kpi} onChange={(kpi) => change({ ...draft, kpi })} />
+          <KpiStripSettings
+            kpi={draft.kpi}
+            onChange={(kpi) => change({ ...draft, kpi })}
+            announce={setMessage}
+          />
           <div className={styles.sideFoot}>
             <p className={styles.note}>
-              칸 사이의 손잡이를 끌면 비율이 바뀝니다. 내용마다 최소 크기가 있어서 그보다 작아지지
-              않습니다.
+              칸 사이의 손잡이를 끌면 비율이 바뀝니다. 칸을 끌어 다른 칸에 놓으면 두 칸의 내용이
+              바뀝니다. 내용마다 최소 크기가 있어서 그보다 작은 칸에는 놓을 수 없습니다.
             </p>
             <Button
               variant="quiet"

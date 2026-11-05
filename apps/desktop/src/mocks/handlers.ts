@@ -22,8 +22,9 @@ import type {
   WatchQuote,
 } from '../api/types';
 import * as fx from './fixtures';
+import { createHoldingsDb, holdingsHandlers, type HoldingsDb } from './holdings';
 
-export interface MockDb {
+export interface MockDb extends HoldingsDb {
   watchItems: WatchItem[];
   watchQuotes: WatchQuote[];
   monitor: MonitorStatus;
@@ -46,6 +47,7 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 export function createMockDb(): MockDb {
   return {
+    ...createHoldingsDb(),
     watchItems: clone(fx.watchItems),
     watchQuotes: clone(fx.watchQuotes),
     monitor: clone(fx.monitorStatus),
@@ -95,6 +97,7 @@ const notFound = () => errorResponse(404, 'NOT_FOUND', '요청한 경로가 없�
 
 export function createHandlers(db: MockDb) {
   return [
+    ...holdingsHandlers(db),
     http.get('*/ui/dashboards', () => HttpResponse.json(db.dashboards as object)),
     http.put('*/ui/dashboards', async ({ request }) => {
       const body: unknown = await request.json();
