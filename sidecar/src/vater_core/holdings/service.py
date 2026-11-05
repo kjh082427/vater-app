@@ -20,7 +20,7 @@ from vater_core.brokers.base import ADAPTERS, BrokerContext, BrokerCreds
 from vater_core.brokers.readonly import ReadOnlyHttp
 from vater_core.secrets.names import BrokerSecretField, SecretName, broker_secret
 from vater_core.secrets.store import SecretStore
-from vater_core.store.holdings import Broker, Connection, Holding, HoldingsRepo
+from vater_core.store.holdings import Broker, Connection, Holding, HoldingRow, HoldingsRepo
 from vater_core.store.settings import SettingsRepo
 
 logger = logging.getLogger(__name__)
@@ -180,6 +180,11 @@ class HoldingsService:
                 status=409,
             )
         conn = self.repo.add_connection(broker_id, mask)
+        replaced = [
+            c.id
+            for c in self.repo.connections()
+            if c.broker_id == broker_id and c.status == "disconnected" and c.account_mask == mask
+        ]
         try:
             s = self._secrets
             if account:
@@ -192,7 +197,55 @@ class HoldingsService:
             self._forget_secrets(conn.id)
             self.repo.remove_connection(conn.id)
             raise
+        for old in replaced:  # 같은 계좌를 다시 연결했다. 옛 수량을 합계에 두 번 넣지 않는다
+            self.repo.remove_connection(old)
         return conn
+
+    def disconnect(self, conn_id: int, delete_data: bool) -> None:
+        """키는 항상 지운다. 보유 내역은 사용자가 고른다(v2 설계 1-1장)."""
+        if self.repo.connection(conn_id) is None:
+            raise VaterError("CONNECTION_NOT_FOUND", "연결을 찾을 수 없습니다.", status=404)
+        self._forget_secrets(conn_id)
+        if delete_data:
+            self.repo.remove_connection(conn_id)
+        else:
+            self.repo.set_status(conn_id, "disconnected")
+        self._changed(None)
+
+    def delete_broker_data(self, broker_id: str) -> None:
+        """그 증권사의 보유 내역을 모두 지운다. 해제된 연결도 함께 지운다."""
+        repo = self.repo
+        if repo.broker(broker_id) is None:
+            raise _unknown_broker(broker_id)
+        for c in repo.connections():
+            if c.broker_id == broker_id and c.status == "disconnected":
+                repo.remove_connection(c.id)
+        repo.delete_broker_data(broker_id)
+        self._changed(broker_id)
+
+    # ---- 수동 입력 --------------------------------------------------------
+
+    def save_manual(self, broker_id: str, row: HoldingRow) -> None:
+        repo = self.repo
+        if repo.broker(broker_id) is None:
+            raise VaterError("HOLDING_INVALID", "증권사를 먼저 추가해 주세요.", status=422)
+        if any(c.broker_id == broker_id and c.status != "disconnected" for c in repo.connections()):
+            raise VaterError(
+                "HOLDING_INVALID",
+                "API로 연결된 증권사는 직접 입력할 수 없습니다.",
+                "연결된 증권사의 보유 내역은 [새로 고침]으로 갱신됩니다.",
+                status=422,
+            )
+        repo.manual_upsert(broker_id, row, _now())
+        self._changed(broker_id)
+
+    def delete_manual(self, broker_id: str, market: str, code: str) -> None:
+        self.repo.manual_delete(broker_id, market, code)
+        self._changed(broker_id)
+
+    def _changed(self, broker_id: str | None) -> None:
+        if self._deps.events is not None:
+            self._deps.events.publish("holdings.changed", {"broker_id": broker_id})
 
     # ---- 동기화 -----------------------------------------------------------
 
@@ -217,8 +270,8 @@ class HoldingsService:
                 if c.status != "disconnected" and (broker_id is None or c.broker_id == broker_id)
             ]
             results = list(await asyncio.gather(*(self._sync_one(c) for c in targets)))
-        if results and self._deps.events is not None:
-            self._deps.events.publish("holdings.changed", {"broker_id": broker_id})
+        if results:
+            self._changed(broker_id)
         return results
 
     def summary(self, market: str, code: str) -> dict[str, Any]:

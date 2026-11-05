@@ -1,8 +1,9 @@
 """증권사 연결과 보유 내역 API (v2 설계 1, 2, 4-1, 5, 14장). 주문 경로는 없다."""
 
+from decimal import Decimal
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, Field
 
 from vater_core.alerts.rules import default_timing, parse_rule
@@ -11,6 +12,7 @@ from vater_core.analysis.symbols import resolve_target
 from vater_core.api.deps import AppDeps, get_deps
 from vater_core.api.errors import ErrorBody, VaterError
 from vater_core.holdings.service import get_holdings
+from vater_core.store.holdings import HoldingRow
 
 router = APIRouter(tags=["holdings"])
 
@@ -104,6 +106,20 @@ class WatchRequest(BaseModel):
     rule: BulkRule | None = None
 
 
+class ManualHolding(BaseModel):
+    broker_id: str
+    market: Literal["KR", "US"]
+    code: str
+    quantity: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    avg_price: Decimal = Field(gt=0, max_digits=20, decimal_places=4)
+
+
+class ManualKey(BaseModel):
+    broker_id: str
+    market: Literal["KR", "US"]
+    code: str
+
+
 class WatchResult(BaseModel):
     added: int
     skipped: int
@@ -134,6 +150,25 @@ async def add_connection(
         body.broker_id, body.app_key, body.app_secret, body.account
     )
     return ConnectionOut(**vars(conn))
+
+
+@router.delete("/connections/{conn_id}", status_code=204)
+async def remove_connection(
+    conn_id: int,
+    delete_data: bool,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> Response:
+    get_holdings(deps).disconnect(conn_id, delete_data)
+    return Response(status_code=204)
+
+
+@router.delete("/brokers/{broker_id}/data", status_code=204)
+async def delete_broker_data(
+    broker_id: str,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> Response:
+    get_holdings(deps).delete_broker_data(broker_id)
+    return Response(status_code=204)
 
 
 @router.post("/holdings/sync")
@@ -182,6 +217,39 @@ async def symbol_holdings(
     deps: AppDeps = Depends(get_deps),  # noqa: B008
 ) -> SymbolHoldings:
     return SymbolHoldings(**get_holdings(deps).summary(market, code))
+
+
+@router.put("/holdings/manual")
+async def save_manual(
+    body: ManualHolding,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> Response:
+    if deps.db is None:
+        raise VaterError("DB_UNAVAILABLE", "저장소가 준비되지 않았습니다.", status=503)
+    code = body.code.upper() if body.market == "US" else body.code
+    target = resolve_target(deps.db, body.market, code)
+    get_holdings(deps).save_manual(
+        body.broker_id,
+        HoldingRow(
+            body.market,
+            code,
+            target.name,
+            body.quantity,
+            body.avg_price,
+            "KRW" if body.market == "KR" else "USD",
+        ),
+    )
+    return Response(status_code=200)
+
+
+@router.delete("/holdings/manual", status_code=204)
+async def delete_manual(
+    body: ManualKey,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> Response:
+    code = body.code.upper() if body.market == "US" else body.code
+    get_holdings(deps).delete_manual(body.broker_id, body.market, code)
+    return Response(status_code=204)
 
 
 @router.post("/holdings/watch")

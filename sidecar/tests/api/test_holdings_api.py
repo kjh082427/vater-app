@@ -361,3 +361,164 @@ async def test_sync_minutes_setting_only_takes_listed_values(client: httpx.Async
     assert ok.status_code == 200
     bad = await client.patch("/settings", json={"holdings.sync_minutes": 5})
     assert bad.status_code == 422 and bad.json()["code"] == "SETTING_INVALID"
+
+
+# ---- 연결 해제 (v2 설계 1-1장) ------------------------------------------------
+
+
+async def test_disconnect_and_delete_removes_holdings_and_secrets_but_keeps_watchlist(
+    client: httpx.AsyncClient, deps: AppDeps, fakes: dict[str, Fake]
+) -> None:
+    _seed_symbol(deps)
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.post("/holdings/watch", json={"items": [{"market": "KR", "code": "005930"}]})
+    r = await client.delete(f"/connections/{c['id']}", params={"delete_data": "true"})
+    assert r.status_code == 204
+    assert deps.secrets is not None
+    assert deps.secrets.get(broker_secret(c["id"], "APP_KEY")) is None
+    assert (await client.get("/connections")).json() == []
+    assert (await client.get("/holdings")).json() == []
+    assert len((await client.get("/watchlist")).json()) == 1
+
+
+async def test_disconnect_and_keep_shows_stale_and_counts_in_total(
+    client: httpx.AsyncClient, deps: AppDeps, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    assert deps.secrets is not None
+    assert deps.secrets.get(broker_secret(c["id"], "APP_SECRET")) is None
+    assert (await client.get("/connections")).json()[0]["status"] == "disconnected"
+    got = (await client.get("/holdings/symbol/KR/005930")).json()
+    assert got["total"] == "10" and got["brokers"][0]["stale"] is True
+    fakes["kiwoom"].sync_error = AUTH
+    assert (await client.post("/holdings/sync", json={})).json() == []  # 다시 부르지 않는다
+
+
+async def test_deleting_a_disconnected_connection_later(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    assert (
+        await client.delete(f"/connections/{c['id']}", params={"delete_data": "true"})
+    ).status_code == 204
+    assert (await client.get("/holdings")).json() == []
+
+
+async def test_disconnect_unknown_is_404(client: httpx.AsyncClient) -> None:
+    r = await client.delete("/connections/99", params={"delete_data": "true"})
+    assert r.status_code == 404 and r.json()["code"] == "CONNECTION_NOT_FOUND"
+
+
+async def test_reconnect_after_disconnect_is_not_a_duplicate(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client)
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    await connect(client)  # 비밀키를 지웠으므로 같은 계좌로 다시 연결할 수 있다
+
+
+# ---- 수동 입력 (v2 설계 5장) ---------------------------------------------------
+
+
+MANUAL = {
+    "broker_id": "samsung",
+    "market": "KR",
+    "code": "005930",
+    "quantity": "5",
+    "avg_price": 72000,
+}
+
+
+async def test_manual_add_update_delete(client: httpx.AsyncClient, deps: AppDeps) -> None:
+    _seed_symbol(deps)
+    r = await client.put("/holdings/manual", json=MANUAL)
+    assert r.status_code == 200
+    got = (await client.get("/holdings")).json()[0]
+    assert (got["name"], got["quantity"], got["avg_price"], got["currency"], got["source"]) == (
+        "삼성전자",
+        "5",
+        72000,
+        "KRW",
+        "manual",
+    )
+    await client.put("/holdings/manual", json={**MANUAL, "quantity": "7.5"})
+    assert (await client.get("/holdings")).json()[0]["quantity"] == "7.5"
+    r = await client.request(
+        "DELETE",
+        "/holdings/manual",
+        json={"broker_id": "samsung", "market": "KR", "code": "005930"},
+    )
+    assert r.status_code == 204 and (await client.get("/holdings")).json() == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"quantity": "0"},
+        {"quantity": "-1"},
+        {"quantity": "abc"},
+        {"quantity": ""},
+        {"avg_price": 0},
+        {"avg_price": -5},
+        {"avg_price": None},
+        {"broker_id": "nope"},
+        {"code": "999999"},
+    ],
+)
+async def test_manual_requires_valid_values(
+    client: httpx.AsyncClient, deps: AppDeps, change: dict[str, Any]
+) -> None:
+    _seed_symbol(deps)
+    r = await client.put("/holdings/manual", json={**MANUAL, **change})
+    assert r.status_code in (404, 422), r.text
+    assert (await client.get("/holdings")).json() == []
+
+
+async def test_manual_refused_for_a_connected_broker(
+    client: httpx.AsyncClient, deps: AppDeps, fakes: dict[str, Fake]
+) -> None:
+    _seed_symbol(deps)
+    await connect(client, "kiwoom")
+    r = await client.put("/holdings/manual", json={**MANUAL, "broker_id": "kiwoom"})
+    assert r.status_code == 422 and r.json()["code"] == "HOLDING_INVALID"
+
+
+async def test_sync_does_not_overwrite_manual_rows(
+    client: httpx.AsyncClient, deps: AppDeps, fakes: dict[str, Fake]
+) -> None:
+    _seed_symbol(deps)
+    await client.put("/holdings/manual", json=MANUAL)
+    await connect(client, "kiwoom")
+    fakes["kiwoom"].rows = []
+    await client.post("/holdings/sync", json={})
+    assert [h["broker_id"] for h in (await client.get("/holdings")).json()] == ["samsung"]
+
+
+async def test_delete_broker_data_for_a_manual_broker(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    _seed_symbol(deps)
+    await client.put("/holdings/manual", json={**MANUAL, "broker_id": "mirae"})
+    await client.put("/holdings/manual", json=MANUAL)
+    assert (await client.delete("/brokers/mirae/data")).status_code == 204
+    assert [h["broker_id"] for h in (await client.get("/holdings")).json()] == ["samsung"]
+
+
+async def test_reconnecting_the_same_account_replaces_kept_rows(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
+) -> None:
+    c = await connect(client)
+    fakes["kiwoom"].rows = [sam("10")]
+    await client.post("/holdings/sync", json={})
+    await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
+    await connect(client)  # 같은 계좌
+    await client.post("/holdings/sync", json={})
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
