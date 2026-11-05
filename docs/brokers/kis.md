@@ -23,6 +23,9 @@ v2에서 한투는 시세·알림의 기준 증권사이므로 키가 계속 필
 - 해외: `CTRP6504R`(모의 `VTRP6504R`), 경로 `/uapi/overseas-stock/v1/trading/inquire-present-balance`, 체결 기준 현재 잔고 ✅ 공식 샘플. `NATN_CD=000`(전체), `TR_MKET_CD=00`, `INQR_DVSN_CD=00`(미니스탁 포함), `WCRC_FRCR_DVSN_CD=02`(외화). 한 번으로 모든 국가를 받는다. 다른 후보 `TTTS3012R`는 거래소와 통화마다 따로 불러야 해서 쓰지 않는다
 - 해외 응답 `output1`: `pdno`, `ccld_qty_smtl1`(체결 수량 합계), `avg_unpr3`(평균 단가), `ovrs_excg_cd`, `natn_kor_name`, `buy_crcy_cd` ✅ 공식 샘플. `prdt_name`은 샘플 표에 없어 없으면 코드를 이름으로 쓴다 ❓
 
+- 빈 계좌의 실제 응답 모양(2026-11-05 확인): 국내 `output1=[]`, `output2=[{scts_evlu_amt: 0, ...}]`, 해외 `output1=[]`, `output3={evlu_amt_smtl: 0, ...}` ✅
+- 목록이 비면 위 합계가 0일 때만 "보유 없음"으로 믿는다. 목록이 없거나 합계가 0이 아니면 저장하지 않는다. 주식 없이 펀드만 있는 계좌는 합계가 0이 아니어서 이 조건에 걸릴 수 있다 ❓
+
 ## 주문 금지
 - 잔고 경로에도 `/trading/`이 들어 있다. 기존 가드는 `/trading/order`와 끝자리 `U` TR ID만 막으므로 이 경로는 통과한다 ✅
 - 쓰는 TR을 허용 목록으로 고정한다. 주문 TR(`TTTC0802U` 등)은 절대 넣지 않는다.
@@ -30,10 +33,10 @@ v2에서 한투는 시세·알림의 기준 증권사이므로 키가 계속 필
 ## 확인할 것
 - [x] 해외 잔고 TR
 - [ ] 소수점 주식 응답 형식, `ccld_qty_smtl1`과 `cblc_qty13` 중 어느 쪽이 맞는지
-- [ ] 해외 거래가 없는 계좌에서 `CTRP6504R`이 오류를 내는지. 오류면 그 계좌의 동기화 전체가 실패한다
+- [x] 빈 계좌: 보유 종목이 없는 실제 계좌에서 국내·해외 조회 모두 오류 없이 0건을 돌려줬다(2026-11-05)
 - [ ] 결제 전 수량 처리: 매도 직후 `hldg_qty`가 어떻게 보이는지
-- [ ] `ACNT_PRDT_CD`가 `01`이 아닌 계좌(연금 등)의 조회 범위
-- [ ] 실제 키로 `kis_live` 테스트: 루트 `.env`에 `KIS_TEST_ACCOUNT=계좌번호10자리`를 넣고 `cd sidecar && uv run pytest -m kis_live -k holdings -q -s`
+- [x] `ACNT_PRDT_CD`가 `01`이 아닌 계좌: v2는 받지 않는다(연금은 공식 샘플상 `TTTC2208R`을 따로 쓴다)
+- [ ] 실제 보유 종목으로 `kis_live` 테스트(수량·평단가 필드 확인): 주식이 있는 계좌로 루트 `.env`에 `KIS_TEST_ACCOUNT=계좌번호10자리`를 넣고 `cd sidecar && uv run pytest -m kis_live -k holdings -q -s`
 
 ## 자료
 - https://raw.githubusercontent.com/koreainvestment/open-trading-api/main/README.md

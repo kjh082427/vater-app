@@ -89,6 +89,8 @@ def bypasses(source: str) -> list[str]:
             found += [a.name for a in node.names if a.name == "KisClient"]
         if isinstance(node, ast.Attribute) and node.attr == "_http":
             found.append("._http")
+        if isinstance(node, ast.Constant) and node.value == "_http":  # getattr(x, "_http")
+            found.append("._http")
         if isinstance(node, ast.Name) and node.id == "__import__":
             found.append("__import__")
     return found
@@ -104,6 +106,7 @@ def bypasses(source: str) -> list[str]:
         "x = __import__('httpx')",
         "async def f(ro): await ro._http.post('/orders')",
         "from vater_core.kis.client import KisClient",
+        "async def f(ctx): await getattr(ctx.kis, '_http').post('/orders')",
     ],
 )
 def test_bypass_scan_catches(source: str) -> None:

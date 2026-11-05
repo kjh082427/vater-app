@@ -15,6 +15,7 @@ router = APIRouter(prefix="/secrets", tags=["secrets"])
 
 # 명세에는 허용 이름 목록을 알리되, 검증은 핸들러가 한다.
 # (FastAPI 검증에 맡기면 틀린 이름이 422가 된다. 지금은 400 SECRET_NAME_INVALID로 답한다.)
+_KIS_KEYS = {SecretName.KIS_APP_KEY, SecretName.KIS_APP_SECRET}
 SecretPathName = Annotated[str, Path(json_schema_extra={"enum": [n.value for n in USER_SETTABLE]})]
 
 
@@ -52,6 +53,10 @@ async def put_secret(
     value = body.value.strip()
     if not value:
         raise VaterError("SECRET_VALUE_EMPTY", "값이 비어 있습니다.")
+    if target in _KIS_KEYS and store.get(target) != value:
+        # 옛 키로 받은 토큰을 새 키에 쓰지 않는다. 같은 값이면 발급(하루 1회 원칙)을 아낀다
+        store.delete(SecretName.KIS_ACCESS_TOKEN)
+        store.delete(SecretName.KIS_WS_APPROVAL_KEY)
     store.set(target, value)
     refresh_secret_cache()  # 다음 로그부터 새 값을 가린다
     return Response(status_code=204)

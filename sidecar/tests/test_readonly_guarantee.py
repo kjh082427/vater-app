@@ -3,8 +3,8 @@
 import re
 from pathlib import Path
 
-ORDER_TR_ID = re.compile(r"\b[TV]TT[A-Z]\d{4}U\b")  # 한투 주문·정정·취소 TR ID (끝자리 U)
-ORDER_PATH = re.compile(r"/trading/order")  # 국내·해외 주문 엔드포인트 경로
+ORDER_TR_ID = re.compile(r"\b[A-Z]{4}\d{4}U\b")  # 한투 주문·정정·취소 TR ID (끝자리 U)
+ORDER_PATH = re.compile(r"/trading/[\w-]*(order|rsvn)")  # 주문·주간주문·예약주문 경로
 KIWOOM_ORDER = re.compile(r"/api/dostk/ordr|\bkt1000[0-9]\b|\bkt5\d{4}\b")  # 키움 주문 경로·TR
 SCANNED = {".py", ".json", ".sql", ".toml", ".yaml", ".yml"}
 SRC = Path(__file__).parents[1] / "src"
@@ -25,7 +25,9 @@ def test_no_order_api_in_source() -> None:
 
 
 def test_guard_patterns_catch_known_order_ids() -> None:
-    for s in ["TTTC0802U", "VTTC0801U", "TTTC0012U", "TTTT1002U", "TTTS1002U",
+    for s in ["TTTC0802U", "VTTC0801U", "TTTC0012U", "TTTT1002U", "TTTS1002U", "CTSC0008U",
+              "/uapi/overseas-stock/v1/trading/daytime-order",
+              "/uapi/overseas-stock/v1/trading/order-resv",
               "/uapi/domestic-stock/v1/trading/order-cash",
               "/uapi/overseas-stock/v1/trading/order-rvsecncl"]:  # fmt: skip
         assert ORDER_TR_ID.search(s) or ORDER_PATH.search(s), s

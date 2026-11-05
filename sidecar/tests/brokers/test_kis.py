@@ -30,6 +30,10 @@ def ok(**extra: Any) -> dict[str, Any]:
     return {"rt_cd": "0", "msg_cd": "MCA00000", "msg1": "정상", **extra}
 
 
+EMPTY_KR = ok(output1=[], output2=[{"scts_evlu_amt": "0"}])
+EMPTY_ABROAD = ok(output1=[], output2=[], output3={"evlu_amt_smtl": "0"})
+
+
 def domestic(code: str, name: str, qty: str, avg: str = "70000.0000") -> dict[str, str]:
     return {"pdno": code, "prdt_name": name, "hldg_qty": qty, "pchs_avg_pric": avg}
 
@@ -55,10 +59,10 @@ def mock_routes(
 ) -> tuple[respx.Route, respx.Route]:
     return (
         respx.get(host + DOMESTIC_PATH).mock(
-            return_value=httpx.Response(200, json=ok(output1=kr or [], output2=[]))
+            return_value=httpx.Response(200, json=ok(output1=kr) if kr else EMPTY_KR)
         ),
         respx.get(host + OVERSEAS_PATH).mock(
-            return_value=httpx.Response(200, json=ok(output1=abroad or [], output2=[]))
+            return_value=httpx.Response(200, json=ok(output1=abroad) if abroad else EMPTY_ABROAD)
         ),
     )
 
@@ -108,7 +112,7 @@ async def test_all_pages_are_read() -> None:
         ),
     )
     dom = respx.get(host + DOMESTIC_PATH).mock(side_effect=[first, last])
-    respx.get(host + OVERSEAS_PATH).mock(return_value=httpx.Response(200, json=ok(output1=[])))
+    respx.get(host + OVERSEAS_PATH).mock(return_value=httpx.Response(200, json=EMPTY_ABROAD))
     async with httpx.AsyncClient() as http:
         rows = await adapter(http).holdings()
     assert [r.code for r in rows] == ["005930", "000660"]
@@ -122,9 +126,18 @@ async def test_all_pages_are_read() -> None:
 
 @respx.mock
 async def test_endless_paging_fails_instead_of_saving_a_partial_list() -> None:
-    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(
-        return_value=httpx.Response(200, headers={"tr_cont": "M"}, json=ok(output1=[]))
-    )
+    pages = iter(range(1000))
+
+    def page(request: httpx.Request) -> httpx.Response:
+        n = next(pages)
+        row = domestic(f"{n:06d}", "종목", "1")
+        return httpx.Response(
+            200,
+            headers={"tr_cont": "M"},
+            json=ok(output1=[row], ctx_area_fk100=f"F{n}", ctx_area_nk100=f"N{n}"),
+        )
+
+    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(side_effect=page)
     async with httpx.AsyncClient() as http:
         with pytest.raises(VaterError) as e:
             await adapter(http).holdings()
@@ -164,6 +177,136 @@ async def test_rejected_account_says_so_in_the_connection_test() -> None:
             await adapter(http).test()
     assert e.value.code == "BROKER_ACCOUNT_INVALID"
     assert e.value.hint and "계좌번호" in e.value.hint
+
+
+@respx.mock
+async def test_other_kis_errors_are_not_called_account_errors() -> None:
+    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(return_value=httpx.Response(503))
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http).test()
+    assert e.value.code == "KIS_API_ERROR"
+
+
+@respx.mock
+async def test_connection_test_also_runs_the_overseas_call() -> None:
+    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(
+        return_value=httpx.Response(200, json=EMPTY_KR)
+    )
+    route = respx.get(REST_HOST[KisServer.PROD] + OVERSEAS_PATH).mock(
+        return_value=httpx.Response(200, json={"rt_cd": "1", "msg_cd": "X", "msg1": "점검"})
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError):
+            await adapter(http).test()
+    assert route.called
+
+
+@respx.mock
+async def test_only_general_accounts_are_accepted() -> None:
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http, "12345678-29").test()  # 연금은 조회 TR이 다르다
+    assert e.value.code == "BROKER_ACCOUNT_INVALID"
+    assert "01" in e.value.message
+    assert respx.calls.call_count == 0
+
+
+@pytest.mark.parametrize("missing", [{}, {"output1": None}, {"output1": ""}, {"output1": {}}])
+@respx.mock
+async def test_missing_list_never_means_everything_was_sold(missing: dict[str, Any]) -> None:
+    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(
+        return_value=httpx.Response(200, json=ok(output2=[{"scts_evlu_amt": "0"}], **missing))
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@pytest.mark.parametrize(
+    ("kr", "abroad_body"),
+    [
+        (ok(output1=[], output2=[{"scts_evlu_amt": "1000"}]), EMPTY_ABROAD),
+        (ok(output1=[], output2=[]), EMPTY_ABROAD),
+        (EMPTY_KR, ok(output1=[], output2=[], output3={"evlu_amt_smtl": "5.5"})),
+        (EMPTY_KR, ok(output1=[], output2=[])),
+    ],
+)
+async def test_empty_list_needs_a_zero_total(
+    kr: dict[str, Any], abroad_body: dict[str, Any]
+) -> None:
+    host = REST_HOST[KisServer.PROD]
+    with respx.mock(assert_all_called=False) as router:
+        router.get(host + DOMESTIC_PATH).mock(return_value=httpx.Response(200, json=kr))
+        router.get(host + OVERSEAS_PATH).mock(return_value=httpx.Response(200, json=abroad_body))
+        async with httpx.AsyncClient() as http:
+            with pytest.raises(VaterError) as e:
+                await adapter(http).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_real_empty_account_shape_is_zero_rows() -> None:
+    mock_routes()
+    async with httpx.AsyncClient() as http:
+        assert await adapter(http).holdings() == []
+
+
+@pytest.mark.parametrize(
+    ("fk", "nk"), [("", ""), ("F0", "N0")], ids=["empty context", "unchanged context"]
+)
+@respx.mock
+async def test_bad_continuation_context_fails(fk: str, nk: str) -> None:
+    respx.get(REST_HOST[KisServer.PROD] + DOMESTIC_PATH).mock(
+        side_effect=[
+            httpx.Response(
+                200,
+                headers={"tr_cont": "M"},
+                json=ok(
+                    output1=[domestic("005930", "삼성전자", "1")],
+                    ctx_area_fk100="F0",
+                    ctx_area_nk100="N0",
+                ),
+            ),
+            httpx.Response(
+                200,
+                headers={"tr_cont": "M"},
+                json=ok(
+                    output1=[domestic("000660", "SK하이닉스", "1")],
+                    ctx_area_fk100=fk,
+                    ctx_area_nk100=nk,
+                ),
+            ),
+        ]
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_page_repeating_a_row_fails_instead_of_doubling() -> None:
+    host = REST_HOST[KisServer.PROD]
+    row = {**domestic("AAPL", "애플", "0"), "ccld_qty_smtl1": "2", "avg_unpr3": "100",
+           "ovrs_excg_cd": "NASD", "buy_crcy_cd": "USD"}  # fmt: skip
+    respx.get(host + DOMESTIC_PATH).mock(return_value=httpx.Response(200, json=EMPTY_KR))
+    respx.get(host + OVERSEAS_PATH).mock(
+        return_value=httpx.Response(200, headers={"tr_cont": "M"}, json=ok(output1=[row]))
+    )
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(VaterError) as e:
+            await adapter(http).holdings()
+    assert e.value.code == "BROKER_RESPONSE_INVALID"
+
+
+@respx.mock
+async def test_blank_average_means_unknown_not_failure() -> None:
+    mock_routes(kr=[domestic("005930", "삼성전자", "10", "")])
+    async with httpx.AsyncClient() as http:
+        rows = await adapter(http).holdings()
+    assert rows[0].avg_price is None and rows[0].quantity == 10
 
 
 @respx.mock
