@@ -998,6 +998,299 @@
         "title": "ConnectionOut",
         "type": "object"
       },
+      "CsvCandidate": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "market",
+          "code",
+          "name"
+        ],
+        "title": "CsvCandidate",
+        "type": "object"
+      },
+      "CsvChanges": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "updated",
+          "removed"
+        ],
+        "title": "CsvChanges",
+        "type": "object"
+      },
+      "CsvCommit": {
+        "properties": {
+          "broker_id": {
+            "title": "Broker Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CsvCommitRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "broker_id",
+          "rows"
+        ],
+        "title": "CsvCommit",
+        "type": "object"
+      },
+      "CsvCommitRow": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "market": {
+            "enum": [
+              "KR",
+              "US"
+            ],
+            "title": "Market",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "required": [
+          "market",
+          "code",
+          "quantity",
+          "avg_price"
+        ],
+        "title": "CsvCommitRow",
+        "type": "object"
+      },
+      "CsvGuess": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "required": [
+          "name",
+          "code",
+          "quantity",
+          "avg_price"
+        ],
+        "title": "CsvGuess",
+        "type": "object"
+      },
+      "CsvPreview": {
+        "properties": {
+          "changes": {
+            "$ref": "#/components/schemas/CsvChanges"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "guess": {
+            "$ref": "#/components/schemas/CsvGuess"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CsvRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "columns",
+          "guess",
+          "rows",
+          "changes"
+        ],
+        "title": "CsvPreview",
+        "type": "object"
+      },
+      "CsvRowOut": {
+        "properties": {
+          "avg_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Price"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CsvCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "market": {
+            "anyOf": [
+              {
+                "enum": [
+                  "KR",
+                  "US"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "name",
+          "market",
+          "code",
+          "quantity",
+          "avg_price",
+          "error",
+          "candidates"
+        ],
+        "title": "CsvRowOut",
+        "type": "object"
+      },
       "Dashboard": {
         "properties": {
           "id": {
@@ -4309,6 +4602,206 @@
           }
         },
         "summary": "List Holdings",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/holdings/csv/commit": {
+      "post": {
+        "description": "그 증권사의 수동 항목을 파일 내용으로 바꾼다. 하나라도 틀리면 아무것도 바꾸지 않는다.",
+        "operationId": "csv_commit_holdings_csv_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CsvCommit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvChanges"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Csv Commit",
+        "tags": [
+          "holdings"
+        ]
+      }
+    },
+    "/holdings/csv/preview": {
+      "post": {
+        "description": "저장하지 않고 행을 해석한다. 열을 고르면 그 값이 추정보다 우선한다.",
+        "operationId": "csv_preview_holdings_csv_preview_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "broker_id",
+            "required": true,
+            "schema": {
+              "title": "Broker Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name_col",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name Col"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code_col",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code Col"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quantity_col",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Quantity Col"
+            }
+          },
+          {
+            "in": "query",
+            "name": "avg_price_col",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Avg Price Col"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/csv": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Csv Preview",
         "tags": [
           "holdings"
         ]

@@ -3,7 +3,7 @@
 from decimal import Decimal
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
 from vater_core.alerts.rules import default_timing, parse_rule
@@ -11,6 +11,13 @@ from vater_core.alerts.store import RuleRepo, WatchlistRepo
 from vater_core.analysis.symbols import resolve_target
 from vater_core.api.deps import AppDeps, get_deps
 from vater_core.api.errors import ErrorBody, VaterError
+from vater_core.holdings.csv_import import (
+    ColumnGuess,
+    build_rows,
+    decode_csv,
+    guess_columns,
+    parse_table,
+)
 from vater_core.holdings.service import get_holdings
 from vater_core.store.holdings import HoldingRow
 
@@ -118,6 +125,55 @@ class ManualKey(BaseModel):
     broker_id: str
     market: Literal["KR", "US"]
     code: str
+
+
+class CsvGuess(BaseModel):
+    name: str | None
+    code: str | None
+    quantity: str | None
+    avg_price: str | None
+
+
+class CsvCandidate(BaseModel):
+    market: str
+    code: str
+    name: str
+
+
+class CsvRowOut(BaseModel):
+    row: int
+    name: str
+    market: Literal["KR", "US"] | None
+    code: str | None
+    quantity: str | None
+    avg_price: float | None
+    error: str | None
+    candidates: list[CsvCandidate]
+
+
+class CsvChanges(BaseModel):
+    added: int
+    updated: int
+    removed: int
+
+
+class CsvPreview(BaseModel):
+    columns: list[str]
+    guess: CsvGuess
+    rows: list[CsvRowOut]
+    changes: CsvChanges
+
+
+class CsvCommitRow(BaseModel):
+    market: Literal["KR", "US"]
+    code: str
+    quantity: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
+    avg_price: Decimal = Field(gt=0, max_digits=20, decimal_places=4)
+
+
+class CsvCommit(BaseModel):
+    broker_id: str
+    rows: list[CsvCommitRow]
 
 
 class WatchResult(BaseModel):
@@ -286,3 +342,76 @@ async def watch_holdings(
             rules.create(new.id, body.rule.kind, params, default_timing(body.rule.kind), True)
             made += 1
     return WatchResult(added=added, skipped=skipped, rules=made)
+
+
+@router.post(
+    "/holdings/csv/preview",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"text/csv": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+async def csv_preview(
+    request: Request,
+    broker_id: str,
+    name_col: str | None = None,
+    code_col: str | None = None,
+    quantity_col: str | None = None,
+    avg_price_col: str | None = None,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> CsvPreview:
+    """저장하지 않고 행을 해석한다. 열을 고르면 그 값이 추정보다 우선한다."""
+    if deps.db is None:
+        raise VaterError("DB_UNAVAILABLE", "저장소가 준비되지 않았습니다.", status=503)
+    service = get_holdings(deps)
+    service.ensure_manual_allowed(broker_id)
+    columns, table = parse_table(decode_csv(await request.body()))
+    auto = guess_columns(columns)
+    guess = ColumnGuess(
+        name_col or auto.name,
+        code_col or auto.code,
+        quantity_col or auto.quantity,
+        avg_price_col or auto.avg_price,
+    )
+    rows = build_rows(deps.db, columns, table, guess)
+    good = [(r.market, r.code) for r in rows if r.error is None and r.market and r.code]
+    return CsvPreview(
+        columns=columns,
+        guess=CsvGuess(**vars(guess)),
+        rows=[
+            CsvRowOut(
+                row=r.row,
+                name=r.name,
+                market=r.market,  # type: ignore[arg-type]
+                code=r.code,
+                quantity=format(r.quantity.normalize(), "f") if r.quantity is not None else None,
+                avg_price=float(r.avg_price) if r.avg_price is not None else None,
+                error=r.error,
+                candidates=[CsvCandidate(**c) for c in r.candidates],
+            )
+            for r in rows
+        ],
+        changes=CsvChanges(**service.manual_changes(broker_id, good)),
+    )
+
+
+@router.post("/holdings/csv/commit")
+async def csv_commit(
+    body: CsvCommit,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> CsvChanges:
+    """그 증권사의 수동 항목을 파일 내용으로 바꾼다. 하나라도 틀리면 아무것도 바꾸지 않는다."""
+    if deps.db is None:
+        raise VaterError("DB_UNAVAILABLE", "저장소가 준비되지 않았습니다.", status=503)
+    service = get_holdings(deps)
+    rows = []
+    for r in body.rows:
+        code = r.code.upper() if r.market == "US" else r.code
+        target = resolve_target(deps.db, r.market, code)
+        currency = "KRW" if r.market == "KR" else "USD"
+        rows.append(HoldingRow(r.market, code, target.name, r.quantity, r.avg_price, currency))
+    changes = service.manual_changes(body.broker_id, [(r.market or "", r.code) for r in rows])
+    service.replace_manual(body.broker_id, rows)
+    return CsvChanges(**changes)

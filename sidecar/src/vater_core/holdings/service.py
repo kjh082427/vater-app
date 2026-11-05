@@ -239,6 +239,33 @@ class HoldingsService:
         repo.manual_upsert(broker_id, row, _now())
         self._changed(broker_id)
 
+    def manual_changes(self, broker_id: str, incoming: list[tuple[str, str]]) -> dict[str, int]:
+        """가져오기로 달라지는 수(v2 설계 14장)."""
+        new = set(incoming)
+        old = {
+            (h.market or "", h.code)
+            for h in self.repo.all()
+            if h.broker_id == broker_id and h.connection_id == 0
+        }
+        return {"added": len(new - old), "updated": len(new & old), "removed": len(old - new)}
+
+    def ensure_manual_allowed(self, broker_id: str) -> None:
+        repo = self.repo
+        if repo.broker(broker_id) is None:
+            raise VaterError("HOLDING_INVALID", "증권사를 먼저 추가해 주세요.", status=422)
+        if any(c.broker_id == broker_id and c.status != "disconnected" for c in repo.connections()):
+            raise VaterError(
+                "HOLDING_INVALID",
+                "API로 연결된 증권사는 직접 입력할 수 없습니다.",
+                "연결된 증권사의 보유 내역은 [새로 고침]으로 갱신됩니다.",
+                status=422,
+            )
+
+    def replace_manual(self, broker_id: str, rows: list[HoldingRow]) -> None:
+        self.ensure_manual_allowed(broker_id)
+        self.repo.replace_manual(broker_id, rows, "csv", _now())
+        self._changed(broker_id)
+
     def delete_manual(self, broker_id: str, market: str, code: str) -> None:
         self.repo.manual_delete(broker_id, market, code)
         self._changed(broker_id)

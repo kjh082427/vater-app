@@ -207,11 +207,16 @@ class HoldingsRepo:
                 (broker_id, market, code),
             )
 
-    def delete_manual_all(self, broker_id: str) -> None:
+    def replace_manual(
+        self, broker_id: str, rows: list[HoldingRow], source: Source, at: str
+    ) -> None:
+        """그 증권사의 수동 항목을 통째로 바꾼다. 한 트랜잭션이다."""
         with self._conn:
             self._conn.execute(
                 "DELETE FROM holdings WHERE broker_id = ? AND connection_id = 0", (broker_id,)
             )
+            for row in rows:
+                self._upsert(broker_id, MANUAL_CONNECTION, row, source, at)
 
     def delete_broker_data(self, broker_id: str) -> None:
         with self._conn:
