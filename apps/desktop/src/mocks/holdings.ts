@@ -40,6 +40,16 @@ export interface HoldingsDb {
   /** 분류 id(대·중·unclassified) → 종목. */
   categoryStocks: Record<string, CategoryStock[]>;
   nextConnectionId: number;
+  /**
+   * 흉내 증권사 서버: 증권사 id → 그 증권사가 돌려줄 보유 종목. 연결하거나 갱신하면 이 내용이 보유 내역이 된다.
+   * 비어 있으면(기본) 연결해도 보유가 생기지 않는다.
+   */
+  fakeBroker: Record<
+    string,
+    { market: 'KR' | 'US'; code: string; quantity: string; avg_price: number | null }[]
+  >;
+  /** 업로드 확인 창에서 이미 본 종목(`KR:005930`). */
+  seen: Set<string>;
 }
 
 export function createHoldingsDb(): HoldingsDb {
@@ -67,6 +77,8 @@ export function createHoldingsDb(): HoldingsDb {
     categories: [{ id: 'unclassified', name: '미분류', mids: [] }],
     categoryStocks: { unclassified: [] },
     nextConnectionId: 1,
+    fakeBroker: {},
+    seen: new Set(),
   };
 }
 
@@ -281,6 +293,32 @@ function upsert(db: Db, broker: string, m: ManualHolding, source: 'manual' | 'cs
   return true;
 }
 
+/** 흉내 증권사가 준 보유로 그 연결의 내역을 바꾼다(사이드카의 갱신과 같다). */
+function pull(db: Db, conn: ConnectionOut) {
+  const rows = db.fakeBroker[conn.broker_id];
+  if (!rows) return;
+  db.holdings = db.holdings.filter((h) => h.connection_id !== conn.id);
+  for (const r of rows) {
+    const sym = db.symbols.find((s) => s.market === r.market && s.code === r.code);
+    db.holdings.push({
+      broker_id: conn.broker_id,
+      connection_id: conn.id,
+      market: r.market,
+      code: r.code,
+      name: sym?.name ?? r.code,
+      quantity: r.quantity,
+      avg_price: r.avg_price,
+      currency: r.market === 'US' ? 'USD' : 'KRW',
+      source: 'api',
+      updated_at: '2026-11-06T14:00:00+09:00',
+      supported: sym !== undefined,
+      unsupported_reason: sym ? null : '종목 목록에 없는 상품입니다(ETN 등).',
+      is_new: !db.seen.has(`${r.market}:${r.code}`),
+    });
+  }
+  conn.last_synced_at = '2026-11-06T14:00:00+09:00';
+}
+
 export function holdingsHandlers(db: Db) {
   return [
     http.get('*/brokers', () => HttpResponse.json(db.brokers)),
@@ -351,6 +389,7 @@ export function holdingsHandlers(db: Db) {
         db.holdings = db.holdings.filter((h) => h.connection_id !== body.replaces);
       }
       db.connections.push(made);
+      pull(db, made);
       return HttpResponse.json(made, { status: 201 });
     }),
     http.delete('*/connections/:id', ({ params, request }) => {
@@ -368,10 +407,12 @@ export function holdingsHandlers(db: Db) {
     }),
     http.post('*/holdings/sync', async ({ request }) => {
       const { broker_id } = (await request.json()) as { broker_id?: string | null };
+      const mine = db.connections.filter(
+        (c) => c.status === 'ok' && (!broker_id || c.broker_id === broker_id),
+      );
+      for (const c of mine) pull(db, c);
       return HttpResponse.json(
-        db.connections
-          .filter((c) => c.status === 'ok' && (!broker_id || c.broker_id === broker_id))
-          .map((c) => ({ connection_id: c.id, broker_id: c.broker_id, ok: true, error: null })),
+        mine.map((c) => ({ connection_id: c.id, broker_id: c.broker_id, ok: true, error: null })),
       );
     }),
     http.get('*/holdings', () => HttpResponse.json(db.holdings)),
@@ -445,6 +486,7 @@ export function holdingsHandlers(db: Db) {
       const seen = new Set(
         [...body.items, ...(body.seen ?? [])].map((t) => `${t.market}:${t.code}`),
       );
+      for (const k of seen) db.seen.add(k);
       for (const h of db.holdings) if (seen.has(`${h.market}:${h.code}`)) h.is_new = false;
       return HttpResponse.json({ added, skipped, rules: body.rule ? added : 0 });
     }),

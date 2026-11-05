@@ -116,6 +116,50 @@ describe('지금 만들기', () => {
     await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(3));
   });
 
+  it('보유 내역이 있어도 만들기 요청에는 시장만 담긴다(개인정보를 AI에 보내지 않는다)', async () => {
+    mock.db.connections = [
+      {
+        id: 1,
+        broker_id: 'kis',
+        account_mask: '****7801',
+        status: 'ok',
+        last_synced_at: '2026-11-06T14:00:00+09:00',
+        last_error: null,
+        server: 'prod',
+      },
+    ];
+    mock.db.holdings = [
+      {
+        broker_id: 'kis',
+        connection_id: 1,
+        market: 'KR',
+        code: '005930',
+        name: '삼성전자',
+        quantity: '15',
+        avg_price: 64000,
+        currency: 'KRW',
+        source: 'api',
+        updated_at: '2026-11-06T14:00:00+09:00',
+        supported: true,
+        unsupported_reason: null,
+        is_new: false,
+      },
+    ];
+    const bodies: string[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method !== 'GET') bodies.push(await request.clone().text());
+    });
+    server.use(
+      http.post('*/briefings/run', () =>
+        HttpResponse.json({ market: 'KR', date: '2026-11-03' }, { status: 202 }),
+      ),
+    );
+    renderAt('#/briefings');
+    await userEvent.click(await screen.findByRole('button', { name: '국내 지금 만들기' }));
+    await screen.findByText('국내 11월 3일(화) 브리핑을 만드는 중입니다.');
+    expect(bodies).toEqual(['{"market":"KR"}']);
+  });
+
   it('만들다 실패하면(briefing.status failed) 원인', async () => {
     server.use(
       http.post('*/briefings/run', () =>

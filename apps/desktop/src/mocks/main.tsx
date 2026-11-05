@@ -10,6 +10,7 @@
  *   ?running=1     실행 중인 분석(#/analyses/40)과 진행 이벤트
  *   ?six=1         홈에 6칸 대시보드 탭("6칸")을 더한다
  *   ?broken=1      저장된 대시보드 문서가 깨짐(기본 배치 + 배너)
+ *   ?brokers=1     흉내 증권사 서버: 키움·메리츠를 연결하면 보유 종목이 들어오고, 시세·일봉·자산 추이 예시가 있다
  */
 import { getResponse, type RequestHandler } from 'msw';
 import { StrictMode } from 'react';
@@ -70,6 +71,33 @@ if (params.get('six') === '1') {
       },
     ],
   };
+}
+if (params.get('brokers') === '1') {
+  // 흉내 증권사 서버(실제 증권사는 부르지 않는다): 연결하면 아래 보유가 그 증권사의 내역이 된다
+  db.fakeBroker = {
+    kiwoom: [
+      { market: 'KR', code: '005930', quantity: '10', avg_price: 64000 },
+      { market: 'KR', code: '035420', quantity: '3', avg_price: 180000 },
+    ],
+    meritz: [
+      { market: 'KR', code: '005930', quantity: '5', avg_price: 64000 },
+      { market: 'US', code: 'NVDA', quantity: '2.5', avg_price: 120 },
+    ],
+  };
+  db.prices = { 'KR:005930': 71400, 'KR:035420': 195000, 'US:NVDA': 130.5 };
+  const closes = (from: number) =>
+    Array.from({ length: 60 }, (_, i) => ({
+      day: new Date(Date.UTC(2026, 8, 7 + i)).toISOString().slice(0, 10),
+      close: Math.round(from + i * 80 + Math.sin(i / 3) * 900),
+    }));
+  db.bars = { 'KR:005930': closes(66000), 'KR:035420': closes(180000), 'US:NVDA': closes(120) };
+  db.history = Array.from({ length: 30 }, (_, i) => ({
+    day: new Date(Date.UTC(2026, 9, 8 + i)).toISOString().slice(0, 10),
+    value: 1000000 + i * 9000 + Math.sin(i / 2) * 20000,
+    cost: i < 12 ? 960000 : 1100000,
+    usdkrw: 1400,
+    backfilled: i === 5,
+  }));
 }
 const running = params.get('running') === '1';
 if (running) {

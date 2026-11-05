@@ -11,7 +11,7 @@ React 18 + TypeScript 화면입니다. Tauri 셸(`src-tauri`, `shell/tauri` 브�
 | `src/platform/`      | 셸 어댑터(스펙 9-3): Tauri(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`) / 브라우저(`VITE_SIDECAR_URL`, `VITE_SIDECAR_TOKEN`)                                                                                                            |
 | `src/app/`           | 해시 라우터(알림 클릭 경로와 같음), 앱 틀(사이드바, 상태 표시줄, 오프라인·연결 끊김 배너, 마법사로 보내기)                                                                                                                                                       |
 | `src/dashboard/`     | 홈 대시보드: 배치 엔진(`layout/`, 순수 함수), 문서 저장(`store.ts`, `/ui/dashboards`), 칸 내용(`panels/`), 같이 쓰는 자료(`shared.ts`), 보기·편집 화면(`DashboardView`, `DashboardEditor`, `editor/`)                                                            |
-| `src/screens/`       | 화면: `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `common`(입력 칸, 종목 검색, 시각 표기)                                                                                                                                |
+| `src/screens/`       | 화면: `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `holdings`(v2: 증권사 연결, 업로드 창, 내 보유 카드·주가 그래프, 직접 입력·CSV), `common`(입력 칸, 종목 검색과 분류 탐색, 시각 표기)                                   |
 | `src/mocks/`         | 사이드카 흉내(MSW 처리기와 예시 자료). 테스트와 견본 화면 `mock.html`이 함께 쓴다                                                                                                                                                                                |
 | `e2e/`               | 흐름 테스트(Playwright, 실제 개발 모드 사이드카)                                                                                                                                                                                                                 |
 
@@ -22,7 +22,7 @@ npm ci
 npm run dev                 # http://localhost:5173
 ```
 
-- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`, `?six=1`(6칸 탭), `?broken=1`(깨진 대시보드 문서)
+- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`, `?six=1`(6칸 탭), `?broken=1`(깨진 대시보드 문서), `?brokers=1`(흉내 증권사 서버: 키움·메리츠를 연결하면 보유 종목이 들어오고 시세·일봉·자산 추이 예시가 있다)
 - **실제 사이드카와**: 사이드카를 `VATER_DEV=1`로 띄우고(`sidecar/README.md`), 출력된 포트와 토큰을 넘긴다. 개발 모드 사이드카는 `http://localhost:5173` 출처만 CORS로 허용한다.
   ```bash
   VITE_SIDECAR_URL=http://127.0.0.1:<포트> VITE_SIDECAR_TOKEN=<토큰> npm run dev
@@ -37,6 +37,7 @@ npm run lint        # ESLint(jsx-a11y strict) + Prettier
 npm run typecheck
 npm run build
 npm run e2e         # 흐름 테스트: 아래
+npm run e2e:holdings # v2 보유 흐름(견본 자료, 사이드카 없이): 아래
 ```
 
 ### 흐름 테스트 (`npm run e2e`)
@@ -51,6 +52,14 @@ npm run e2e         # 흐름 테스트: 아래
 - 화면 캡처: `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`(로컬 `design-preview/화면/`에도 복사)
 - CI에는 아직 넣지 않았다(Ubuntu 러너에 uv·사이드카 의존성과 Chromium이 필요)
 
+### v2 보유 흐름 (`npm run e2e:holdings`)
+
+`playwright.holdings.config.ts`가 Vite만 띄우고(포트 5174) `mock.html?brokers=1`을 연다. 사이드카의 증권사 어댑터는 주소가 코드에 박혀 있어(`brokers/kiwoom.py`, `meritz.py`) 가짜 증권사 서버로 돌릴 수 없으므로, 흉내 증권사는 `src/mocks/holdings.ts`의 `fakeBroker`다. 실제 증권사·AI는 부르지 않고 키는 가짜 값만 넣는다.
+
+- 연결(키움·메리츠, 키가 화면에 남지 않음) → 업로드(새 종목 알림, 확인 창, 체크 해제 종목은 올리지 않고 다시 새 종목으로 세지 않음) → 내 보유(그래프, 카드, 칩 전환을 기억) → 해제(데이터 삭제 뒤 합계에서 빠짐), 대시보드 칸(내 보유 종목, 자산 추이)
+- `VATER_SHOTS_DIR=<폴더>`를 주면 그 폴더에 1280×800, 1024×600, 1280×720(1080p 배율 1.5)로 찍고 가로로 넘치지 않는지 본다. 저장소에는 넣지 않는다.
+- 견본 자료는 새로 고치면 처음으로 돌아가므로 화면을 떠났다 돌아와 기억을 본다.
+
 ## 화면 캡처
 
 `docs/design/screens/shots/`: 화면별 1280×800·1024×600, 홈·편집·마법사는 배율 1.5. 견본 자료(예시 데이터)로 찍었다. `home-6`은 6칸 탭(1024×600에서는 배치를 그대로 두고 스크롤), `home-edit`·`home-pick`은 배치 편집.
@@ -60,6 +69,16 @@ impeccable 검출기(2026-11-03): 소스 0건, 화면 12개(1280×800)·8개(102
 ## 남은 일
 
 `ui/screens` 범위 밖이라 고치지 않고 적어 둔 것입니다. 해당 영역 브랜치에서 다룹니다.
+
+**v2 보유 화면 (`ui/holdings`)이 사이드카에 바라는 것**
+
+- 증권사 어댑터의 기본 주소(`BASE_URL`)를 환경 변수로 바꿀 수 없어, 실제 사이드카로 하는 흐름 테스트에 가짜 증권사 서버를 붙일 수 없다. 흐름은 견본 자료(`e2e:holdings`)로 돌린다.
+- 연결 상태가 `lost`로 바뀌거나 보유 수량이 갱신되어도 SSE 이벤트가 없다. 화면은 화면을 옮길 때 `/connections`를 다시 받고, 평가(`/portfolio/summary`)는 주가 주기마다 다시 받는다.
+- `GET /portfolio/summary`의 `at`을 "시세 시각"으로 쓴다. 종목별 시세 시각이 따로 오지 않는다.
+- 브리핑 `my_assets`에는 `missing_prices`가 없어 어느 종목이 합계에서 빠졌는지 알 수 없다(통화 하나가 불완전하면 그 통화의 변화는 null). 대시보드 칸과 숫자 카드는 `/portfolio/summary`의 `missing_prices`로 알린다.
+- `GET /alerts/kinds`에 `avg_price_pct`의 이름·방향 문구가 없어 화면이 `screens/alerts/kinds.ts`에 옮겨 적었다.
+- 수동 입력 항목의 `connection_id`는 0으로 보고(화면은 `source`로 구분) 있다. 사이드카가 다른 값을 주면 "갱신 안 됨" 표시 기준을 다시 봐야 한다.
+- 분류 탐색의 미분류 목록은 쪽 나눔이 없어 화면이 100개씩 나눠 그린다.
 
 **사이드카 API (`core/*`)**
 
