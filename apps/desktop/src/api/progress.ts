@@ -28,6 +28,8 @@ export interface ProgressState {
   current: StageId | null;
   /** 시작부터 지난 시간(초). */
   elapsed: number;
+  /** 구글 AI 혼잡·분당 한도로 기다리는 중이면 그 문구. 다음 진행 소식이 오면 지운다. */
+  waiting?: string;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -51,6 +53,12 @@ export class ProgressTracker {
 
   private add(p: EventMap['analysis.progress']) {
     const s = this.states.get(p.id) ?? { timings: {}, current: null, elapsed: 0 };
+    if (p.wait) {
+      // 기다림은 단계 시간에 넣지 않는다(시간은 다음 단계 소식이 올 때 그 단계에 더한다)
+      this.states.set(p.id, { ...s, waiting: p.wait.message });
+      for (const listener of this.listeners) listener();
+      return;
+    }
     const delta = Math.max(0, p.elapsed_sec - s.elapsed);
     const stage = visibleStage(p.stage);
     this.states.set(p.id, {

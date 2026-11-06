@@ -89,8 +89,17 @@ export interface EventMap {
     decision?: string | null;
     error?: ErrorBody | null;
   };
-  /** stage: analysts → research → trader → risk → portfolio (그 밖은 other) */
-  'analysis.progress': { id: number; stage: string; node: string; elapsed_sec: number };
+  /**
+   * stage: analysts → research → trader → risk → portfolio (그 밖은 other).
+   * wait: 구글 AI 혼잡(busy)·분당 한도(rate)로 기다리는 동안만 온다(v2 설계 20장).
+   */
+  'analysis.progress': {
+    id: number;
+    stage: string;
+    node: string;
+    elapsed_sec: number;
+    wait?: { reason: 'busy' | 'rate'; message: string; seconds: number } | null;
+  };
   'briefing.status': {
     market: MarketCode;
     date: string;

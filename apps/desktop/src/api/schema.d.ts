@@ -1704,6 +1704,11 @@ export interface components {
     };
     /** ModelChoice */
     ModelChoice: {
+      /**
+       * Fallbacks
+       * @default []
+       */
+      fallbacks: string[];
       /** Model */
       model: string;
       /** Provider */

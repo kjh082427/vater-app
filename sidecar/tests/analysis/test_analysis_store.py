@@ -34,7 +34,7 @@ def test_lifecycle_queued_running_done(db: sqlite3.Connection) -> None:
     )
     repo.set_running(aid, MODELS)
     assert repo.get(aid).status == "running" and repo.get(aid).models == MODELS
-    repo.finish(aid, result())
+    repo.finish(aid, result(), MODELS)
     done = repo.get(aid)
     assert done.status == "done" and done.decision == "Hold"
     assert done.summary == ["첫 줄.", "둘째 줄."]
@@ -85,11 +85,11 @@ def test_previous_done_skips_unfinished(db: sqlite3.Connection) -> None:
     repo = AnalysisRepo(db)
     t = resolve_target(db, "KR", "005930")
     first = repo.create(t, "2026-10-30", "cloud")
-    repo.finish(first, result("Buy"))
+    repo.finish(first, result("Buy"), MODELS)
     failed = repo.create(t, "2026-10-31", "cloud")
     repo.fail(failed, "ANALYSIS_FAILED", "실패", None)
     latest = repo.create(t, "2026-11-02", "cloud")
-    repo.finish(latest, result("Sell"))
+    repo.finish(latest, result("Sell"), MODELS)
     prev = repo.previous_done("KR", "005930", before_id=latest)
     assert prev is not None and prev.id == first and prev.decision == "Buy"
     assert repo.previous_done("KR", "005930", before_id=first) is None
@@ -102,7 +102,7 @@ def test_recover_interrupted(db: sqlite3.Connection) -> None:
     running = repo.create(t, "2026-11-02", "cloud")
     repo.set_running(running, MODELS)
     done = repo.create(t, "2026-11-02", "cloud")
-    repo.finish(done, result())
+    repo.finish(done, result(), MODELS)
     assert repo.recover_interrupted() == 2
     for aid in (queued, running):
         a = repo.get(aid)

@@ -237,7 +237,13 @@ class AnalysisQueue:
         def publish(p: Progress) -> None:  # 엔진 스레드에서 불린다
             self._publish(
                 "analysis.progress",
-                {"id": aid, "stage": p.stage, "node": p.node, "elapsed_sec": p.elapsed_sec},
+                {
+                    "id": aid,
+                    "stage": p.stage,
+                    "node": p.node,
+                    "elapsed_sec": p.elapsed_sec,
+                    "wait": p.wait,
+                },
             )
 
         return publish
@@ -254,7 +260,7 @@ class AnalysisQueue:
             target, run = await self._prepare(a.market, a.code, a.preset)
             if cancel.is_set() or repo.get(aid).status != "queued":
                 return  # 확인하는 사이에 취소됨 (취소 쪽에서 상태와 이벤트를 이미 처리했다)
-            models = {
+            models: dict[str, dict[str, Any]] = {
                 "deep": {"provider": run.deep.provider, "model": run.deep.model},
                 "quick": {"provider": run.quick.provider, "model": run.quick.model},
             }
@@ -286,7 +292,9 @@ class AnalysisQueue:
                 "다시 시도하거나 설정 > 로그 폴더에서 원인을 확인하세요.",
             )
         else:
-            repo.finish(aid, result)
+            for tier, used in result.fallbacks.items():  # 대신 답한 모델을 결과에 표시한다
+                models[tier]["fallbacks"] = used
+            repo.finish(aid, result, models)
             decision = result.summary.decision
             self._publish("analysis.status", {"id": aid, "status": "done", "decision": decision})
             self._notify("분석 완료", f"{name}: {decision_ko(decision)}", f"/analyses/{aid}")

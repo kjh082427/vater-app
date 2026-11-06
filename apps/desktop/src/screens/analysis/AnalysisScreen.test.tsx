@@ -211,6 +211,39 @@ describe('진행 타임라인', () => {
     expect(within(progress).getByText('경과 8분 50초')).toBeInTheDocument();
   });
 
+  it('구글 AI 혼잡·분당 한도로 기다리는 중이면 그 문구, 다음 진행이 오면 사라진다(v2 설계 20장)', async () => {
+    addRunning(40);
+    const { stream } = renderAt('#/analyses/40');
+    const progress = await screen.findByRole('region', { name: '진행' });
+    const source = await stream();
+    emit(source, 'analysis.progress', {
+      id: 40,
+      stage: 'analysts',
+      node: 'Market Analyst',
+      elapsed_sec: 60,
+    });
+    const busy = '구글 AI 서버가 혼잡합니다. 잠시 후 자동으로 다시 시도합니다.';
+    emit(source, 'analysis.progress', {
+      id: 40,
+      stage: 'other',
+      node: 'gemini-3.5-flash-lite',
+      elapsed_sec: 200,
+      wait: { reason: 'busy', message: busy, seconds: 20 },
+    });
+    expect(await within(progress).findByText(busy)).toBeInTheDocument();
+    expect(within(progress).getByText('경과 1분')).toBeInTheDocument(); // 기다림은 진행 시간에 넣지 않는다
+    emit(source, 'analysis.progress', {
+      id: 40,
+      stage: 'analysts',
+      node: 'News Analyst',
+      elapsed_sec: 240,
+      wait: null,
+    });
+    await waitFor(() => expect(within(progress).queryByText(busy)).not.toBeInTheDocument());
+    const steps = within(progress).getByRole('list', { name: '진행 단계' });
+    expect(within(steps).getByText('애널리스트').closest('li')).toHaveTextContent('4분');
+  });
+
   it('진행 소식을 아직 못 받았으면 모두 대기로 보이지 않고 "단계 확인 중"과 요청 시각', async () => {
     addRunning(40);
     renderAt('#/analyses/40');
@@ -350,6 +383,20 @@ describe('결과', () => {
     const steps = within(info).getByRole('table', { name: '단계별 시간' });
     expect(within(steps).getByRole('row', { name: /애널리스트/ })).toHaveTextContent('6분 52초');
   });
+  it('대체 모델이 답했으면 실행 정보에 표시', async () => {
+    setAnalysis(7, {
+      models: {
+        deep: { provider: 'google', model: 'gemini-3-pro', fallbacks: ['gemini-3.5-flash'] },
+        quick: { provider: 'google', model: 'gemini-3-flash', fallbacks: [] },
+      },
+    });
+    renderAt('#/analyses/7');
+    const info = await waitFor(() => region('실행 정보'));
+    expect(
+      within(info).getByText('google · gemini-3-pro (혼잡·한도로 대체: gemini-3.5-flash)'),
+    ).toBeInTheDocument();
+    expect(within(info).getByText('google · gemini-3-flash')).toBeInTheDocument();
+  });
 });
 
 describe('실패', () => {
@@ -379,6 +426,43 @@ describe('실패', () => {
     await waitFor(() =>
       expect(window.location.hash).toBe('#/analyses?market=US&code=AAPL&as_of=2026-11-03'),
     );
+  });
+
+  it('하루 한도: 사이드카 문구, [AI 사용 방식 바꿔 새로 분석]이 먼저(v2 설계 20장)', async () => {
+    const message = '오늘 무료 사용량을 다 썼습니다. 내일 다시 시도하거나 로컬 AI로 바꿔 주세요.';
+    setAnalysis(6, { error: { code: 'LLM_DAILY_LIMIT', message, hint: null } });
+    renderAt('#/analyses/6');
+    const failed = await waitFor(() => region('분석 실패'));
+    expect(within(failed).getByText(message)).toBeInTheDocument();
+    const change = within(failed).getByRole('button', { name: 'AI 사용 방식 바꿔 새로 분석' });
+    expect(change).toHaveAttribute('data-variant', 'primary');
+    const retry = within(failed).getByRole('button', { name: '다시 시도' });
+    expect(retry).toHaveAttribute('data-variant', 'secondary');
+  });
+
+  it('혼잡·분당 한도로 끝내 실패: 문구와 [다시 시도]', async () => {
+    const message =
+      '분석을 끝내지 못했습니다. 마친 단계는 저장됐으니 잠시 뒤 [다시 시도]를 눌러 주세요.';
+    setAnalysis(6, {
+      error: { code: 'LLM_BUSY', message, hint: '구글 AI 서버가 계속 혼잡했습니다.' },
+    });
+    renderAt('#/analyses/6');
+    const failed = await waitFor(() => region('분석 실패'));
+    expect(within(failed).getByText(message)).toBeInTheDocument();
+    expect(within(failed).getByText('구글 AI 서버가 계속 혼잡했습니다.')).toBeInTheDocument();
+    const retry = within(failed).getByRole('button', { name: '다시 시도' });
+    expect(retry).toHaveAttribute('data-variant', 'primary');
+  });
+
+  it('키 오류: 다시 시도 대신 [설정 열기]', async () => {
+    setAnalysis(6, {
+      error: { code: 'LLM_KEY_INVALID', message: 'Google Gemini 키가 거부되었습니다.', hint: null },
+    });
+    renderAt('#/analyses/6');
+    const failed = await waitFor(() => region('분석 실패'));
+    expect(within(failed).queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+    await userEvent.click(within(failed).getByRole('button', { name: '설정 열기' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/settings'));
   });
 
   it('다시 시도가 거절되면 사이드카 문구', async () => {

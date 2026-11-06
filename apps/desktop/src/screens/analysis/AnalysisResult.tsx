@@ -133,7 +133,9 @@ function RunInfo({ detail }: { detail: AnalysisDetail }) {
   }));
   const model = (tier: string) => {
     const m = detail.models?.[tier];
-    return m ? `${m.provider} · ${m.model}` : '—';
+    if (!m) return '—';
+    const used = m.fallbacks.length ? ` (혼잡·한도로 대체: ${m.fallbacks.join(', ')})` : '';
+    return `${m.provider} · ${m.model}${used}`;
   };
   const tokens = detail.tokens;
   return (

@@ -122,7 +122,7 @@ class AnalysisRepo:
     def set_running(self, id: int, models: dict[str, Any]) -> None:
         self._update(id, "status = 'running', models = ?", (_dump(models),))
 
-    def finish(self, id: int, result: EngineResult) -> None:
+    def finish(self, id: int, result: EngineResult, models: dict[str, Any]) -> None:
         s = result.summary
         summary = {
             "lines": list(s.lines),
@@ -132,13 +132,14 @@ class AnalysisRepo:
         self._update(
             id,
             "status = 'done', decision = ?, summary = ?, reports = ?, timings = ?, tokens = ?, "
-            "error = NULL",
+            "models = ?, error = NULL",
             (
                 s.decision,
                 _dump(summary),
                 _dump(result.reports),
                 _dump(result.timings),
                 _dump(result.tokens),
+                _dump(models),
             ),
         )
 
