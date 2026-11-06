@@ -63,14 +63,14 @@ describe('보유 종목 화면', () => {
       'href',
       '#/settings',
     );
-    expect(screen.getByRole('button', { name: '보유 내역 직접 입력' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '보유 종목 직접 추가' })).toBeInTheDocument();
     expect(await screen.findByText(/보유 내역이 없습니다/)).toBeInTheDocument();
   });
 
-  it('[보유 내역 직접 입력]은 입력 창을, 증권사 버튼은 업로드 확인 창을 연다', async () => {
+  it('[보유 종목 직접 추가]은 입력 창을, 증권사 버튼은 업로드 확인 창을 연다', async () => {
     setup();
     renderWithServices(<HoldingsScreen />);
-    await userEvent.click(await screen.findByRole('button', { name: '보유 내역 직접 입력' }));
+    await userEvent.click(await screen.findByRole('button', { name: '보유 종목 직접 추가' }));
     const manual = await screen.findByRole('dialog', { name: '보유 내역 직접 입력' });
     await userEvent.keyboard('{Escape}');
     expect(manual).not.toBeInTheDocument();

@@ -73,9 +73,9 @@ describe('업로드 버튼', () => {
     expect(screen.getByText('새 종목 2개')).toBeInTheDocument();
   });
 
-  it('[보유 내역 직접 입력]는 연결이 없어도 늘 있고, 누르면 직접 추가 창을 연다', async () => {
+  it('[보유 종목 직접 추가]는 연결이 없어도 늘 있고, 누르면 직접 추가 창을 연다', async () => {
     render();
-    await userEvent.click(await screen.findByRole('button', { name: '보유 내역 직접 입력' }));
+    await userEvent.click(await screen.findByRole('button', { name: '보유 종목 직접 추가' }));
     expect(await screen.findByRole('dialog', { name: '보유 내역 직접 입력' })).toBeInTheDocument();
   });
 
@@ -175,7 +175,7 @@ describe('업로드 확인 창', () => {
       }),
     );
     render();
-    await screen.findByRole('button', { name: '보유 내역 직접 입력' });
+    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
     expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
     release();
     expect(await screen.findByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe('업로드 확인 창', () => {
       ),
     );
     render();
-    await screen.findByRole('button', { name: '보유 내역 직접 입력' });
+    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
   });

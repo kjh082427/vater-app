@@ -6,6 +6,7 @@ import { App } from '../../app/App';
 import { analysisDone } from '../../mocks/fixtures';
 import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
+import { choose } from '../../test/select';
 
 function renderAt(hash: string) {
   window.location.hash = hash;
@@ -59,6 +60,17 @@ describe('분석 이력 지우기', () => {
     expect(within(table).getByText('삼성전자')).toBeInTheDocument();
     expect(calls).toEqual([{ method: 'POST', path: '/analyses/delete', body: { ids: [6] } }]);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('종목 거르기를 바꾸면 고른 것을 비운다(보이지 않는 분석을 지우지 않는다)', async () => {
+    renderAt('#/analyses');
+    const history = await screen.findByRole('region', { name: '분석 이력' });
+    const table = await within(history).findByRole('table', { name: '분석 이력' });
+    await userEvent.click(within(table).getByRole('checkbox', { name: '삼성전자 분석 선택' }));
+    expect(screen.getByText('1건 선택')).toBeInTheDocument();
+    await choose(history, '종목', '애플');
+    await waitFor(() => expect(within(table).queryByText('삼성전자')).not.toBeInTheDocument());
+    expect(screen.queryByText(/건 선택/)).not.toBeInTheDocument();
   });
 
   it('확인 창에서 취소하면 아무것도 지우지 않는다', async () => {

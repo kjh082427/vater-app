@@ -40,7 +40,7 @@ export function manualBrokers(brokers: BrokerOut[], connections: ConnectionOut[]
 
 export interface ManualDialogProps {
   onClose: () => void;
-  /** 수동 입력을 저장·삭제했다(보유 내역이 바뀌었다). */
+  /** 수동 입력을 저장·삭제했거나 제안대로 감시 종목에 넣었다(부모는 보유·감시 목록을 다시 받는다). */
   onChanged: () => void;
   /** CSV를 올렸다. 그 증권사로 업로드 확인 창을 연다(스펙 14장). */
   onCsvDone: (brokerId: string) => void;
@@ -110,6 +110,7 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
       const added = !draft.editing ? draft.stock : null;
       setDraft({ ...EMPTY, brokerId: draft.brokerId });
       setAsking(null);
+      onChanged();
       setWatched(null);
       holdings.reload();
       onChanged();
@@ -140,6 +141,7 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
         body: { market: stock.market, code: stock.code },
       });
       setAsking(null);
+      onChanged();
       setWatched(`${withObjectParticle(stock.name)} 감시 종목에 추가했습니다.`);
     } catch (e) {
       setFailed(toApiError(e));

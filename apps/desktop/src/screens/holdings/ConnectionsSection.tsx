@@ -317,7 +317,7 @@ export function ConnectionsSection() {
       {conns.data && list.length === 0 ? (
         <p className={styles.empty}>
           연결한 증권사가 없습니다. 증권사를 연결하면 보유 종목과 평단가를 불러와 감시 종목에 올릴
-          수 있습니다. 연결하지 않아도 [보유 내역 직접 입력]으로 입력할 수 있습니다.
+          수 있습니다. 연결하지 않아도 [보유 종목 직접 추가]로 입력할 수 있습니다.
         </p>
       ) : null}
       {list.length > 0 ? (

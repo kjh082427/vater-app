@@ -15,6 +15,7 @@ import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
+import { brokerInfo } from '../common/brokers';
 import { ScreenHeader } from '../common/ScreenHeader';
 import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
@@ -56,10 +57,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     if (h.market === null || Number(h.quantity) <= 0) continue;
     const key = `${h.market}:${h.code}`;
     const list = heldBy.get(key) ?? [];
-    if (!list.some((b) => b.id === h.broker_id)) {
-      const b = brokers.data?.find((x) => x.id === h.broker_id);
-      list.push({ id: h.broker_id, name: b?.name ?? h.broker_id, color: b?.color ?? '#7f8698' });
-    }
+    if (!list.some((b) => b.id === h.broker_id)) list.push(brokerInfo(brokers.data, h.broker_id));
     heldBy.set(key, list);
   }
   const heldKeys = new Set(heldBy.keys());

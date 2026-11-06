@@ -21,6 +21,7 @@ import {
   PriceChange,
   type Column,
 } from '../../design-system';
+import { brokerInfo } from '../common/brokers';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { currencyOf, MissingValue, Price, StockName } from '../common/quotes';
 import { ScreenHeader } from '../common/ScreenHeader';
@@ -47,13 +48,9 @@ function sharesOf(holdings: HoldingOut[], brokers: BrokerOut[], v: SymbolValue):
   }
   return [...byBroker]
     .map(([id, quantity]) => {
-      const b = brokers.find((x) => x.id === id);
-      return {
-        broker_id: id,
-        name: b?.name ?? id,
-        color: b?.color ?? '#7f8698',
-        quantity: String(quantity),
-      };
+      const { name, color } = brokerInfo(brokers, id);
+      // 소수 주(미국)를 더하면 0.30000000000000004가 생겨 8자리에서 자른다
+      return { broker_id: id, name, color, quantity: String(Number(quantity.toFixed(8))) };
     })
     .sort((a, b) => Number(b.quantity) - Number(a.quantity));
 }
@@ -180,7 +177,7 @@ export function HoldingsScreen() {
               setUploading({ brokerId });
             }}
           >
-            <Button onClick={() => setManual(true)}>보유 내역 직접 입력</Button>
+            <Button onClick={() => setManual(true)}>보유 종목 직접 추가</Button>
           </UploadButtons>
           {uploaded ? (
             <p role="status" className={common.meta}>

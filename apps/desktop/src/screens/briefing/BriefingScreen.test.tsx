@@ -464,12 +464,12 @@ describe('브리핑 상세: AI 해석이 없을 때(v0.2.1 21장 5번)', () => {
   it.each([
     ['LLM_KEY_INVALID', 'AI 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.'],
     ['LLM_KEY_MISSING', 'AI 키가 없습니다. 설정에서 키를 넣어 주세요.'],
-  ])('%s: 다시 만들기 대신 [설정 열기]', async (code, text) => {
+  ])('%s: [설정 열기]와 함께 키를 고친 뒤 다시 만들 수 있다', async (code, text) => {
     failWith(code);
     renderAt('#/briefings/20');
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '설정 열기' })).toHaveAttribute('href', '#/settings');
-    expect(screen.queryByRole('button', { name: 'AI 해석 다시 만들기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
   });
 
   it('모르는 코드는 사이드카가 준 문구를 그대로 보인다', async () => {
@@ -566,7 +566,7 @@ describe('브리핑 상세: AI 해석이 없을 때(v0.2.1 21장 5번)', () => {
     expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
   });
 
-  it('이미 만드는 중이면(409) 만드는 중으로 보인다', async () => {
+  it('다른 브리핑을 만드는 중이면(409) 이유를 보이고 다시 누를 수 있다(만드는 중에 갇히지 않는다)', async () => {
     server.use(
       http.post('*/briefings/:bid/interpret', () =>
         errorResponse(
@@ -579,7 +579,48 @@ describe('브리핑 상세: AI 해석이 없을 때(v0.2.1 21장 5번)', () => {
     );
     renderAt('#/briefings/20');
     await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
-    expect(await screen.findByText(/AI 해석을 만드는 중입니다/)).toBeInTheDocument();
+    expect(await screen.findByText('브리핑을 만드는 중입니다.')).toBeInTheDocument();
+    expect(screen.getByText(/끝난 뒤 다시 시도하세요/)).toBeInTheDocument();
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('SSE 끝 알림이 202 응답보다 먼저 와도 만드는 중에 갇히지 않는다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    const button = await screen.findByRole('button', { name: 'AI 해석 다시 만들기' });
+    const source = await stream();
+    server.use(
+      http.post('*/briefings/:bid/interpret', () => {
+        emit(source, 'briefing.status', {
+          market: 'US',
+          date: '2026-11-02',
+          status: 'failed',
+          id: 20,
+          error: { code: 'LLM_BUSY', message: '사이드카 문구', hint: null },
+        });
+        return HttpResponse.json({ status: 'running' }, { status: 202 });
+      }),
+    );
+    await userEvent.click(button);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled(),
+    );
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+  });
+
+  it('해석과 무관한 이유로 실패하면(SSE BRIEFING_FAILED) 그 이유를 보인다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await screen.findByText(/AI 해석을 만드는 중입니다/);
+    const source = await stream();
+    emit(source, 'briefing.status', {
+      market: 'US',
+      date: '2026-11-02',
+      status: 'failed',
+      error: { code: 'BRIEFING_FAILED', message: '브리핑을 고치지 못했습니다.', hint: null },
+    });
+    expect(await screen.findByText('브리핑을 고치지 못했습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
   });
 
   it('브리핑이 없으면(404) 원인을 보인다', async () => {

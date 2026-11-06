@@ -158,7 +158,12 @@ export function AnalysisHistory() {
           <SelectField
             label="종목"
             value={symbol}
-            onChange={setSymbol}
+            onChange={(value) => {
+              // 거른 뒤에는 보이지 않는 분석을 지우지 않도록 고른 것을 비운다
+              setSymbol(value);
+              setSelected([]);
+              setConfirming(false);
+            }}
             options={[
               { value: '', label: '전체 종목' },
               ...[...options].map(([value, name]) => ({ value, label: name })),

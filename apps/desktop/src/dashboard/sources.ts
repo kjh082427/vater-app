@@ -181,7 +181,11 @@ export function analysisSource(id: number): Source<AnalysisDetail> {
     s = {
       key: `/analyses/${id}`,
       load: (api) => api.request<AnalysisDetail>(`/analyses/${id}`),
-      refreshOn: ['analysis.deleted'], // 지워졌으면 404가 되어 칸이 "지워진 분석입니다"를 보인다
+      // 이 분석이 지워졌을 때만 다시 받는다: 404가 되어 칸이 "지워진 분석입니다"를 보인다
+      live: ({ events, reload }) =>
+        events.subscribe('analysis.deleted', ({ ids }) => {
+          if (ids.includes(id)) reload();
+        }),
     };
     detailSources.set(id, s);
   }

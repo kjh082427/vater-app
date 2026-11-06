@@ -293,11 +293,14 @@ describe('직접 입력 뒤 감시 종목 제안(21장 4번)', () => {
     const ask = await within(d).findByRole('group', { name: '감시 종목에도 추가할까요?' });
     expect(within(ask).getByText(/NAVER/)).toBeInTheDocument();
     expect(posts).toEqual([]);
+    const before = onSaved.mock.calls.length;
     await userEvent.click(within(ask).getByRole('button', { name: '감시 종목에 추가' }));
     await waitFor(() =>
       expect(posts).toEqual([{ path: '/watchlist', body: { market: 'KR', code: '035420' } }]),
     );
     expect(await within(d).findByText(/NAVER.* 감시 종목에 추가했습니다/)).toBeInTheDocument();
+    // 감시 목록이 바뀌었으니 부모 화면이 다시 불러오게 알린다
+    expect(onSaved.mock.calls.length).toBe(before + 1);
     expect(
       within(d).queryByRole('group', { name: '감시 종목에도 추가할까요?' }),
     ).not.toBeInTheDocument();

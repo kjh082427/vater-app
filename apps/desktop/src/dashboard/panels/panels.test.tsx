@@ -425,4 +425,19 @@ describe('분석 결과 칸: 지운 분석', () => {
     emit(source, 'analysis.deleted', { ids: [7] });
     expect(await within(card).findByText(/지워진 분석입니다/)).toBeInTheDocument();
   });
+
+  it('다른 분석이 지워지면 보던 분석을 다시 받지 않는다', async () => {
+    const { stream } = renderPanel('analysis-result', { analysis: '7' });
+    const card = section('분석 결과');
+    await within(card).findByText(/삼성전자/);
+    const gets: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method === 'GET' && path === '/analyses/7') gets.push(path);
+    });
+    emit(await stream(), 'analysis.deleted', { ids: [6] });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(gets).toEqual([]);
+    expect(within(card).getByText(/삼성전자/)).toBeInTheDocument();
+  });
 });
