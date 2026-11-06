@@ -1,6 +1,6 @@
 [project]
 name = "vater-core"
-version = "0.1.0"
+version = "0.2.0-rc.1"
 description = "Vater 사이드카: 한국투자증권 연동, AI 분석, 알림, 브리핑을 담당하는 로컬 백엔드"
 requires-python = "==3.13.*"
 dependencies = [
