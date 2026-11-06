@@ -180,3 +180,21 @@
   line-height: var(--leading-sm);
   font-weight: var(--weight-semibold);
 }
+
+/* 보유한 종목: "보유" + 증권사 색 점 칩(화면 표시만) */
+.held {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.heldLabel {
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-weak);
+  color: var(--color-accent-strong);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-semibold);
+}

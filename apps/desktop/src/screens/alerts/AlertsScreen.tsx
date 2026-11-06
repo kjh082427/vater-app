@@ -2,7 +2,15 @@ import { useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { AlertKindInfo, AlertRule, HoldingOut, MarketCode, WatchItem } from '../../api/types';
+import type {
+  AlertKindInfo,
+  AlertRule,
+  BrokerOut,
+  HoldingOut,
+  MarketCode,
+  WatchItem,
+  WatchResult,
+} from '../../api/types';
 import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -12,7 +20,9 @@ import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { AlertHistory } from './AlertHistory';
 import styles from './alerts.module.css';
-import { WatchPanel } from './WatchPanel';
+import { ManualDialog } from '../holdings/ManualForm';
+import { uploadMessage, UploadDialog } from '../holdings/UploadDialog';
+import { WatchPanel, type HeldBroker } from './WatchPanel';
 
 export interface AlertsScreenProps {
   /** #/symbols/:market/:code로 열었으면 그 종목(펼친 상태). */
@@ -25,8 +35,13 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const watch = useResource<WatchItem[]>('/watchlist');
   const rules = useResource<AlertRule[]>('/alerts/rules');
   const kinds = useResource<AlertKindInfo[]>('/alerts/kinds');
-  // 보유 여부는 화면에서 두 묶음으로 나누는 데만 쓴다(AI로는 보내지 않는다, 스펙 8-1)
+  // 보유 여부와 증권사는 화면 표시에만 쓴다(AI로는 보내지 않는다, 스펙 8-1)
   const holdings = useResource<HoldingOut[]>('/holdings');
+  const brokers = useResource<BrokerOut[]>('/brokers');
+  // [보유 종목 직접 추가]는 이 화면에도 둔다(스펙 21-2, 사용자 정정). CSV를 넣으면 올리기 창을 잇는다
+  const [manual, setManual] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
@@ -35,11 +50,19 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const items = watch.data;
   const watchedKeys = new Set((items ?? []).map(symbolKey));
   const focusMissing = Boolean(focus && items && !watchedKeys.has(focusKey ?? ''));
-  const heldKeys = new Set(
-    (holdings.data ?? [])
-      .filter((h) => h.market !== null && Number(h.quantity) > 0)
-      .map((h) => `${h.market}:${h.code}`),
-  );
+  // 종목 키 → 그 종목을 가진 증권사들(같은 증권사는 한 번만)
+  const heldBy = new Map<string, HeldBroker[]>();
+  for (const h of holdings.data ?? []) {
+    if (h.market === null || Number(h.quantity) <= 0) continue;
+    const key = `${h.market}:${h.code}`;
+    const list = heldBy.get(key) ?? [];
+    if (!list.some((b) => b.id === h.broker_id)) {
+      const b = brokers.data?.find((x) => x.id === h.broker_id);
+      list.push({ id: h.broker_id, name: b?.name ?? h.broker_id, color: b?.color ?? '#7f8698' });
+    }
+    heldBy.set(key, list);
+  }
+  const heldKeys = new Set(heldBy.keys());
   const held = (items ?? []).filter((w) => heldKeys.has(symbolKey(w)));
   // 보유한 종목이 하나라도 있을 때만 나눈다
   const groups =
@@ -73,6 +96,14 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     }
   }
 
+  function uploadDone(result: WatchResult) {
+    setUploading(null);
+    setUploaded(uploadMessage(result));
+    watch.reload();
+    rules.reload();
+    holdings.reload();
+  }
+
   function removed(item: WatchItem) {
     watch.mutate((list) => list?.filter((w) => w.id !== item.id));
     rules.mutate((list) => list?.filter((r) => r.watchlist_id !== item.id));
@@ -95,10 +126,16 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               <Button variant="primary" onClick={() => setAdding(true)}>
                 종목 검색으로 추가
               </Button>
+              <Button onClick={() => setManual(true)}>보유 종목 직접 추가</Button>
               <span className={common.meta}>
-                보유 내역은 <a href="#/holdings">보유 종목</a> 탭에서 올리거나 넣습니다.
+                증권사 연결과 올리기는 <a href="#/holdings">보유 종목</a> 탭에서 합니다.
               </span>
             </div>
+            {uploaded ? (
+              <p role="status" className={common.meta}>
+                {uploaded}
+              </p>
+            ) : null}
             {adding ? (
               <div className={styles.editor}>
                 <SymbolSearch
@@ -185,6 +222,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                         <WatchPanel
                           key={item.id}
                           item={item}
+                          heldBrokers={heldBy.get(key)}
                           rules={(rules.data ?? []).filter((r) => r.watchlist_id === item.id)}
                           kinds={kinds.data}
                           expanded={expanded}
@@ -212,6 +250,31 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               ) : null,
             )}
           </Card>
+          {manual ? (
+            <ManualDialog
+              onClose={() => setManual(false)}
+              onChanged={() => {
+                holdings.reload();
+                watch.reload();
+              }}
+              onCsvDone={(brokerId) => {
+                setManual(false);
+                holdings.reload();
+                brokers.reload();
+                setUploaded(null);
+                setUploading(brokerId);
+              }}
+            />
+          ) : null}
+          {uploading ? (
+            <UploadDialog
+              brokerId={uploading}
+              brokers={brokers.data ?? []}
+              kinds={kinds.data}
+              onClose={() => setUploading(null)}
+              onUploaded={uploadDone}
+            />
+          ) : null}
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
         </div>
       </div>

@@ -120,16 +120,39 @@ describe('보유한 종목과 보유하지 않은 종목', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('보유 내역을 올리거나 직접 넣는 버튼은 이 화면에 없다(보유 종목 탭으로 옮겼다)', async () => {
+  it('보유한 종목에는 "보유"와 증권사 색 점을 붙인다(보유하지 않은 종목에는 없다)', async () => {
+    mock.db.connections = [
+      connection({ id: 1, broker_id: 'kis' }),
+      connection({ id: 2, broker_id: 'meritz' }),
+    ];
+    mock.db.holdings = [
+      holding({ code: '005930', name: '삼성전자' }),
+      holding({ code: '005930', name: '삼성전자', broker_id: 'meritz', connection_id: 2 }),
+    ];
+    renderAlerts();
+    const held = await within(watchSection()).findByRole('list', { name: '보유 중인 감시 종목' });
+    const badge = await within(held).findByText('보유');
+    const chips = badge.parentElement?.querySelectorAll('[data-dot]') ?? [];
+    expect(chips).toHaveLength(2);
+    expect(within(held).getByText('한국투자')).toBeInTheDocument();
+    expect(within(held).getByText('메리츠')).toBeInTheDocument();
+    const rest = within(watchSection()).getByRole('list', { name: '보유하지 않은 감시 종목' });
+    expect(within(rest).queryByText('보유')).not.toBeInTheDocument();
+  });
+
+  it('[보유 종목 직접 추가]는 이 화면에 남고 보유 내역 입력 창을 연다(올리기 버튼은 보유 종목 탭에만)', async () => {
     mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
     renderAlerts();
     await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
-    expect(screen.queryByRole('button', { name: /직접 (추가|입력)/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '한국투자' })).not.toBeInTheDocument();
     expect(within(watchSection()).getByRole('link', { name: '보유 종목' })).toHaveAttribute(
       'href',
       '#/holdings',
     );
+    await userEvent.click(
+      within(watchSection()).getByRole('button', { name: '보유 종목 직접 추가' }),
+    );
+    expect(await screen.findByRole('dialog', { name: /보유/ })).toBeInTheDocument();
   });
 
   it('감시 종목 카드의 첫 동작은 종목 검색으로 추가하기', async () => {

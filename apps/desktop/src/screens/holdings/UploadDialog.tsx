@@ -361,3 +361,10 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
     </Dialog>
   );
 }
+
+/** 올리기 결과 한 줄(보유 종목·감시·알림 화면이 같이 쓴다). */
+export function uploadMessage(result: WatchResult): string {
+  return result.added === 0 && result.skipped === 0
+    ? '확인했습니다. 감시 종목에는 올리지 않았습니다.'
+    : `${result.added}종목을 감시 종목에 올렸습니다.${result.skipped > 0 ? ` ${result.skipped}종목은 이미 있거나 찾지 못해 건너뛰었습니다.` : ''}${result.rules > 0 ? ` 알림 규칙 ${result.rules}개를 만들었습니다.` : ''}`;
+}
