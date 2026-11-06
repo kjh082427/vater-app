@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from typing import Any
 
 import pytest
@@ -180,3 +181,169 @@ def test_every_catalog_provider_gets_the_key_without_env(
 def test_null_for_a_section_means_empty() -> None:
     got = parse_text('{"headline": "오늘은 조용했다.", "sectors": null, "flows": null}')
     assert got["headline"] == "오늘은 조용했다." and got["sectors"] == "" and got["flows"] == ""
+
+
+# ---- 재시도와 대체 모델 (v2 설계 21장 5번, 20장) ------------------------------------
+
+DEEP = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
+
+
+def gemini_run(
+    chains: dict[str, tuple[str, ...]] | None = None, provider: str = "google"
+) -> LlmRun:
+    overrides = {
+        "llm_provider": provider,
+        "deep_think_llm": DEEP[0],
+        "quick_think_llm": DEEP[0],
+        "backend_url": None,
+    }
+    tier = TierChoice(provider, DEEP[0], None)
+    chains = {"deep": DEEP} if chains is None else chains
+    return LlmRun("cloud", tier, tier, overrides, {"GOOGLE_API_KEY": "g-key"}, chains)
+
+
+class FakeModels:
+    """모델 이름별로 낼 오류를 차례로 낸다. 오류가 다 떨어지면 해석을 답한다."""
+
+    def __init__(self, script: dict[str, list[Exception]]) -> None:
+        from google.genai import types
+
+        self.script = script
+        self.calls: list[str] = []
+        part = types.Part(text=json.dumps(GOOD, ensure_ascii=False))
+        content = types.Content(role="model", parts=[part])
+        self.reply = types.GenerateContentResponse(
+            candidates=[types.Candidate(content=content, finish_reason=types.FinishReason.STOP)]
+        )
+
+    def generate_content(self, *, model: str, **request: Any) -> Any:
+        self.calls.append(model)
+        queue = self.script.get(model, [])
+        if queue:
+            raise queue.pop(0)
+        return self.reply
+
+
+def overloaded() -> Exception:
+    from google.genai import errors
+
+    return errors.ServerError(
+        503, {"error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}}
+    )
+
+
+class QuickStop(threading.Event):
+    """기다리지 않고 시간만 기록한다. `stop_after`번째 기다림에서 멈춤 신호가 선다."""
+
+    def __init__(self, stop_after: int | None = None) -> None:
+        super().__init__()
+        self.slept: list[float] = []
+        self.stop_after = stop_after
+
+    def wait(self, timeout: float | None = None) -> bool:
+        self.slept.append(timeout or 0.0)
+        if self.stop_after is not None and len(self.slept) >= self.stop_after:
+            self.set()
+        return self.is_set()
+
+
+def real_model(
+    monkeypatch: pytest.MonkeyPatch,
+    script: dict[str, list[Exception]],
+    run_: LlmRun,
+    stop: QuickStop | None = None,
+) -> tuple[Any, FakeModels, list[float]]:
+    """진짜 `deep_model`이 만든 Gemini 모델. 네트워크 대신 가짜 `models`를 끼우고 잠은 건너뛴다."""
+    from vater_core.analysis.fallback import GeminiFallback
+    from vater_core.briefing.interpret import deep_model
+
+    stop = stop or QuickStop()
+    slept = stop.slept
+    model = deep_model(run_, stop)
+    fake = FakeModels(script)
+    assert isinstance(model.client.models, GeminiFallback)
+    model.client.models._models = fake
+    return model, fake, slept
+
+
+def test_google_deep_model_waits_and_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    """실제 로그의 503: 첫 모델이 계속 혼잡해도 대체 모델이 해석을 만든다."""
+    from vater_core.analysis.fallback import BUDGET_SEC
+
+    script = {DEEP[0]: [overloaded() for _ in range(50)]}
+    model, fake, slept = real_model(monkeypatch, script, gemini_run())
+    assert interpret("KR", DATA, gemini_run(), factory=lambda r: model) == GOOD
+    assert fake.calls[-1] == DEEP[1] and set(fake.calls) == {DEEP[0], DEEP[1]}
+    assert 0 < sum(slept) <= BUDGET_SEC
+
+
+def rate_limited() -> Exception:
+    from google.genai import errors
+
+    quota = "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"
+    details = [{"violations": [{"quotaId": quota}]}, {"retryDelay": "30s"}]
+    body = {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED", "details": details}
+    return errors.ClientError(429, {"error": body})
+
+
+@pytest.mark.parametrize(
+    ("make", "code"), [(overloaded, "LLM_BUSY"), (rate_limited, "LLM_RATE_LIMITED")]
+)
+def test_exhausted_chain_keeps_the_reason_with_briefing_wording(
+    monkeypatch: pytest.MonkeyPatch, make: Any, code: str
+) -> None:
+    script = {m: [make() for _ in range(80)] for m in DEEP}
+    model, _, _ = real_model(monkeypatch, script, gemini_run())
+    with pytest.raises(VaterError) as e:
+        interpret("KR", DATA, gemini_run(), factory=lambda r: model)
+    assert e.value.code == code
+    assert "분석" not in e.value.message and "해석" in e.value.message
+
+
+def test_daily_limit_and_key_errors_keep_their_codes() -> None:
+    for code in ("LLM_DAILY_LIMIT", "LLM_KEY_INVALID"):
+        model = Model(error=VaterError(code, "원문", status=429))
+        with pytest.raises(VaterError) as e:
+            interpret("KR", DATA, run(), factory=lambda r, m=model: m)
+        assert (e.value.code, e.value.message) == (code, "원문")
+
+
+@pytest.mark.parametrize(
+    "run_",
+    [
+        gemini_run({}),  # 로컬 프리셋과 대체 목록이 없는 공급자
+        gemini_run({"deep": ("a", "b")}, provider="anthropic"),
+    ],
+)
+def test_only_google_gets_the_fallback(monkeypatch: pytest.MonkeyPatch, run_: LlmRun) -> None:
+    from vater_core.analysis.fallback import GeminiFallback
+    from vater_core.briefing.interpret import deep_model
+
+    monkeypatch.setattr("tradingagents.llm_clients.factory.create_tier_client", _plain_client)
+    model = deep_model(run_)
+    assert not isinstance(getattr(getattr(model, "client", None), "models", None), GeminiFallback)
+
+
+class _plain_client:
+    def __init__(self, config: Any, tier: str, **keys: Any) -> None:
+        pass
+
+    def get_llm(self) -> Any:
+        return object()
+
+
+def test_a_stop_signal_ends_the_waiting_and_the_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """시간 초과나 종료로 멈춤 신호가 서면 스레드는 더 기다리지도 Gemini를 다시 부르지도 않는다."""
+    stop = QuickStop(stop_after=2)
+    script = {m: [overloaded() for _ in range(80)] for m in DEEP}
+    model, fake, slept = real_model(monkeypatch, script, gemini_run(), stop)
+    with pytest.raises(VaterError):
+        interpret("KR", DATA, gemini_run(), factory=lambda r: model)
+    assert stop.is_set() and len(fake.calls) == 2 and len(slept) == 2
+
+    already = QuickStop(stop_after=1)
+    already.set()
+    model, fake, _ = real_model(monkeypatch, {DEEP[0]: [overloaded()]}, gemini_run(), already)
+    with pytest.raises(VaterError):
+        interpret("KR", DATA, gemini_run(), factory=lambda r: model)
+    assert len(fake.calls) == 1  # 첫 호출이 혼잡해도 기다리지 않고 끝낸다

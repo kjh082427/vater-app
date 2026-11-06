@@ -294,7 +294,10 @@ def seeded(tmp_path: Path) -> sqlite3.Connection:
     return db
 
 
-async def generate(db: sqlite3.Connection) -> tuple[dict[str, Any], int, list[Any], list[Any]]:
+async def generate(
+    db: sqlite3.Connection, retry: bool = False
+) -> tuple[dict[str, Any], int, list[Any], list[Any]]:
+    """`retry`: 첫 해석이 실패해 해석 없이 저장된 뒤 `reinterpret`(다시 만들기 경로)로 만든다."""
     deps = AppDeps(token="t", dev=True, data_dir=Path("."), db=db, events=EventBus())
     assert deps.events is not None
     sub = deps.events.subscribe()
@@ -306,6 +309,9 @@ async def generate(db: sqlite3.Connection) -> tuple[dict[str, Any], int, list[An
     notes: list[Any] = []
 
     def interpret(market: str, data: dict[str, Any], run: LlmRun) -> dict[str, str]:
+        seen["calls"] = seen.get("calls", 0) + 1
+        if retry and seen["calls"] == 1:
+            raise RuntimeError("busy")
         seen["data"] = data
         seen["text"] = "\n".join(c for _, c in build_messages(market, data))
         return dict(TEXT)
@@ -321,15 +327,22 @@ async def generate(db: sqlite3.Connection) -> tuple[dict[str, Any], int, list[An
         assets_fn=recorder.my_assets,
     )
     bid = await service.generate("KR", TUE)
+    if retry:
+        assert BriefingRepo(db).get(bid).text is None
+        await service.reinterpret(bid)
+        assert BriefingRepo(db).get(bid).text == TEXT and seen["calls"] == 2
     published = []
     while not sub.queue.empty():
         published.append(sub.queue.get_nowait())
     return seen, bid, notes, published
 
 
-async def test_prompt_has_no_holdings_even_with_an_average_price_alert(tmp_path: Path) -> None:
+@pytest.mark.parametrize("retry", [False, True], ids=["first", "reinterpret"])
+async def test_prompt_has_no_holdings_even_with_an_average_price_alert(
+    tmp_path: Path, retry: bool
+) -> None:
     db = seeded(tmp_path)
-    seen, bid, notes, published = await generate(db)
+    seen, bid, notes, published = await generate(db, retry)
     text = seen["text"]
 
     # 보유만 한 종목은 이름도 코드도 없다

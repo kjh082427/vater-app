@@ -12,7 +12,7 @@ from typing import Any
 
 from vater_core.api.errors import VaterError
 
-_COLUMNS = "id, market, date, data, text, status, missing, created_at, my_assets"
+_COLUMNS = "id, market, date, data, text, status, missing, created_at, my_assets, interpret_error"
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,7 @@ class Briefing:
     missing: list[str]
     created_at: str
     my_assets: dict[str, Any] | None = None  # 앱이 계산한 내 자산 구역. AI에 보내지 않는다
+    interpret_error: dict[str, str] | None = None  # 해석이 없는 이유 {code, message}
 
 
 def _row(r: tuple[Any, ...]) -> Briefing:
@@ -39,6 +40,7 @@ def _row(r: tuple[Any, ...]) -> Briefing:
         missing=json.loads(r[6]) if r[6] else [],
         created_at=r[7],
         my_assets=json.loads(r[8]) if r[8] else None,
+        interpret_error=json.loads(r[9]) if r[9] else None,
     )
 
 
@@ -54,15 +56,17 @@ class BriefingRepo:
         text: dict[str, str] | None,
         missing: builtins.list[str],
         my_assets: dict[str, Any] | None = None,
+        interpret_error: dict[str, str] | None = None,
     ) -> int:
         status = "partial" if missing else "done"
         with self._conn:
             self._conn.execute(
-                "INSERT INTO briefings (market, date, data, text, status, missing, my_assets) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "INSERT INTO briefings "
+                "(market, date, data, text, status, missing, my_assets, interpret_error) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(market, date) DO UPDATE SET data = excluded.data, "
                 "text = excluded.text, status = excluded.status, missing = excluded.missing, "
-                "my_assets = excluded.my_assets, "
+                "my_assets = excluded.my_assets, interpret_error = excluded.interpret_error, "
                 "created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
                 (
                     market,
@@ -72,12 +76,36 @@ class BriefingRepo:
                     status,
                     json.dumps(missing),
                     None if my_assets is None else json.dumps(my_assets, ensure_ascii=False),
+                    None if interpret_error is None else json.dumps(interpret_error),
                 ),
             )
         found = self.find(market, day)
         if found is None:  # 방금 넣었으므로 일어나지 않는다
             raise RuntimeError("briefing upsert lost its row")
         return found.id
+
+    def set_interpretation(
+        self, id: int, text: dict[str, str] | None, error: dict[str, str] | None
+    ) -> None:
+        """해석만 바꾼다. 다시 만들다 실패하면(`text` None) 있던 문장은 그대로 두고 이유만 바꾼다.
+        `created_at`은 건드리지 않는다(자동 재시도 기간의 기준이다)."""
+        b = self.get(id)
+        text = text if text is not None else b.text
+        missing = [m for m in b.missing if m != "interpretation"]
+        if text is None:
+            missing.append("interpretation")
+        with self._conn:
+            self._conn.execute(
+                "UPDATE briefings SET text = ?, status = ?, missing = ?, interpret_error = ? "
+                "WHERE id = ?",
+                (
+                    None if text is None else json.dumps(text, ensure_ascii=False),
+                    "partial" if missing else "done",
+                    json.dumps(missing),
+                    None if error is None else json.dumps(error),
+                    id,
+                ),
+            )
 
     def get(self, id: int) -> Briefing:
         r = self._conn.execute(

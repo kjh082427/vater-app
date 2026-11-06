@@ -30,7 +30,9 @@ def quiet(title: str, body: str, route: str | None = None) -> None:
     return None
 
 
-def install(deps: AppDeps, at: datetime, *, trading: bool = True) -> asyncio.Event:
+def install(
+    deps: AppDeps, at: datetime, *, trading: bool = True, interpret: Any = None
+) -> asyncio.Event:
     gate = asyncio.Event()
 
     async def trading_day(day: date) -> bool:
@@ -48,7 +50,7 @@ def install(deps: AppDeps, at: datetime, *, trading: bool = True) -> asyncio.Eve
         feeds_fn=lambda: cast(Feeds, None),
         run_fn=lambda: LlmRun("cloud", TIER, TIER, {}, {}),
         collect_fn=collect,
-        interpret_fn=lambda m, d, r: dict(TEXT),
+        interpret_fn=interpret or (lambda m, d, r: dict(TEXT)),
         notify_fn=quiet,
         now=lambda: at,
     )
@@ -118,9 +120,67 @@ async def test_run_rejects_an_unknown_market(client: httpx.AsyncClient) -> None:
 
 @pytest.mark.parametrize(
     ("method", "path"),
-    [("GET", "/briefings"), ("GET", "/briefings/1"), ("POST", "/briefings/run")],
+    [
+        ("GET", "/briefings"),
+        ("GET", "/briefings/1"),
+        ("POST", "/briefings/run"),
+        ("POST", "/briefings/1/interpret"),
+    ],
 )
 async def test_routes_need_the_token(
     anon_client: httpx.AsyncClient, method: str, path: str
 ) -> None:
     assert (await anon_client.request(method, path)).status_code == 401
+
+
+REASON = {"code": "LLM_BUSY", "message": "구글 AI 서버가 계속 혼잡해 해석을 만들지 못했습니다."}
+
+
+async def test_detail_tells_why_there_is_no_interpretation(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    bad = repo(deps).save("KR", TUE, {"market": "KR"}, None, ["interpretation"], None, REASON)
+    ok = repo(deps).save("US", TUE, {"market": "US"}, TEXT, [])
+    assert (await client.get(f"/briefings/{bad}")).json()["interpret_error"] == REASON
+    assert (await client.get(f"/briefings/{ok}")).json()["interpret_error"] is None
+
+
+async def test_interpret_again_runs_in_the_background(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def interpret(market: str, data: dict[str, Any], run: LlmRun) -> dict[str, str]:
+        seen.append(data)
+        return dict(TEXT)
+
+    install(deps, datetime(2026, 11, 3, 8, 0, tzinfo=UTC), interpret=interpret)
+    bid = repo(deps).save("KR", TUE, {"market": "KR"}, None, ["interpretation"], None, REASON)
+
+    r = await client.post(f"/briefings/{bid}/interpret")
+    assert (r.status_code, r.json()) == (202, {"market": "KR", "date": "2026-11-03"})
+    for _ in range(100):
+        if repo(deps).get(bid).text is not None:
+            break
+        await asyncio.sleep(0.01)
+    done = (await client.get(f"/briefings/{bid}")).json()
+    assert (done["status"], done["missing"], done["interpret_error"]) == ("done", [], None)
+    assert done["headline"] == TEXT["headline"] and seen == [{"market": "KR"}]
+    assert deps.briefing is not None
+    await deps.briefing.stop()
+
+
+async def test_interpret_again_while_busy_or_unknown(
+    client: httpx.AsyncClient, deps: AppDeps
+) -> None:
+    gate = install(deps, datetime(2026, 11, 3, 8, 0, tzinfo=UTC))
+    bid = repo(deps).save("KR", TUE, {"market": "KR"}, None, ["interpretation"], None, REASON)
+    assert (await client.post("/briefings/run", json={"market": "KR"})).status_code == 202
+    busy = await client.post(f"/briefings/{bid}/interpret")
+    assert (busy.status_code, busy.json()["code"]) == (409, "BRIEFING_BUSY")
+    gate.set()
+    assert deps.briefing is not None
+    await deps.briefing.stop()
+
+    missing = await client.post("/briefings/99/interpret")
+    assert (missing.status_code, missing.json()["code"]) == (404, "BRIEFING_NOT_FOUND")
