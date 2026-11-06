@@ -63,7 +63,7 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
 
   await test.step('업로드: 새 종목 알림, 확인 창, 체크 해제 종목은 올리지 않는다', async () => {
     await page.evaluate(() => {
-      location.hash = '#/alerts';
+      location.hash = '#/holdings';
     });
     await expect(page.getByRole('button', { name: '연결한 증권사 모두' })).toBeVisible();
     // NAVER, 엔비디아(삼성전자는 이미 감시 중)
@@ -78,10 +78,19 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
     await dialog.getByRole('checkbox', { name: /엔비디아/ }).uncheck();
     await dialog.getByRole('button', { name: /감시 종목에 올리기/ }).click();
     await expect(page.getByText(/1종목을 감시 종목에 올렸습니다/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^NAVER/ })).toBeVisible();
     // 체크하지 않은 엔비디아는 올리지 않았지만 다시 새 종목으로 세지 않는다
     await expect(page.getByText(/새 종목/)).toHaveCount(0);
+    // 보유 종목 탭은 감시 종목 목록이 아니다. 올린 종목은 감시·알림에서, 보유 중 묶음으로 보인다
+    await page.evaluate(() => {
+      location.hash = '#/alerts';
+    });
+    await expect(
+      page
+        .getByRole('list', { name: '보유 중인 감시 종목' })
+        .getByRole('button', { name: /^NAVER/ }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /^엔비디아/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /직접 (추가|입력)/ })).toHaveCount(0);
   });
 
   await test.step('내 보유: 주가 그래프와 카드, 칩 전환을 기억한다', async () => {
@@ -101,7 +110,7 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
     await expect(card.getByRole('button', { name: '메리츠 33.3%' })).toBeVisible();
     // 견본 자료는 새로 고치면 처음으로 돌아가므로, 화면을 떠났다 돌아와 기억을 본다
     await page.evaluate(() => {
-      location.hash = '#/alerts';
+      location.hash = '#/holdings';
     });
     await expect(page.getByRole('button', { name: '연결한 증권사 모두' })).toBeVisible();
     await page.evaluate(() => {
