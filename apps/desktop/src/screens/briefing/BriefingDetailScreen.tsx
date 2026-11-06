@@ -1,9 +1,12 @@
-import type { ReactNode } from 'react';
-import { useEvent } from '../../api/services';
+import { useState, type ReactNode } from 'react';
+import { toApiError, type ApiError } from '../../api/errors';
+import { useApi, useEvent } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { BriefingDetail, MyAssets } from '../../api/types';
+import type { BriefingDetail, ErrorBody, MyAssets } from '../../api/types';
 import {
   AiText,
+  Banner,
+  Button,
   Card,
   Disclaimer,
   formatNumber,
@@ -34,6 +37,88 @@ import { FlowTable, IndexTable, RankTable, SectorTable, WatchTable } from './tab
 /** AI 해석 한 항목. 빈 문장이면 그리지 않는다(데이터가 없는 항목은 AI가 빈 문자열을 준다). */
 function Interpretation({ text }: { text: string | undefined }) {
   return text?.trim() ? <AiText attribution="AI 해석">{text}</AiText> : null;
+}
+
+/** AI 해석이 없는 이유(분석 화면 20장과 같은 문구). 키 문제는 다시 해도 안 되므로 설정으로 안내한다. */
+const INTERPRET_REASON: Record<string, string> = {
+  LLM_BUSY: '구글 AI 서버가 혼잡합니다. 잠시 후 자동으로 다시 시도합니다.',
+  LLM_RATE_LIMITED: '무료 사용량의 분당 한도에 걸려 잠시 기다립니다.',
+  LLM_DAILY_LIMIT: '오늘 무료 사용량을 다 썼습니다. 내일 다시 시도하거나 로컬 AI로 바꿔 주세요.',
+  LLM_KEY_INVALID: 'AI 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.',
+  LLM_KEY_MISSING: 'AI 키가 없습니다. 설정에서 키를 넣어 주세요.',
+  BRIEFING_LLM_FAILED: 'AI 해석을 끝내지 못했습니다. 잠시 뒤 [AI 해석 다시 만들기]를 눌러 주세요.',
+};
+const KEY_CODES = new Set(['LLM_KEY_INVALID', 'LLM_KEY_MISSING']);
+
+/**
+ * 해석이 없는 브리핑의 이유와 [AI 해석 다시 만들기](POST /briefings/{id}/interpret, 202).
+ * 진행과 결과는 SSE briefing.status로 받는다: 끝나면 상세를 다시 불러오는 것은 화면(BriefingDetailScreen)이 한다.
+ * 요청에는 아무것도 싣지 않는다(브리핑 AI 입력 범위는 그대로, 8-1장).
+ */
+function InterpretRetry({ b }: { b: BriefingDetail }) {
+  const api = useApi();
+  const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [problem, setProblem] = useState<ErrorBody | ApiError | null>(null);
+  useEvent('briefing.status', (event) => {
+    if (event.id !== b.id && !(event.market === b.market && event.date === b.date)) return;
+    if (event.status === 'running') {
+      setRunning(true);
+      return;
+    }
+    setRunning(false);
+    // 실패 이유는 상세를 다시 불러오면 interpret_error로 온다. 해석을 시작하지 못한 경우(BRIEFING_BUSY)만 여기서 보인다
+    setProblem(
+      event.status === 'failed' && event.error?.code === 'BRIEFING_BUSY' ? event.error : null,
+    );
+  });
+
+  async function start() {
+    setStarting(true);
+    setProblem(null);
+    try {
+      await api.request(`/briefings/${b.id}/interpret`, { method: 'POST' });
+      setRunning(true);
+    } catch (e) {
+      const error = toApiError(e);
+      if (error.code === 'BRIEFING_BUSY') setRunning(true);
+      else setProblem(error);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  const code = b.interpret_error?.code;
+  const reason = code ? (INTERPRET_REASON[code] ?? b.interpret_error?.message) : undefined;
+  const busyOther = problem !== null && problem.code === 'BRIEFING_BUSY';
+  return (
+    <div className={styles.interpret}>
+      {running ? (
+        <Banner tone="info" title="AI 해석을 만드는 중입니다. 끝나면 이 화면이 바뀝니다." />
+      ) : (
+        <>
+          {reason ? <Banner tone="caution" title={reason} /> : null}
+          {problem && !busyOther ? <ApiErrorNotice error={toApiError(problem)} /> : null}
+          {busyOther ? (
+            <Banner tone="caution" title={problem.message}>
+              {problem.hint ?? undefined}
+            </Banner>
+          ) : null}
+        </>
+      )}
+      <div>
+        {code && KEY_CODES.has(code) && !running ? (
+          <a className={common.textLink} href="#/settings">
+            설정 열기
+          </a>
+        ) : (
+          <Button busy={running || starting} onClick={() => void start()}>
+            AI 해석 다시 만들기
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function NotReceived({ label }: { label: string }) {
@@ -158,7 +243,10 @@ function Body({ b }: { b: BriefingDetail }) {
             {lead}
           </AiText>
         ) : (
-          <p className={common.meta}>AI 해석 없음(데이터만)</p>
+          <>
+            <p className={common.meta}>AI 해석 없음(데이터만)</p>
+            <InterpretRetry b={b} />
+          </>
         )}
         {missing.length > 0 ? (
           <p className={styles.missing}>{`빠진 항목: ${missing.map(missingLabel).join(', ')}`}</p>
@@ -238,10 +326,11 @@ function ledeNote(missing: string[]): string {
 export function BriefingDetailScreen({ id }: { id: number }) {
   const detail = useResource<BriefingDetail>(`/briefings/${id}`);
   const { reload } = detail;
-  useEvent('briefing.status', (event) => {
-    if (event.id === id) reload();
-  });
   const b = detail.data;
+  useEvent('briefing.status', (event) => {
+    // 같은 날·시장의 브리핑이면 id가 없는 소식(만드는 중)도 해석 상태를 바꿀 수 있다
+    if (event.id === id || (b && event.market === b.market && event.date === b.date)) reload();
+  });
   return (
     <>
       <ScreenHeader

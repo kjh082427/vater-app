@@ -458,6 +458,11 @@ export function createHandlers(db: MockDb) {
         }));
       return HttpResponse.json(rows);
     }),
+    http.post('*/briefings/:bid/interpret', ({ params }) => {
+      const found = db.briefings.find((b) => b.id === Number(params.bid));
+      if (!found) return errorResponse(404, 'BRIEFING_NOT_FOUND', '브리핑이 없습니다.');
+      return HttpResponse.json({ market: found.market, date: found.date }, { status: 202 });
+    }),
     http.get('*/briefings/:bid', ({ params }) => {
       const found = db.briefings.find((b) => b.id === Number(params.bid));
       return found ? HttpResponse.json(found) : notFound();
