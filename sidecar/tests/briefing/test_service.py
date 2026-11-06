@@ -519,3 +519,88 @@ async def test_tick_retry_does_not_block_the_schedule(db: sqlite3.Connection) ->
 async def test_the_retry_window_and_interval_are_bounded() -> None:
     assert timedelta(minutes=10) <= RETRY_EVERY <= timedelta(hours=2)
     assert timedelta(hours=1) <= RETRY_WINDOW <= timedelta(hours=12)
+
+
+async def test_a_timeout_stops_the_llm_thread_from_retrying(
+    db: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """900초 시간 초과 뒤 daemon 스레드가 계속 기다리며 Gemini를 부르면 다시 만들기와 겹친다."""
+    seen: list[threading.Event] = []
+
+    def waits_for_stop(m: str, d: dict[str, Any], r: LlmRun, stop: threading.Event) -> Any:
+        seen.append(stop)
+        stop.wait(10)  # 대기 중인 스레드: 멈춤 신호가 서야 끝난다
+        raise RuntimeError("stopped")
+
+    monkeypatch.setattr("vater_core.briefing.service.interpret", waits_for_stop)
+    rig = Rig(db, KR_SLOT, llm_timeout=0.1)
+    rig.service._interpret = None  # 기본 해석 함수를 쓴다(테스트에서만 바꾼다)
+    await rig.service.generate("KR", TUE)
+    assert len(seen) == 1 and seen[0].is_set()
+    for _ in range(100):
+        if not [t for t in threading.enumerate() if t.name == "vater-briefing-llm"]:
+            break
+        await asyncio.sleep(0.02)
+    assert not [t for t in threading.enumerate() if t.name == "vater-briefing-llm"]
+
+
+async def test_stopping_the_service_stops_the_llm_thread(
+    db: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[threading.Event] = []
+
+    def waits_for_stop(m: str, d: dict[str, Any], r: LlmRun, stop: threading.Event) -> Any:
+        seen.append(stop)
+        stop.wait(10)
+        raise RuntimeError("stopped")
+
+    monkeypatch.setattr("vater_core.briefing.service.interpret", waits_for_stop)
+    rig = Rig(db, KR_SLOT)
+    rig.service._interpret = None
+    bid = await saved_without_text(rig)
+    seen.clear()
+    rig.service.start_reinterpret(bid)
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if seen:
+            break
+    await rig.service.stop()
+    assert seen and seen[0].is_set()
+
+
+@pytest.mark.parametrize("code", ["LLM_LOCAL_MODEL_MISSING", "LLM_MODEL_UNKNOWN"])
+async def test_tick_does_not_retry_a_model_the_user_must_fix(
+    db: sqlite3.Connection, code: str
+) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    await saved_without_text(rig, VaterError(code, "모델", status=409))
+    calls = len(rig.interpreted)
+    rig.clock.at = KR_SLOT + RETRY_EVERY * 2
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls
+
+
+async def test_a_reinterpret_that_loses_the_lock_tells_the_screen(db: sqlite3.Connection) -> None:
+    """202를 받은 뒤 일정 생성이 잠금을 먼저 잡으면 화면이 SSE로 실패 이유를 안다."""
+    rig = Rig(db, KR_SLOT)
+    bid = await saved_without_text(rig)
+    sub = rig.bus.subscribe()
+    rig.service.start_reinterpret(bid)  # 작업은 아직 시작 전이다
+    await rig.service._lock.acquire()  # 일정 생성이 먼저 잡았다
+    try:
+        for _ in range(20):
+            await asyncio.sleep(0)
+    finally:
+        rig.service._lock.release()
+    events = [e.data for e in await drain(sub)]
+    assert events == [
+        {
+            "market": "KR",
+            "date": "2026-11-03",
+            "status": "failed",
+            "error": {"code": "BRIEFING_BUSY", "message": "브리핑을 만드는 중입니다."},
+        }
+    ]
+    assert BriefingRepo(db).get(bid).text is None

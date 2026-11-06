@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from typing import Any
 
 import pytest
@@ -231,18 +232,34 @@ def overloaded() -> Exception:
     )
 
 
+class QuickStop(threading.Event):
+    """기다리지 않고 시간만 기록한다. `stop_after`번째 기다림에서 멈춤 신호가 선다."""
+
+    def __init__(self, stop_after: int | None = None) -> None:
+        super().__init__()
+        self.slept: list[float] = []
+        self.stop_after = stop_after
+
+    def wait(self, timeout: float | None = None) -> bool:
+        self.slept.append(timeout or 0.0)
+        if self.stop_after is not None and len(self.slept) >= self.stop_after:
+            self.set()
+        return self.is_set()
+
+
 def real_model(
-    monkeypatch: pytest.MonkeyPatch, script: dict[str, list[Exception]], run_: LlmRun
+    monkeypatch: pytest.MonkeyPatch,
+    script: dict[str, list[Exception]],
+    run_: LlmRun,
+    stop: QuickStop | None = None,
 ) -> tuple[Any, FakeModels, list[float]]:
     """진짜 `deep_model`이 만든 Gemini 모델. 네트워크 대신 가짜 `models`를 끼우고 잠은 건너뛴다."""
-    import time
-
     from vater_core.analysis.fallback import GeminiFallback
     from vater_core.briefing.interpret import deep_model
 
-    slept: list[float] = []
-    monkeypatch.setattr(time, "sleep", slept.append)
-    model = deep_model(run_)
+    stop = stop or QuickStop()
+    slept = stop.slept
+    model = deep_model(run_, stop)
     fake = FakeModels(script)
     assert isinstance(model.client.models, GeminiFallback)
     model.client.models._models = fake
@@ -313,3 +330,20 @@ class _plain_client:
 
     def get_llm(self) -> Any:
         return object()
+
+
+def test_a_stop_signal_ends_the_waiting_and_the_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """시간 초과나 종료로 멈춤 신호가 서면 스레드는 더 기다리지도 Gemini를 다시 부르지도 않는다."""
+    stop = QuickStop(stop_after=2)
+    script = {m: [overloaded() for _ in range(80)] for m in DEEP}
+    model, fake, slept = real_model(monkeypatch, script, gemini_run(), stop)
+    with pytest.raises(VaterError):
+        interpret("KR", DATA, gemini_run(), factory=lambda r: model)
+    assert stop.is_set() and len(fake.calls) == 2 and len(slept) == 2
+
+    already = QuickStop(stop_after=1)
+    already.set()
+    model, fake, _ = real_model(monkeypatch, {DEEP[0]: [overloaded()]}, gemini_run(), already)
+    with pytest.raises(VaterError):
+        interpret("KR", DATA, gemini_run(), factory=lambda r: model)
+    assert len(fake.calls) == 1  # 첫 호출이 혼잡해도 기다리지 않고 끝낸다

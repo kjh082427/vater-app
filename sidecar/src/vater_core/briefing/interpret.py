@@ -13,7 +13,7 @@
 import json
 import logging
 import re
-import time
+import threading
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -112,7 +112,11 @@ def _key_kwargs(run: LlmRun) -> dict[str, str]:
     return {"api_key": run.env[name]}
 
 
-def deep_model(run: LlmRun) -> ChatModel:
+class Stopped(Exception):
+    """시간 초과나 종료로 멈춤 신호가 섰다: 기다리던 스레드가 바로 끝난다."""
+
+
+def deep_model(run: LlmRun, stop: threading.Event | None = None) -> ChatModel:
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.llm_clients.factory import build_llm_kwargs, create_tier_client
 
@@ -131,7 +135,13 @@ def deep_model(run: LlmRun) -> ChatModel:
     llm: ChatModel = create_tier_client(config, "deep", **keys).get_llm()
     chain = run.chains.get("deep")
     if run.deep.provider == "google" and chain:
-        install(llm, chain, time.sleep, _log_wait)
+        stop = stop or threading.Event()
+
+        def wait(seconds: float) -> None:  # 분석 엔진처럼 Event로 기다려, 신호가 서면 바로 멈춘다
+            if stop.wait(seconds):
+                raise Stopped
+
+        install(llm, chain, wait, _log_wait)
     return llm
 
 
@@ -143,11 +153,13 @@ def interpret(
     market: str,
     data: dict[str, Any],
     run: LlmRun,
-    factory: Callable[[LlmRun], ChatModel] = deep_model,
+    stop: threading.Event | None = None,
+    factory: Callable[[LlmRun], ChatModel] | None = None,
 ) -> dict[str, str]:
-    """동기 함수다. 서비스가 `asyncio.to_thread`로 부른다."""
+    """동기 함수다. 서비스가 daemon 스레드에서 부른다. `stop`이 서면 대기를 멈춘다."""
     try:
-        reply = factory(run).invoke(build_messages(market, data))
+        model = factory(run) if factory else deep_model(run, stop)
+        reply = model.invoke(build_messages(market, data))
     except VaterError as e:  # 대기와 대체 모델을 다 쓴 결과: 혼잡, 분당·하루 한도, 키 오류
         logger.warning("briefing interpretation failed (%s)", e.code)
         if e.code in _KIND:  # 분석 화면 문구("마친 단계는 저장됐으니")는 브리핑에 맞지 않는다
