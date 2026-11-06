@@ -265,6 +265,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/briefings/{bid}/interpret': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Interpret Briefing
+     * @description 해석만 다시 만든다(백그라운드). 진행은 SSE `briefing.status`, 이유는 `interpret_error`.
+     */
+    post: operations['interpret_briefing_briefings__bid__interpret_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/brokers': {
     parameters: {
       query?: never;
@@ -1137,6 +1157,7 @@ export interface components {
       headline: string | null;
       /** Id */
       id: number;
+      interpret_error?: components['schemas']['InterpretError'] | null;
       /** Market */
       market: string;
       /** Missing */
@@ -1591,6 +1612,17 @@ export interface components {
       name: string;
       /** Size */
       size: number;
+    };
+    /**
+     * InterpretError
+     * @description AI 해석이 없는 이유. 분석과 같은 구분이다: LLM_BUSY(혼잡), LLM_RATE_LIMITED(분당 한도),
+     *     LLM_DAILY_LIMIT(하루 한도), LLM_KEY_INVALID·LLM_KEY_MISSING(키), BRIEFING_LLM_FAILED(그 밖).
+     */
+    InterpretError: {
+      /** Code */
+      code: string;
+      /** Message */
+      message: string;
     };
     /** KindInfo */
     KindInfo: {
@@ -2974,6 +3006,55 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['BriefingDetail'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  interpret_briefing_briefings__bid__interpret_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bid: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BriefingRunAccepted'];
         };
       };
       /** @description 인증 실패 (AUTH_INVALID) */

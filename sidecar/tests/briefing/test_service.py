@@ -12,7 +12,12 @@ from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
 from vater_core.api.events import Event, EventBus
 from vater_core.briefing.collect import Collected, Feeds
-from vater_core.briefing.service import BriefingService, get_briefing
+from vater_core.briefing.service import (
+    RETRY_EVERY,
+    RETRY_WINDOW,
+    BriefingService,
+    get_briefing,
+)
 from vater_core.briefing.store import BriefingRepo
 from vater_core.llm.presets import LlmRun, TierChoice
 from vater_core.store.db import open_db
@@ -48,6 +53,7 @@ class Rig:
         self.run_error: Exception | None = None
         self.feeds_error: Exception | None = None
         self.interpret_block: threading.Event | None = None
+        self.interpreted: list[dict[str, Any]] = []
 
         async def weekdays(day: date) -> bool:
             return day.weekday() < 5
@@ -63,6 +69,7 @@ class Rig:
             return Collected({"market": market, "session": session.isoformat()}, list(self.missing))
 
         def interpret(market: str, data: dict[str, Any], run: LlmRun) -> dict[str, str]:
+            self.interpreted.append(data)
             if self.interpret_block is not None:
                 self.interpret_block.wait()  # 응답이 오지 않는 LLM
             if self.interpret_error is not None:
@@ -317,3 +324,198 @@ async def test_missing_kis_keys_stay_quiet(db: sqlite3.Connection) -> None:
     await rig.service.tick_once()
     assert await drain(sub) == []  # 첫 실행 마법사 중에 '브리핑 실패'를 보내지 않는다
     assert BriefingRepo(db).list() == []
+
+
+# ---- AI 해석 다시 만들기와 자동 재시도 (v2 설계 21장 5번) ------------------------------
+
+
+def busy_error() -> VaterError:
+    return VaterError("LLM_BUSY", "구글 AI 서버가 계속 혼잡했습니다.", status=503)
+
+
+async def saved_without_text(rig: Rig, error: Exception | None = None) -> int:
+    rig.interpret_error = error or busy_error()
+    bid = await rig.service.generate("KR", TUE)
+    rig.interpret_error = None
+    return bid
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (VaterError("LLM_DAILY_LIMIT", "하루 한도", status=429), "LLM_DAILY_LIMIT"),
+        (VaterError("LLM_KEY_MISSING", "키 없음", status=409), "LLM_KEY_MISSING"),
+        (RuntimeError("secret g-key"), "BRIEFING_LLM_FAILED"),
+    ],
+)
+async def test_the_reason_for_a_missing_interpretation_is_saved(
+    db: sqlite3.Connection, error: Exception, code: str
+) -> None:
+    rig = Rig(db, KR_SLOT)
+    bid = await saved_without_text(rig, error)
+    reason = BriefingRepo(db).get(bid).interpret_error
+    assert reason is not None and reason["code"] == code
+    assert "g-key" not in reason["message"]
+
+
+async def test_a_timeout_is_saved_as_a_reason(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT, llm_timeout=0.1)
+    rig.interpret_block = threading.Event()
+    try:
+        bid = await rig.service.generate("KR", TUE)
+    finally:
+        rig.interpret_block.set()
+    reason = BriefingRepo(db).get(bid).interpret_error
+    assert reason is not None and reason["code"] == "BRIEFING_LLM_FAILED"
+
+
+async def test_reinterpret_fills_in_only_the_text(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    rig.missing = ["flows"]
+    bid = await saved_without_text(rig)
+    before = BriefingRepo(db).get(bid)
+    sub = rig.bus.subscribe()
+    rig.notes.clear()
+
+    await rig.service.reinterpret(bid)
+
+    b = BriefingRepo(db).get(bid)
+    assert (b.text, b.missing, b.status, b.interpret_error) == (TEXT, ["flows"], "partial", None)
+    assert (b.data, b.created_at) == (before.data, before.created_at)
+    assert rig.notes == [] and len(rig.collected) == 1  # 다시 수집하지도 알리지도 않는다
+    assert rig.interpreted[-1] == before.data  # 처음과 같은 데이터만 AI에 간다
+    events = [e.data for e in await drain(sub)]
+    assert [e["status"] for e in events] == ["running", "partial"] and events[-1]["id"] == bid
+
+
+async def test_reinterpret_failure_updates_the_reason(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    bid = await saved_without_text(rig)
+    rig.interpret_error = VaterError("LLM_DAILY_LIMIT", "하루 한도", status=429)
+
+    await rig.service.reinterpret(bid)  # 실패해도 예외로 새지 않는다
+
+    b = BriefingRepo(db).get(bid)
+    assert (b.text, b.missing) == (None, ["interpretation"])
+    assert b.interpret_error == {"code": "LLM_DAILY_LIMIT", "message": "하루 한도"}
+
+
+async def test_reinterpret_does_not_run_twice_at_once(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    bid = await saved_without_text(rig)
+    rig.interpret_block = threading.Event()
+    try:
+        assert rig.service.start_reinterpret(bid).id == bid
+        assert rig.service.busy()
+        with pytest.raises(VaterError) as e:
+            rig.service.start_reinterpret(bid)
+        assert (e.value.code, e.value.status) == ("BRIEFING_BUSY", 409)
+        with pytest.raises(VaterError):
+            await rig.service.run_latest("KR")  # 브리핑 만들기도 같이 돌지 않는다
+    finally:
+        rig.interpret_block.set()
+    for _ in range(50):
+        await asyncio.sleep(0.01)
+        if not rig.service.busy():
+            break
+    assert BriefingRepo(db).get(bid).text == TEXT
+    await rig.service.stop()
+
+
+async def test_reinterpret_of_an_unknown_briefing(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    with pytest.raises(VaterError) as e:
+        rig.service.start_reinterpret(99)
+    assert (e.value.code, e.value.status) == ("BRIEFING_NOT_FOUND", 404)
+
+
+async def settle(rig: Rig) -> None:
+    for _ in range(300):
+        await asyncio.sleep(0.01)
+        if not rig.service.busy():
+            return
+
+
+async def test_tick_retries_a_missing_interpretation_on_schedule(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    bid = await saved_without_text(rig)  # 방금 한 번 실패했다
+    calls = len(rig.interpreted)
+
+    rig.clock.at = KR_SLOT + RETRY_EVERY - timedelta(minutes=1)
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls  # 간격이 차기 전에는 부르지 않는다
+
+    rig.clock.at = KR_SLOT + RETRY_EVERY
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls + 1
+    assert BriefingRepo(db).get(bid).text == TEXT
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls + 1  # 해석이 생기면 더 부르지 않는다
+
+
+async def test_tick_keeps_the_interval_while_failures_repeat(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    await saved_without_text(rig)
+    rig.interpret_error = busy_error()
+    calls = len(rig.interpreted)
+
+    for minutes in (30, 31, 45, 59, 60, 61, 90):
+        rig.clock.at = KR_SLOT + timedelta(minutes=minutes)
+        await rig.service.tick_once()
+        await settle(rig)
+    assert len(rig.interpreted) - calls == 3  # 30분, 60분, 90분에만
+
+
+async def test_tick_stops_retrying_after_the_window(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    bid = await saved_without_text(rig)
+    calls = len(rig.interpreted)
+    stamp = (KR_SLOT - RETRY_WINDOW - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    db.execute("UPDATE briefings SET created_at = ? WHERE id = ?", (stamp, bid))
+    db.commit()
+
+    rig.clock.at = KR_SLOT + RETRY_EVERY
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls
+
+
+@pytest.mark.parametrize("code", ["LLM_DAILY_LIMIT", "LLM_KEY_INVALID", "LLM_KEY_MISSING"])
+async def test_tick_does_not_retry_when_waiting_cannot_help(
+    db: sqlite3.Connection, code: str
+) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    await saved_without_text(rig, VaterError(code, "안 됨", status=409))
+    calls = len(rig.interpreted)
+
+    rig.clock.at = KR_SLOT + RETRY_EVERY * 2
+    await rig.service.tick_once()
+    await settle(rig)
+    assert len(rig.interpreted) == calls
+
+
+async def test_tick_retry_does_not_block_the_schedule(db: sqlite3.Connection) -> None:
+    rig = Rig(db, KR_SLOT)
+    SettingsRepo(db).update({"briefing.us.enabled": False})
+    await saved_without_text(rig)
+    rig.interpret_block = threading.Event()  # 해석이 멈춘 LLM
+    rig.clock.at = KR_SLOT + RETRY_EVERY
+    try:
+        await asyncio.wait_for(rig.service.tick_once(), 2)  # 기다리지 않고 돌아온다
+        assert rig.service.busy()
+    finally:
+        rig.interpret_block.set()
+    await settle(rig)
+    await rig.service.stop()
+
+
+async def test_the_retry_window_and_interval_are_bounded() -> None:
+    assert timedelta(minutes=10) <= RETRY_EVERY <= timedelta(hours=2)
+    assert timedelta(hours=1) <= RETRY_WINDOW <= timedelta(hours=12)
