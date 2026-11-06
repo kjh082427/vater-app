@@ -51,9 +51,18 @@ class MyAssets(BaseModel):
     bottom: AssetMove | None
 
 
+class InterpretError(BaseModel):
+    """AI 해석이 없는 이유. 분석과 같은 구분이다: LLM_BUSY(혼잡), LLM_RATE_LIMITED(분당 한도),
+    LLM_DAILY_LIMIT(하루 한도), LLM_KEY_INVALID·LLM_KEY_MISSING(키), BRIEFING_LLM_FAILED(그 밖)."""
+
+    code: str
+    message: str
+
+
 class BriefingDetail(BriefingItem):
     data: dict[str, Any]
     text: dict[str, str] | None
+    interpret_error: InterpretError | None = None  # 해석이 없을 때만 의미가 있다
     my_assets: MyAssets | None = None  # 보유 내역이 없으면 null이고 빠진 항목으로 세지 않는다
 
 
@@ -97,7 +106,10 @@ async def list_briefings(
 async def read_briefing(bid: int, deps: AppDeps = Depends(get_deps)) -> BriefingDetail:  # noqa: B008
     b = _repo(deps).get(bid)
     assets = MyAssets(**b.my_assets) if b.my_assets else None
-    return BriefingDetail(**_item(b), data=b.data, text=b.text, my_assets=assets)
+    error = InterpretError(**b.interpret_error) if b.interpret_error else None
+    return BriefingDetail(
+        **_item(b), data=b.data, text=b.text, interpret_error=error, my_assets=assets
+    )
 
 
 @router.post("/run", status_code=202)
@@ -107,3 +119,13 @@ async def run_briefing(
 ) -> BriefingRunAccepted:
     session = await get_briefing(deps).run_latest(body.market)
     return BriefingRunAccepted(market=body.market, date=session.isoformat())
+
+
+@router.post("/{bid}/interpret", status_code=202)
+async def interpret_briefing(
+    bid: int,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> BriefingRunAccepted:
+    """해석만 다시 만든다(백그라운드). 진행은 SSE `briefing.status`, 이유는 `interpret_error`."""
+    b = get_briefing(deps).start_reinterpret(bid)
+    return BriefingRunAccepted(market=b.market, date=b.date)

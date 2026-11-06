@@ -1,5 +1,8 @@
 """브리핑 해석: deep 모델을 1번 부른다 (스펙 6장). TradingAgents는 이 파일에서만 import한다.
 
+- Google이면 분석과 같은 대기와 대체 모델을 쓴다(`analysis/fallback.py`, v2 설계 20장). 로컬과 다른
+  공급자는 그대로다.
+
 - **숫자 환각 차단:** 숫자는 화면이 수집 데이터로 직접 그린다. 프롬프트에서 숫자를 쓰지 말라고 하고,
   그래도 숫자가 든 문장은 저장하기 전에 뺀다.
 - 키는 환경변수가 아니라 LLM 클라이언트 인자로만 넘긴다. 분석이 같은 때 환경변수를 넣고
@@ -10,9 +13,11 @@
 import json
 import logging
 import re
+import threading
 from collections.abc import Callable
 from typing import Any, Protocol
 
+from vater_core.analysis.fallback import GAVE_UP_HINT, install
 from vater_core.api.errors import VaterError
 from vater_core.llm.presets import ENV_FOR_PROVIDER, LlmRun
 
@@ -35,6 +40,7 @@ SYSTEM = """너는 한국 개인 투자자를 위한 일일 시장 브리핑을 
   notable: 눈에 띄는 상승·하락·거래대금 상위 종목
   watchlist: 내 감시 종목의 흐름과 오늘 울린 알림"""
 
+_KIND = {"LLM_BUSY": "busy", "LLM_RATE_LIMITED": "rate"}
 _SENTENCE = re.compile(r"(?<=[.!?。])\s+|\n+")
 _DIGIT = re.compile(r"\d")
 _FENCE = re.compile(r"```(?:json)?", re.IGNORECASE)
@@ -106,7 +112,11 @@ def _key_kwargs(run: LlmRun) -> dict[str, str]:
     return {"api_key": run.env[name]}
 
 
-def deep_model(run: LlmRun) -> ChatModel:
+class Stopped(Exception):
+    """시간 초과나 종료로 멈춤 신호가 섰다: 기다리던 스레드가 바로 끝난다."""
+
+
+def deep_model(run: LlmRun, stop: threading.Event | None = None) -> ChatModel:
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.llm_clients.factory import build_llm_kwargs, create_tier_client
 
@@ -123,18 +133,39 @@ def deep_model(run: LlmRun) -> ChatModel:
         )
         return openai
     llm: ChatModel = create_tier_client(config, "deep", **keys).get_llm()
+    chain = run.chains.get("deep")
+    if run.deep.provider == "google" and chain:
+        stop = stop or threading.Event()
+
+        def wait(seconds: float) -> None:  # 분석 엔진처럼 Event로 기다려, 신호가 서면 바로 멈춘다
+            if stop.wait(seconds):
+                raise Stopped
+
+        install(llm, chain, wait, _log_wait)
     return llm
+
+
+def _log_wait(reason: str, model: str, seconds: float) -> None:
+    logger.info("briefing AI waits %.0fs (%s, %s)", seconds, reason, model)
 
 
 def interpret(
     market: str,
     data: dict[str, Any],
     run: LlmRun,
-    factory: Callable[[LlmRun], ChatModel] = deep_model,
+    stop: threading.Event | None = None,
+    factory: Callable[[LlmRun], ChatModel] | None = None,
 ) -> dict[str, str]:
-    """동기 함수다. 서비스가 `asyncio.to_thread`로 부른다."""
+    """동기 함수다. 서비스가 daemon 스레드에서 부른다. `stop`이 서면 대기를 멈춘다."""
     try:
-        reply = factory(run).invoke(build_messages(market, data))
+        model = factory(run) if factory else deep_model(run, stop)
+        reply = model.invoke(build_messages(market, data))
+    except VaterError as e:  # 대기와 대체 모델을 다 쓴 결과: 혼잡, 분당·하루 한도, 키 오류
+        logger.warning("briefing interpretation failed (%s)", e.code)
+        if e.code in _KIND:  # 분석 화면 문구("마친 단계는 저장됐으니")는 브리핑에 맞지 않는다
+            message = f"{GAVE_UP_HINT[_KIND[e.code]]} 해석 없이 저장했습니다."
+            raise VaterError(e.code, message, status=e.status) from e
+        raise
     except Exception as e:
         logger.exception("briefing interpretation failed")
         raise _failed(f"AI 해석에 실패했습니다 ({type(e).__name__}).") from e

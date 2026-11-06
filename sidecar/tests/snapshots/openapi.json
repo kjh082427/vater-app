@@ -596,6 +596,16 @@
             "title": "Id",
             "type": "integer"
           },
+          "interpret_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterpretError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "market": {
             "title": "Market",
             "type": "string"
@@ -2106,6 +2116,25 @@
           "size"
         ],
         "title": "InstalledOut",
+        "type": "object"
+      },
+      "InterpretError": {
+        "description": "AI 해석이 없는 이유. 분석과 같은 구분이다: LLM_BUSY(혼잡), LLM_RATE_LIMITED(분당 한도),\nLLM_DAILY_LIMIT(하루 한도), LLM_KEY_INVALID·LLM_KEY_MISSING(키), BRIEFING_LLM_FAILED(그 밖).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "InterpretError",
         "type": "object"
       },
       "KindInfo": {
@@ -4988,6 +5017,69 @@
           }
         },
         "summary": "Read Briefing",
+        "tags": [
+          "briefings"
+        ]
+      }
+    },
+    "/briefings/{bid}/interpret": {
+      "post": {
+        "description": "해석만 다시 만든다(백그라운드). 진행은 SSE `briefing.status`, 이유는 `interpret_error`.",
+        "operationId": "interpret_briefing_briefings__bid__interpret_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "bid",
+            "required": true,
+            "schema": {
+              "title": "Bid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingRunAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Interpret Briefing",
         "tags": [
           "briefings"
         ]

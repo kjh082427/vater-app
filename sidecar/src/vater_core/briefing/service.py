@@ -3,7 +3,9 @@
 - 만들기: 수집 → 해석(LLM 1회, 워커 스레드) → 내 자산 → 저장 → 알림·SSE·알림 이력. 한 번에 1건.
 - 내 자산은 해석이 끝난 뒤에 계산하고 저장에만 넘긴다. `got.data`에 넣지 않는다(v2 설계 8-1, 15장).
 - LLM 문제(키 없음, 호출 실패, 읽을 수 없는 답)는 브리핑을 막지 않는다: 문장 없이 데이터만 저장하고
-  `missing`에 `interpretation`을 남긴다.
+  `missing`에 `interpretation`을, 이유를 `interpret_error`에 남긴다.
+- 해석 없이 저장된 브리핑은 일정 루프가 일정 간격으로, 일정 기간 안에서만 해석을 다시 만든다
+  (화면의 [AI 해석 다시 만들기]도 같은 경로). 다시 만들 때도 저장된 `data`만 AI에 보낸다.
 - 일정: 1분마다 시장별로 지금 만들어야 할 세션을 확인한다.
   이미 있으면 건너뛰고, 실패하면 5분 뒤 다시.
 - DB 쓰기는 이벤트 루프에서만 한다. LLM 호출만 daemon 스레드에서 돌리고 시간 제한을 둔다
@@ -27,7 +29,7 @@ from vater_core.api.errors import VaterError
 from vater_core.briefing.collect import Collected, Feeds, KisFeeds, collect
 from vater_core.briefing.interpret import interpret
 from vater_core.briefing.schedule import BriefingMarket, due_session, next_open
-from vater_core.briefing.store import BriefingRepo
+from vater_core.briefing.store import Briefing, BriefingRepo
 from vater_core.llm.presets import LlmRun
 from vater_core.stdout_events import notify
 from vater_core.store.settings import SettingsRepo
@@ -40,7 +42,23 @@ logger = logging.getLogger(__name__)
 MARKETS: tuple[BriefingMarket, ...] = ("KR", "US")
 LABEL = {"KR": "국내", "US": "미국"}
 LOOP_SEC = 60.0
+RETRY_SCAN = 6  # 최근 브리핑 몇 건까지 해석 유무를 보는가(시장 2개 × 며칠)
 RETRY = timedelta(minutes=5)
+# 해석 자동 재시도. 서버 혼잡(503)은 보통 몇 분~몇 시간 안에 풀린다. 한 번 시도에 모델마다 최대
+# 3분을 기다리고 무료 하루 한도를 쓰므로, 30분 간격으로 6시간까지만 시도한다(최대 12번). 6시간이면
+# 국내 브리핑(15:40)은 밤에, 미국 브리핑(아침)은 낮에 끝나 다음 브리핑과 겹치지 않는다.
+RETRY_EVERY = timedelta(minutes=30)
+RETRY_WINDOW = timedelta(hours=6)
+# 기다려도 달라지지 않는 이유: 하루 한도를 다 썼거나 키·모델 설정이 틀렸다. 사용자가 고쳐야 한다.
+NO_AUTO_RETRY = frozenset(
+    {
+        "LLM_DAILY_LIMIT",
+        "LLM_KEY_INVALID",
+        "LLM_KEY_MISSING",
+        "LLM_LOCAL_MODEL_MISSING",
+        "LLM_MODEL_UNKNOWN",
+    }
+)
 LLM_TIMEOUT_SEC = 900.0  # Gemini 무료 등급 실측 약 6분
 LLM_THREAD = "vater-briefing-llm"
 
@@ -81,6 +99,18 @@ def _in_daemon_thread(fn: Callable[[], Any]) -> asyncio.Future[Any]:
     return future
 
 
+def _reason(e: Exception) -> dict[str, str]:
+    """해석이 없는 이유. 원문은 키가 섞일 수 있어 담지 않는다(VaterError 문구는 이미 마스킹된다)."""
+    if isinstance(e, VaterError):
+        return {"code": e.code, "message": e.message}
+    what = (
+        "AI 응답이 너무 오래 걸렸습니다."
+        if isinstance(e, TimeoutError)
+        else (f"AI 해석에 실패했습니다 ({type(e).__name__}).")
+    )
+    return {"code": "BRIEFING_LLM_FAILED", "message": what}
+
+
 def _busy() -> VaterError:
     return VaterError(
         "BRIEFING_BUSY", "브리핑을 만드는 중입니다.", "끝난 뒤 다시 시도하세요.", status=409
@@ -96,7 +126,7 @@ class BriefingService:
         feeds_fn: Callable[[], Feeds],
         run_fn: Callable[[], LlmRun],
         collect_fn: CollectFn = collect,
-        interpret_fn: InterpretFn = interpret,
+        interpret_fn: InterpretFn | None = None,  # 없으면 `interpret`(멈춤 신호를 넘긴다)
         notify_fn: NotifyFn = notify,
         now: Callable[[], datetime] = _now_default,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -116,6 +146,8 @@ class BriefingService:
         self._assets = assets_fn
         self._lock = asyncio.Lock()
         self._retry_at: dict[tuple[str, date], datetime] = {}
+        # ponytail: 메모리에만 둔다. 앱을 다시 켜면 한 번 더 시도할 뿐이고 기간 안으로 제한된다
+        self._tried: dict[int, datetime] = {}  # 브리핑 id별 마지막 해석 시도
         self._loop_task: asyncio.Task[None] | None = None
         self._manual: asyncio.Task[None] | None = None
 
@@ -152,16 +184,8 @@ class BriefingService:
                 )
                 raise
             missing = list(got.missing)
-            text: dict[str, str] | None = None
-            try:
-                run = self._run_fn()
-                call = _in_daemon_thread(lambda: self._interpret(market, got.data, run))
-                text = await asyncio.wait_for(call, self._llm_timeout)
-            except Exception as e:  # LLM 문제는 브리핑을 막지 않는다 (사용자 규칙)
-                cause = e.code if isinstance(e, VaterError) else type(e).__name__
-                logger.warning(
-                    "briefing %s %s: saved without interpretation (%s)", market, session, cause
-                )
+            text, error = await self._interpret_text(market, got.data)
+            if text is None:
                 missing.append("interpretation")
             assets: dict[str, Any] | None = None
             if self._assets is not None:
@@ -173,7 +197,8 @@ class BriefingService:
                     )
                     missing.append("my_assets")
             db = self._db()
-            bid = BriefingRepo(db).save(market, session, got.data, text, missing, assets)
+            bid = BriefingRepo(db).save(market, session, got.data, text, missing, assets, error)
+            self._tried[bid] = self._now()
             label = LABEL[market]
             self._notify(
                 "오늘의 시장 브리핑",
@@ -185,6 +210,70 @@ class BriefingService:
             status = "partial" if missing else "done"
             self._publish({**base, "status": status, "id": bid})
             return bid
+
+    async def _interpret_text(
+        self, market: str, data: dict[str, Any]
+    ) -> tuple[dict[str, str] | None, dict[str, str] | None]:
+        """(문장, 이유). LLM 문제는 예외로 새지 않고 이유로 돌려준다."""
+        stop = threading.Event()  # 시간 초과나 종료 때 서서 스레드의 대기와 재호출을 멈춘다
+        try:
+            run = self._run_fn()
+            fn = self._interpret or (lambda m, d, r: interpret(m, d, r, stop))
+            call = _in_daemon_thread(lambda: fn(market, data, run))
+            return await asyncio.wait_for(call, self._llm_timeout), None
+        except Exception as e:  # LLM 문제는 브리핑을 막지 않는다 (사용자 규칙)
+            cause = e.code if isinstance(e, VaterError) else type(e).__name__
+            logger.warning("briefing %s: no interpretation (%s)", market, cause)
+            return None, _reason(e)
+        finally:
+            stop.set()
+
+    async def reinterpret(self, bid: int) -> None:
+        """저장된 브리핑의 해석만 다시 만든다. AI에는 처음과 같은 `data`만 간다(내 자산 제외)."""
+        if self._lock.locked():
+            raise _busy()
+        async with self._lock:
+            repo = BriefingRepo(self._db())
+            b = repo.get(bid)
+            base = {"market": b.market, "date": b.date}
+            self._publish({**base, "status": "running"})
+            text, error = await self._interpret_text(b.market, b.data)
+            repo.set_interpretation(bid, text, error)
+            self._tried[bid] = self._now()
+            done = repo.get(bid)
+            self._publish({**base, "status": done.status, "id": bid})
+
+    def start_reinterpret(self, bid: int) -> Briefing:
+        """백그라운드로 시작한다. 없는 id는 404, 만드는 중이면 409."""
+        b = BriefingRepo(self._db()).get(bid)
+        if self.busy():
+            raise _busy()
+
+        async def run() -> None:
+            try:
+                await self.reinterpret(bid)
+            except (
+                Exception
+            ) as e:  # 202 뒤에 일정 생성이 잠금을 먼저 잡은 경우 등: 화면이 알게 한다
+                logger.warning("briefing %s interpretation did not run: %s", bid, e)
+                code = e.code if isinstance(e, VaterError) else "BRIEFING_FAILED"
+                message = e.message if isinstance(e, VaterError) else type(e).__name__
+                error = {"code": code, "message": message}
+                base = {"market": b.market, "date": b.date}
+                self._publish({**base, "status": "failed", "error": error})
+
+        self._manual = asyncio.get_running_loop().create_task(run())
+        return b
+
+    def _retry_due(self, b: Briefing) -> bool:
+        if "interpretation" not in b.missing or self.busy():
+            return False
+        if b.interpret_error and b.interpret_error["code"] in NO_AUTO_RETRY:
+            return False
+        now = self._now()
+        saved = datetime.fromisoformat(b.created_at)
+        tried = self._tried.get(b.id, saved)
+        return now - saved <= RETRY_WINDOW and now - tried >= RETRY_EVERY
 
     async def run_latest(self, market: BriefingMarket) -> date:
         """수동 실행: 일봉이 확정된 가장 최근 세션을 백그라운드로 만든다."""
@@ -239,6 +328,9 @@ class BriefingService:
                     logger.debug("briefing %s skipped: KIS keys are not configured", market)
                 else:
                     logger.warning("briefing %s %s failed, retrying later: %s", market, session, e)
+        for b in BriefingRepo(self._db()).list(limit=RETRY_SCAN):
+            if self._retry_due(b):
+                self.start_reinterpret(b.id)  # 한 번에 1건: 바쁘면 다음 회차에
 
     def start(self) -> None:
         if self._loop_task is None:

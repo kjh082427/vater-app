@@ -62,3 +62,29 @@ def test_unknown_id(repo: BriefingRepo) -> None:
     with pytest.raises(VaterError) as e:
         repo.get(42)
     assert (e.value.code, e.value.status) == ("BRIEFING_NOT_FOUND", 404)
+
+
+ERROR = {"code": "LLM_BUSY", "message": "혼잡"}
+
+
+def test_interpret_error_is_saved_and_cleared_by_a_new_interpretation(repo: BriefingRepo) -> None:
+    bid = repo.save("KR", date(2026, 11, 3), DATA, None, ["flows", "interpretation"], None, ERROR)
+    before = repo.get(bid)
+    assert before.interpret_error == ERROR
+
+    repo.set_interpretation(bid, TEXT, None)
+    b = repo.get(bid)
+    assert (b.text, b.missing, b.status, b.interpret_error) == (TEXT, ["flows"], "partial", None)
+    assert (b.data, b.created_at) == (DATA, before.created_at)  # 기간 계산이 흔들리지 않게
+
+    repo.set_interpretation(bid, None, ERROR)  # 다시 만들다 실패해도 있던 문장은 지우지 않는다
+    again = repo.get(bid)
+    assert (again.text, again.missing, again.interpret_error) == (TEXT, ["flows"], ERROR)
+
+
+def test_failed_reinterpretation_of_a_missing_text_stays_partial(repo: BriefingRepo) -> None:
+    bid = repo.save("KR", date(2026, 11, 3), DATA, None, ["interpretation"], None, ERROR)
+    repo.set_interpretation(bid, None, {"code": "LLM_DAILY_LIMIT", "message": "다 씀"})
+    b = repo.get(bid)
+    assert (b.text, b.missing, b.status) == (None, ["interpretation"], "partial")
+    assert b.interpret_error == {"code": "LLM_DAILY_LIMIT", "message": "다 씀"}

@@ -96,9 +96,9 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 |---|---|
 | `schedule.py` | 국내 16:00·미국 07:00 KST(설정 가능, 마감 + 10분 이전으로는 당겨지지 않음), 휴장일, 놓친 브리핑은 다음 세션이 열리기 전까지 가장 최근 1회분만 |
 | `collect.py` | 한투 수집: 지수(국내·미국 모두 현재값 + 최근 30거래일 종가), 국내 업종·상위 종목·수급, 감시 종목, 그 세션의 알림. 항목 단위로 실패를 `missing`에 남긴다 |
-| `interpret.py` | deep 모델 1회 호출(TradingAgents의 LLM 생성 함수만 사용). **숫자를 쓰지 않게** 하고, 숫자가 든 문장은 뺀다. 키는 환경변수가 아니라 인자로 넘긴다 |
+| `interpret.py` | deep 모델 1회 호출(TradingAgents의 LLM 생성 함수만 사용). **숫자를 쓰지 않게** 하고, 숫자가 든 문장은 뺀다. 키는 환경변수가 아니라 인자로 넘긴다. Google이면 분석과 같은 대기·대체 모델(`analysis/fallback.py`) |
 | `store.py` | `briefings` 테이블. 같은 시장·날짜는 덮어쓴다 |
-| `service.py` | 만들기(수집 → 해석 → 저장 → 알림), 1분마다 일정 확인, 실패하면 5분 뒤 다시, 한 번에 1건. LLM이 실패해도 데이터만으로 저장 |
+| `service.py` | 만들기(수집 → 해석 → 저장 → 알림), 1분마다 일정 확인, 실패하면 5분 뒤 다시, 한 번에 1건. LLM이 실패해도 데이터만으로 저장하고 이유를 `interpret_error`에 남긴다. 해석이 없는 브리핑은 30분 간격으로 저장 뒤 6시간까지 자동 재시도(하루 한도·키 문제는 제외, `reinterpret`) |
 
 이벤트(SSE): `briefing.status` `{market, date, status: running|done|partial|failed, id?, error?}`
 
@@ -109,7 +109,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 
 감시·알림: `GET/POST /watchlist` · `GET /watchlist/quotes`(홈 화면 감시 종목 시세·수신 상태) · `DELETE /watchlist/{id}` · `GET/POST /alerts/rules` · `PATCH/DELETE /alerts/rules/{id}` · `GET /alerts/events` · `POST /alerts/pause` · `POST /alerts/resume` · `GET /alerts/status` · `GET /alerts/kinds`
 
-브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run`
+브리핑: `GET /briefings?market=&limit=` · `GET /briefings/{id}` · `POST /briefings/run` · `POST /briefings/{id}/interpret`(202, AI 해석만 다시 만든다. 진행 중이면 409, 없는 id는 404). 상세의 `interpret_error` `{code, message}`가 해석이 없는 이유다: `LLM_BUSY`(혼잡) · `LLM_RATE_LIMITED`(분당 한도) · `LLM_DAILY_LIMIT`(하루 한도) · `LLM_KEY_INVALID`·`LLM_KEY_MISSING`(키) · `BRIEFING_LLM_FAILED`(그 밖)
 
 증권사 보유 내역(v2, 주문 없음): `GET/POST /brokers` · `DELETE /brokers/{id}/data` · `GET/POST /connections`(`replaces`로 옛 연결 대신) · `DELETE /connections/{id}?delete_data=` · `POST /holdings/sync` · `GET /holdings` · `GET /holdings/symbol/{market}/{code}` · `PUT/DELETE /holdings/manual` · `POST /holdings/watch` · `POST /holdings/csv/preview` · `POST /holdings/csv/commit`. 어댑터는 `brokers/`에 있고 허용 목록(`ReadOnlyHttp`)으로만 증권사를 부른다. 한투만 시세와 한도를 함께 쓰는 GET 전용 `KisClient`를 쓴다.
 
