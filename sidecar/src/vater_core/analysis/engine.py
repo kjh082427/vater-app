@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 from vater_core.analysis.fallback import WAIT_MESSAGE, GeminiFallback, install
@@ -146,6 +147,32 @@ def result_from_final(
         timings=timings,
         tokens=tokens,
     )
+
+
+def clear_checkpoints(data_cache_dir: Path, market: str, code: str, day: str) -> None:
+    """그 종목·기준일의 체크포인트를 모두 지운다(분석 이력 삭제, v2 설계 21장 1번).
+
+    스레드 id에는 설정(모델, 분석가, 언어 등)의 해시가 섞여 있어서, 지금 설정으로는 옛 분석의 id를
+    만들 수 없다. 그래서 종목별 DB의 스레드를 읽어 저장된 상태의 기준일이 같은 것을 지운다.
+    다른 분석이 같은 체크포인트를 쓰는지는 부르는 쪽이 본다.
+    """
+    from tradingagents.dataflows.symbols import safe_ticker_component
+    from tradingagents.graph.checkpointer import get_checkpointer
+
+    # 접미사는 종목 마스터의 거래소로 정해진다(symbols.py). 마스터에서 사라졌어도 찾도록 모두 본다.
+    tickers = (code, f"{code}.KS", f"{code}.KQ") if market == "KR" else (code,)
+    for ticker in tickers:
+        if not (
+            data_cache_dir / "checkpoints" / f"{safe_ticker_component(ticker).upper()}.db"
+        ).exists():
+            continue  # get_checkpointer가 빈 DB 파일을 만들지 않게
+        with get_checkpointer(data_cache_dir, ticker) as saver:
+            rows = saver.conn.execute("SELECT DISTINCT thread_id FROM checkpoints").fetchall()
+            for (tid,) in rows:
+                saved = saver.get_tuple({"configurable": {"thread_id": tid}})
+                values = saved.checkpoint.get("channel_values", {}) if saved else {}
+                if values.get("trade_date") == day:
+                    saver.delete_thread(tid)
 
 
 def attach_fallbacks(

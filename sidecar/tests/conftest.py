@@ -1,9 +1,11 @@
 import asyncio
+import contextlib
 import socket
 import threading
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
+from typing import TypedDict
 
 import httpx
 import pytest
@@ -18,6 +20,42 @@ from vater_core.secrets.store import EnvFileSecretStore
 from vater_core.store.db import open_db
 
 TEST_TOKEN = "test-token"
+
+
+class _CheckpointState(TypedDict, total=False):
+    company_of_interest: str
+    trade_date: str
+
+
+@pytest.fixture
+def make_checkpoint() -> Callable[[Path, str, str, str], str]:
+    """진짜 TradingAgents 체크포인트 DB에 중간에 멈춘 실행 하나를 남긴다(스레드 id를 돌려준다)."""
+
+    def make(data_cache_dir: Path, ticker: str, day: str, signature: str) -> str:
+        from langgraph.graph import END, START, StateGraph
+        from tradingagents.graph.checkpointer import get_checkpointer, thread_id
+
+        def first(_: _CheckpointState) -> _CheckpointState:
+            return {}
+
+        def second(_: _CheckpointState) -> _CheckpointState:
+            raise RuntimeError("멈춤")
+
+        graph = StateGraph(_CheckpointState)
+        graph.add_node("first", first)
+        graph.add_node("second", second)
+        graph.add_edge(START, "first")
+        graph.add_edge("first", "second")
+        graph.add_edge("second", END)
+        tid = thread_id(ticker, day, signature)
+        with get_checkpointer(data_cache_dir, ticker) as saver:
+            app = graph.compile(checkpointer=saver)
+            state: _CheckpointState = {"company_of_interest": ticker, "trade_date": day}
+            with contextlib.suppress(RuntimeError):
+                app.invoke(state, {"configurable": {"thread_id": tid}})
+        return tid
+
+    return make
 
 
 @pytest.fixture

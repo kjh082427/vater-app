@@ -105,7 +105,7 @@ curl -H "Authorization: Bearer dev" http://127.0.0.1:54321/health
 ## API (현재)
 `GET /health` · `POST /shutdown` · `GET/PATCH /settings` · `GET /secrets` · `PUT/DELETE /secrets/{name}` · `GET /events` (SSE) · `GET /symbols/search?q=` · `POST /settings/kis/test`
 
-분석: `POST /analyses` · `GET /analyses?market=&code=` · `GET /analyses/{id}` · `POST /analyses/{id}/cancel` · `POST /analyses/{id}/retry`
+분석: `POST /analyses` · `GET /analyses?market=&code=` · `GET /analyses/{id}` · `POST /analyses/{id}/cancel` · `POST /analyses/{id}/retry` · `DELETE /analyses/{id}`(204, 기록·보고서·체크포인트 삭제. 대기·진행 중 409 `ANALYSIS_IN_PROGRESS`, 없는 id 404) · `POST /analyses/delete` `{ids}`(최대 50개, 지운 것은 `deleted`, 건너뛴 것은 `skipped[{id, code}]`). 지우면 SSE `analysis.deleted` `{ids}`를 보낸다. 같은 종목·기준일을 [다시 시도]로 이어 쓸 다른 분석이 남아 있으면 체크포인트는 둔다. 알림 이력의 "분석 완료·실패" 줄은 분석 id를 담지 않아 이어진 곳이 없으므로 그대로 남는다
 
 감시·알림: `GET/POST /watchlist` · `GET /watchlist/quotes`(홈 화면 감시 종목 시세·수신 상태) · `DELETE /watchlist/{id}` · `GET/POST /alerts/rules` · `PATCH/DELETE /alerts/rules/{id}` · `GET /alerts/events` · `POST /alerts/pause` · `POST /alerts/resume` · `GET /alerts/status` · `GET /alerts/kinds`
 
