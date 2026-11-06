@@ -149,6 +149,49 @@
         "title": "AnalysisCreate",
         "type": "object"
       },
+      "AnalysisDeleteRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "AnalysisDeleteRequest",
+        "type": "object"
+      },
+      "AnalysisDeleted": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/DeleteSkipped"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted",
+          "skipped"
+        ],
+        "title": "AnalysisDeleted",
+        "type": "object"
+      },
       "AnalysisDetail": {
         "properties": {
           "as_of": {
@@ -1532,6 +1575,28 @@
           "dashboards"
         ],
         "title": "DashboardsDoc",
+        "type": "object"
+      },
+      "DeleteSkipped": {
+        "properties": {
+          "code": {
+            "enum": [
+              "ANALYSIS_NOT_FOUND",
+              "ANALYSIS_IN_PROGRESS"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ],
+        "title": "DeleteSkipped",
         "type": "object"
       },
       "ErrorBody": {
@@ -4414,7 +4479,123 @@
         ]
       }
     },
+    "/analyses/delete": {
+      "post": {
+        "description": "여러 개를 지운다(최대 50개). 지울 수 있는 것만 지우고 건너뛴 것은 이유와 함께 돌려준다.",
+        "operationId": "delete_analyses_analyses_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisDeleted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Delete Analyses",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
     "/analyses/{aid}": {
+      "delete": {
+        "description": "분석 기록·보고서·체크포인트를 지운다. 대기·진행 중이면 409, 없는 id는 404.",
+        "operationId": "delete_analysis_analyses__aid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "인증 실패 (AUTH_INVALID)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "요청 형식 오류 (REQUEST_INVALID 등)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "예상하지 못한 오류 (INTERNAL)"
+          }
+        },
+        "summary": "Delete Analysis",
+        "tags": [
+          "analyses"
+        ]
+      },
       "get": {
         "operationId": "read_analysis_analyses__aid__get",
         "parameters": [

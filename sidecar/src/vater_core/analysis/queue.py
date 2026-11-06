@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from vater_core.analysis.engine import AnalysisEngine, Cancelled
+from vater_core.analysis.engine import AnalysisEngine, Cancelled, clear_checkpoints
 from vater_core.analysis.kis_vendor import KisBridge
 from vater_core.analysis.models import EngineJob, Progress, TaPaths
 from vater_core.analysis.store import AnalysisRepo
@@ -50,6 +50,15 @@ LatestDayFn = Callable[[Target], Awaitable[date]]
 def _not_cancellable(status: str) -> VaterError:
     return VaterError(
         "ANALYSIS_NOT_CANCELLABLE", f"이미 끝난 분석은 취소할 수 없습니다 ({status}).", status=409
+    )
+
+
+def _in_progress(status: str) -> VaterError:
+    return VaterError(
+        "ANALYSIS_IN_PROGRESS",
+        f"대기 중이거나 진행 중인 분석은 지울 수 없습니다 ({status}).",
+        hint="[취소]한 뒤에 지우세요.",
+        status=409,
     )
 
 
@@ -202,6 +211,36 @@ class AnalysisQueue:
             )
         # 같은 종목·기준일·프리셋이면 TradingAgents 체크포인트로 끝난 단계를 건너뛴다 (S5)
         return await self.submit(a.market, a.code, date.fromisoformat(a.as_of), a.preset)  # type: ignore[arg-type]
+
+    async def delete(self, ids: list[int]) -> tuple[list[int], list[tuple[int, VaterError]]]:
+        """기록·보고서·체크포인트를 지운다. (지운 id, 건너뛴 id와 이유). 대기·진행 중은 건너뛴다.
+
+        체크포인트는 같은 종목·기준일을 쓸 다른 분석이 없을 때만 지운다. 알림 이력(`alert_events`)은
+        분석 id를 담지 않아 이어진 곳이 없다. 이력 줄은 그대로 남는다.
+        """
+        repo = self._repo()
+        deleted: list[int] = []
+        skipped: list[tuple[int, VaterError]] = []
+        for aid in dict.fromkeys(ids):
+            try:
+                a = repo.get(aid)
+                if a.status in ("queued", "running"):
+                    raise _in_progress(a.status)
+            except VaterError as e:
+                skipped.append((aid, e))
+                continue
+            keep = repo.shares_checkpoint(a)
+            repo.delete(aid)
+            deleted.append(aid)
+            if not keep:
+                cache = TaPaths.under(self._deps.data_dir).data_cache_dir
+                try:
+                    await asyncio.to_thread(clear_checkpoints, cache, a.market, a.code, a.as_of)
+                except Exception:  # 기록은 이미 지웠다. 남은 체크포인트는 다음 분석에 쓰이지 않는다
+                    logger.warning("could not clear checkpoints of analysis %s", aid, exc_info=True)
+        if deleted:
+            self._publish("analysis.deleted", {"ids": deleted})
+        return deleted, skipped
 
     # ---- 워커 ------------------------------------------------------------
 
