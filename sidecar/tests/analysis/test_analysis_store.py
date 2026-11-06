@@ -109,3 +109,30 @@ def test_recover_interrupted(db: sqlite3.Connection) -> None:
         assert a.status == "failed" and a.error is not None
         assert a.error["code"] == "ANALYSIS_INTERRUPTED"
     assert repo.get(done).status == "done"
+
+
+def test_delete_and_checkpoint_sharing(db: sqlite3.Connection) -> None:
+    repo = AnalysisRepo(db)
+    t = resolve_target(db, "KR", "005930")
+    first = repo.create(t, "2026-11-02", "cloud")
+    repo.fail(first, "X", "실패", None)
+    retry = repo.create(t, "2026-11-02", "cloud")  # [다시 시도]가 같은 체크포인트를 이어 쓴다
+    other_day = repo.create(t, "2026-11-03", "cloud")
+    other_code = repo.create(resolve_target(db, "US", "AAPL"), "2026-11-02", "cloud")
+    assert repo.shares_checkpoint(repo.get(first))  # 대기 중인 다시 시도가 쓴다
+    assert repo.shares_checkpoint(repo.get(retry))
+
+    repo.fail(retry, "X", "실패", None)
+    assert repo.shares_checkpoint(repo.get(first))  # 실패한 것도 다시 시도할 수 있다
+    repo.cancel(retry)
+    assert repo.shares_checkpoint(repo.get(first))
+    repo.finish(retry, result(), MODELS)  # 끝난 분석은 체크포인트를 이미 지웠고 쓰지 않는다
+    assert not repo.shares_checkpoint(repo.get(first))
+    assert not repo.shares_checkpoint(repo.get(other_day))
+    assert not repo.shares_checkpoint(repo.get(other_code))
+
+    repo.delete(first)
+    with pytest.raises(VaterError) as e:
+        repo.get(first)
+    assert e.value.status == 404
+    assert repo.get(retry).status == "done"

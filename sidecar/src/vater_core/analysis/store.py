@@ -150,6 +150,25 @@ class AnalysisRepo:
     def cancel(self, id: int) -> None:
         self._update(id, "status = 'cancelled'", ())
 
+    def delete(self, id: int) -> None:
+        with self._conn:
+            self._conn.execute("DELETE FROM analyses WHERE id = ?", (id,))
+
+    def shares_checkpoint(self, a: Analysis) -> bool:
+        """같은 종목·기준일의 다른 분석이 이 체크포인트를 쓸 수 있는가.
+
+        체크포인트는 종목·기준일·설정으로 정해지고 [다시 시도]가 같은 것을 이어 쓴다.
+        대기·실행 중이거나 실패·취소로 다시 시도할 수 있는 분석이 있으면 둔다.
+        설정은 보지 않는다(옛 설정은 알 수 없어서 같다고 보고 남긴다).
+        끝난 분석은 성공할 때 체크포인트를 지웠으므로 쓰지 않는다.
+        """
+        r = self._conn.execute(
+            "SELECT 1 FROM analyses WHERE market = ? AND code = ? AND as_of = ? AND id != ? "
+            "AND status IN ('queued', 'running', 'failed', 'cancelled') LIMIT 1",
+            (a.market, a.code, a.as_of, a.id),
+        ).fetchone()
+        return r is not None
+
     def previous_done(self, market: str, code: str, before_id: int) -> Analysis | None:
         r = self._conn.execute(
             f"SELECT {_COLUMNS} {_FROM} WHERE a.market = ? AND a.code = ? AND a.status = 'done' "

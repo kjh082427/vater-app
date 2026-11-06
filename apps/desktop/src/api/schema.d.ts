@@ -163,6 +163,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/analyses/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Delete Analyses
+     * @description 여러 개를 지운다(최대 50개). 지울 수 있는 것만 지우고 건너뛴 것은 이유와 함께 돌려준다.
+     */
+    post: operations['delete_analyses_analyses_delete_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/analyses/{aid}': {
     parameters: {
       query?: never;
@@ -174,7 +194,11 @@ export interface paths {
     get: operations['read_analysis_analyses__aid__get'];
     put?: never;
     post?: never;
-    delete?: never;
+    /**
+     * Delete Analysis
+     * @description 분석 기록·보고서·체크포인트를 지운다. 대기·진행 중이면 409, 없는 id는 404.
+     */
+    delete: operations['delete_analysis_analyses__aid__delete'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1018,6 +1042,18 @@ export interface components {
       /** Preset */
       preset?: ('cloud' | 'local' | 'mixed') | null;
     };
+    /** AnalysisDeleteRequest */
+    AnalysisDeleteRequest: {
+      /** Ids */
+      ids: number[];
+    };
+    /** AnalysisDeleted */
+    AnalysisDeleted: {
+      /** Deleted */
+      deleted: number[];
+      /** Skipped */
+      skipped: components['schemas']['DeleteSkipped'][];
+    };
     /** AnalysisDetail */
     AnalysisDetail: {
       /** As Of */
@@ -1436,6 +1472,16 @@ export interface components {
       dashboards: components['schemas']['Dashboard'][];
       /** Version */
       version: number;
+    };
+    /** DeleteSkipped */
+    DeleteSkipped: {
+      /**
+       * Code
+       * @enum {string}
+       */
+      code: 'ANALYSIS_NOT_FOUND' | 'ANALYSIS_IN_PROGRESS';
+      /** Id */
+      id: number;
     };
     /**
      * ErrorBody
@@ -2708,6 +2754,57 @@ export interface operations {
       };
     };
   };
+  delete_analyses_analyses_delete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AnalysisDeleteRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AnalysisDeleted'];
+        };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
   read_analysis_analyses__aid__get: {
     parameters: {
       query?: never;
@@ -2727,6 +2824,53 @@ export interface operations {
         content: {
           'application/json': components['schemas']['AnalysisDetail'];
         };
+      };
+      /** @description 인증 실패 (AUTH_INVALID) */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 요청 형식 오류 (REQUEST_INVALID 등) */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+      /** @description 예상하지 못한 오류 (INTERNAL) */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorBody'];
+        };
+      };
+    };
+  };
+  delete_analysis_analyses__aid__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        aid: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description 인증 실패 (AUTH_INVALID) */
       401: {

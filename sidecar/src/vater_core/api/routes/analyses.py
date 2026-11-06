@@ -3,12 +3,13 @@
 - `analysis.status` `{id, status, decision?, error?}`
 - `analysis.progress` `{id, stage, node, elapsed_sec, wait}`. `wait`는 Gemini 혼잡·분당 한도로
   기다리는 동안만 `{reason: busy|rate, message, seconds}`이고 평소에는 null이다 (v2 설계 20장).
+- `analysis.deleted` `{ids}`: 지운 분석. 화면은 이 id의 목록 줄과 상세 링크를 버린다 (21장 1번).
 """
 
 from datetime import date
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field
 
 from vater_core.analysis.queue import get_analysis
@@ -44,6 +45,23 @@ class AnalysisItem(BaseModel):
     decision_ko: str | None
     decision_changed: bool  # 같은 종목의 직전 완료 분석과 결정이 다름
     created_at: str
+
+
+DELETE_MAX = 50  # 한 번에 지울 수 있는 개수
+
+
+class AnalysisDeleteRequest(BaseModel):
+    ids: list[Annotated[int, Field(ge=1)]] = Field(min_length=1, max_length=DELETE_MAX)
+
+
+class DeleteSkipped(BaseModel):
+    id: int
+    code: Literal["ANALYSIS_NOT_FOUND", "ANALYSIS_IN_PROGRESS"]
+
+
+class AnalysisDeleted(BaseModel):
+    deleted: list[int]
+    skipped: list[DeleteSkipped]
 
 
 class ModelChoice(BaseModel):
@@ -145,3 +163,25 @@ async def cancel_analysis(aid: int, deps: AppDeps = Depends(get_deps)) -> Analys
 async def retry_analysis(aid: int, deps: AppDeps = Depends(get_deps)) -> AnalysisQueued:  # noqa: B008
     new_id = await get_analysis(deps).retry(aid)
     return AnalysisQueued(id=new_id, status="queued")
+
+
+@router.delete("/{aid}", status_code=204)
+async def delete_analysis(aid: int, deps: AppDeps = Depends(get_deps)) -> Response:  # noqa: B008
+    """분석 기록·보고서·체크포인트를 지운다. 대기·진행 중이면 409, 없는 id는 404."""
+    _, skipped = await get_analysis(deps).delete([aid])
+    if skipped:
+        raise skipped[0][1]
+    return Response(status_code=204)
+
+
+@router.post("/delete")
+async def delete_analyses(
+    body: AnalysisDeleteRequest,
+    deps: AppDeps = Depends(get_deps),  # noqa: B008
+) -> AnalysisDeleted:
+    """여러 개를 지운다(최대 50개). 지울 수 있는 것만 지우고 건너뛴 것은 이유와 함께 돌려준다."""
+    deleted, skipped = await get_analysis(deps).delete(body.ids)
+    return AnalysisDeleted(
+        deleted=deleted,
+        skipped=[DeleteSkipped(id=i, code=e.code) for i, e in skipped],  # type: ignore[arg-type]
+    )
