@@ -3,8 +3,12 @@
 실제 코드: FastAPI 앱(create_app), DB, 비밀키 저장소(env 파일), 이벤트 통로, 알림 감시 루프
 (AlertMonitor + 실제 KisRealtime·KisClient·TokenManager), 분석 작업 큐, 브리핑 서비스, 알림 이력 기록.
 가짜: 한투 REST·WebSocket 서버(이 프로세스 안의 로컬 서버), TradingAgents 엔진, 브리핑 수집·LLM 해석.
+v2 확인(v2.accept.ts)용으로 키움·메리츠 서버와 한투 잔고·일봉·환율도 이 프로세스 안에 둔다. 응답 모양은
+`sidecar/tests/brokers/test_{kis,kiwoom,meritz}.py`의 공식 형식 픽스처와 같다.
 
-- 한투 주소(`kis.config.REST_HOST`·`WS_HOST`)는 **이 판에서만** 로컬 가짜 서버로 바꾼다(제품 코드는 그대로).
+- 한투 주소(`kis.config.REST_HOST`·`WS_HOST`)와 키움·메리츠 주소(`brokers.kiwoom.BASE_URL`·
+  `brokers.meritz.BASE_URL`, 어댑터가 부를 때마다 읽는 모듈 값)는 **이 판에서만** 로컬 가짜 서버로 바꾼다
+  (제품 코드는 그대로, 환경 변수 같은 설치본의 우회로를 더하지 않는다).
 - 알림 감시 시계는 실제 시간으로 흐르되 화 10:00 KST(국내 장중)에서 시작한다.
   브리핑 시계는 같은 날 16:00 KST(국내 장 마감 뒤)에서 시작한다(수동 "지금 만들기"용, 자동 일정은 끈다).
 - 토큰은 실제 셸처럼 환경변수 `VATER_TOKEN`으로 받고, 준비되면 stdout에
@@ -43,6 +47,8 @@ from vater_core.alerts.clock import MarketClock
 from vater_core.alerts.evaluator import record_event_alerts
 from vater_core.alerts.monitor import AlertMonitor
 from vater_core.alerts.store import WatchItem
+from vater_core.brokers import kiwoom, meritz
+from vater_core.briefing.interpret import build_messages
 from vater_core.analysis.engine import Cancelled
 from vater_core.analysis.models import EngineResult, Progress
 from vater_core.analysis.queue import AnalysisQueue
@@ -60,6 +66,8 @@ from vater_core.kis.quotes import domestic_price, overseas_price
 from vater_core.kis.services import require_kis
 from vater_core.kis.ws import KisRealtime, Tick
 from vater_core.llm.presets import LlmRun, TierChoice
+from vater_core.portfolio.daily import DailyRecorder, DailyRepo
+from vater_core.portfolio.service import PortfolioService
 from vater_core.logging_setup import setup_logging
 from vater_core.secrets.names import SecretName
 from vater_core.secrets.store import EnvFileSecretStore
@@ -77,6 +85,12 @@ SYMBOLS = [
     ("KR", "005930", "KOSPI", "삼성전자", "SAMSUNG ELECTRONICS", "stock"),
     ("KR", "000660", "KOSPI", "SK하이닉스", "SK HYNIX", "stock"),
     ("US", "AAPL", "NAS", "애플", "APPLE INC", "stock"),
+    # v2: 보유(NAVER·엔비디아)와 분류 탐색(반도체·인터넷, 미분류)용
+    ("KR", "035420", "KOSPI", "NAVER", "NAVER", "stock"),
+    ("US", "NVDA", "NAS", "엔비디아", "NVIDIA CORP", "stock"),
+    ("US", "AMD", "NAS", "AMD", "ADVANCED MICRO DEVICES", "stock"),
+    ("US", "GOOGL", "NAS", "알파벳", "ALPHABET INC", "stock"),
+    ("KR", "999999", "KOSDAQ", "가상기업", "FAKE CO", "stock"),
 ]
 # 화면 밖에서 미리 넣는 가짜 키(마법사를 거치지 않는 테스트용). 실제 키가 아니다.
 FAKE_SECRETS = {
@@ -134,12 +148,19 @@ class Control:
             "AAPL": (227.48, 2.13, 0.95),
         }
         self.rest_paths: list[str] = []
+        self.rest_trs: list[str] = []  # 한투 REST에 온 TR ID(주문 TR이 없는지 본다)
         self.tokens_issued = 0
         self.ws_connections: list[ServerConnection] = []
         self.ws_accepted = 0
         self.subscribed: list[str] = []
         self.rest_port = 0
         self.dead_port = closed_port()
+        # v2: 키움·메리츠 가짜 서버 상태(ok | auth | down)와 받은 호출("METHOD /경로"), 환율·시계·AI 입력
+        self.broker_mode = {"kiwoom": "ok", "meritz": "ok"}
+        self.broker_calls: dict[str, list[str]] = {"kiwoom": [], "meritz": []}
+        self.fx_off = False
+        self.skew_min = 0
+        self.ai_inputs: list[str] = []
 
 
 C = Control()
@@ -214,10 +235,52 @@ def _closes(base: float, step: float) -> list[dict[str, str]]:
     return rows
 
 
+
+# 한투 잔고(공식 필드 이름은 test_kis.py와 같다). 계좌 12345678-01
+KIS_DOMESTIC = [
+    {"pdno": "005930", "prdt_name": "삼성전자", "hldg_qty": "10", "pchs_avg_pric": "60000.0000"},
+    {"pdno": "000660", "prdt_name": "SK하이닉스", "hldg_qty": "2", "pchs_avg_pric": "190000.0000"},
+]
+KIS_OVERSEAS = [
+    {"pdno": "AAPL", "prdt_name": "애플", "ccld_qty_smtl1": "1.5", "cblc_qty13": "999",
+     "avg_unpr3": "200.00", "ovrs_excg_cd": "NASD", "natn_kor_name": "미국", "buy_crcy_cd": "USD"},
+    {"pdno": "7203", "prdt_name": "토요타", "ccld_qty_smtl1": "100", "cblc_qty13": "999",
+     "avg_unpr3": "2500", "ovrs_excg_cd": "TKSE", "natn_kor_name": "일본", "buy_crcy_cd": "JPY"},
+]  # fmt: skip
+KIS_ACCOUNT = "12345678"
+
+
+def _price_of(code: str) -> float:
+    return C.prices.get(code, (10000.0, 0.0, 0.0))[0]
+
+
+def _weekdays(start: date, end: date) -> list[date]:
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    return [d for d in days if d.weekday() < 5]
+
+
+def _ymd(raw: str) -> date:
+    return date(int(raw[:4]), int(raw[4:6]), int(raw[6:8]))
+
+
+def kr_close(code: str, day: date) -> float:
+    """국내 일봉 종가: 현재가 + 일(day) × 100. 날마다 달라야 채운 값을 구별할 수 있다."""
+    return _price_of(code) + day.day * 100
+
+
+def us_close(code: str, day: date) -> float:
+    return _price_of(code) + day.day
+
+
+def fx_rate(day: date) -> float:
+    return 1400.0 + day.day
+
+
 @kis_rest.get("/{path:path}")
 async def kis_get(path: str, request: Request) -> JSONResponse:
     full = "/" + path
     C.rest_paths.append(full)
+    C.rest_trs.append(request.headers.get("tr_id", ""))
     if not C.auth_ok:  # 키가 만료·폐기됨: 토큰을 거부한다(클라이언트는 한 번 재발급을 시도한다)
         return JSONResponse(
             {"rt_cd": "1", "msg_cd": "EGW00123", "msg1": "기간이 만료된 token 입니다."},
@@ -257,6 +320,50 @@ async def kis_get(path: str, request: Request) -> JSONResponse:
         )
     if full.endswith("/inquire-daily-indexchartprice"):
         return _ok(output1={}, output2=_closes(2583.27, 3.0))
+    if full.endswith("/inquire-daily-chartprice") and q.get("FID_INPUT_ISCD") == "FX@KRW":
+        days = [] if C.fx_off else _weekdays(_ymd(q["FID_INPUT_DATE_1"]), _ymd(q["FID_INPUT_DATE_2"]))
+        rows = [
+            {"stck_bsop_date": d.strftime("%Y%m%d"), "ovrs_nmix_prpr": f"{fx_rate(d):.2f}"}
+            for d in reversed(days)
+        ]
+        return _ok(output1={}, output2=rows)
+    if full.endswith("/trading/inquire-balance"):
+        if q.get("CANO") != KIS_ACCOUNT or request.headers.get("tr_id") != "TTTC8434R":
+            return JSONResponse(
+                {"rt_cd": "7", "msg_cd": "OPSQ2000", "msg1": "ERROR : INPUT INVALID_CHECK_ACNO"}
+            )
+        return _ok(output1=KIS_DOMESTIC, output2=[{"scts_evlu_amt": "1000000"}])
+    if full.endswith("/trading/inquire-present-balance"):
+        return _ok(output1=KIS_OVERSEAS, output2=[], output3={"evlu_amt_smtl": "1000"})
+    if full.endswith("/inquire-daily-itemchartprice"):
+        code = q.get("FID_INPUT_ISCD", "")
+        rows = [
+            {
+                "stck_bsop_date": d.strftime("%Y%m%d"),
+                "stck_oprc": f"{kr_close(code, d):.0f}",
+                "stck_hgpr": f"{kr_close(code, d):.0f}",
+                "stck_lwpr": f"{kr_close(code, d):.0f}",
+                "stck_clpr": f"{kr_close(code, d):.0f}",
+                "acml_vol": "1000",
+            }
+            for d in reversed(_weekdays(_ymd(q["FID_INPUT_DATE_1"]), _ymd(q["FID_INPUT_DATE_2"])))
+        ]
+        return _ok(output1={}, output2=rows)
+    if full.endswith("/overseas-price/v1/quotations/dailyprice"):
+        code, end = q.get("SYMB", ""), _ymd(q["BYMD"])
+        days = _weekdays(end - timedelta(days=140), end)[-100:]  # 한 번에 약 100행
+        rows = [
+            {
+                "xymd": d.strftime("%Y%m%d"),
+                "open": f"{us_close(code, d):.2f}",
+                "high": f"{us_close(code, d):.2f}",
+                "low": f"{us_close(code, d):.2f}",
+                "clos": f"{us_close(code, d):.2f}",
+                "tvol": "1000",
+            }
+            for d in reversed(days)
+        ]
+        return _ok(output1={}, output2=rows)
     if full.endswith("/inquire-daily-chartprice"):
         return _ok(
             output1={
@@ -329,6 +436,138 @@ async def drop_ws() -> None:
     for ws in list(C.ws_connections):
         with contextlib.suppress(Exception):
             await ws.close()
+
+
+# ── 가짜 키움·메리츠 ────────────────────────────────────────────────────────────
+# 받은 호출은 모두 기록한다. 공식 목록 밖의 경로나 방법(주문 등)이 오면 "UNEXPECTED"로 따로 남겨 테스트가 본다.
+
+kiwoom_app = FastAPI()
+meritz_app = FastAPI()
+KIWOOM_OK = {"return_code": 0, "return_msg": "정상적으로 처리되었습니다"}
+KIWOOM_KR = [
+    {"stk_cd": "A005930", "stk_nm": "삼성전자", "rmnd_qty": "000000000000005",
+     "pur_pric": "000000000066000"},
+    {"stk_cd": "A035420", "stk_nm": "NAVER", "rmnd_qty": "000000000000003",
+     "pur_pric": "000000000200000"},
+]  # fmt: skip
+KIWOOM_US = [
+    {"stk_cd": "NVDA", "frgn_stk_nm": "엔비디아", "poss_qty": "000000000002",
+     "frgn_stk_book_uv": "100.0000", "crnc_code": "USD"},
+]  # fmt: skip
+
+
+def _record(broker: str, request: Request) -> None:
+    C.broker_calls[broker].append(f"{request.method} {request.url.path}")
+
+
+@kiwoom_app.post("/oauth2/token")
+async def kiwoom_token(request: Request) -> JSONResponse:
+    _record("kiwoom", request)
+    mode = C.broker_mode["kiwoom"]
+    if mode == "down":
+        return JSONResponse({}, status_code=500)
+    if mode == "auth":
+        return JSONResponse({"return_code": 3, "return_msg": "[3:인증에 실패했습니다]"}, 401)
+    return JSONResponse(
+        {"token": f"fake-kiwoom-token-{len(C.broker_calls['kiwoom'])}",
+         "expires_dt": "20991231235959", "token_type": "bearer", "return_code": 0}
+    )  # fmt: skip
+
+
+async def _kiwoom_data(request: Request, api_id: str, body: dict[str, Any]) -> JSONResponse:
+    _record("kiwoom", request)
+    mode = C.broker_mode["kiwoom"]
+    if mode == "down":
+        return JSONResponse({}, status_code=500)
+    if mode == "auth" or not request.headers.get("authorization", "").startswith("Bearer fake-"):
+        return JSONResponse({"return_code": 3, "return_msg": "[3:인증에 실패했습니다]"}, 401)
+    if request.headers.get("api-id") != api_id:
+        return JSONResponse({"return_code": 1, "return_msg": "api-id 불일치"}, 400)
+    return JSONResponse(body, headers={"cont-yn": "N", "next-key": ""})
+
+
+@kiwoom_app.post("/api/dostk/acnt")
+async def kiwoom_kr(request: Request) -> JSONResponse:
+    body = {**KIWOOM_OK, "tot_evlt_amt": "000000025789890", "acnt_evlt_remn_indv_tot": KIWOOM_KR}
+    return await _kiwoom_data(request, "kt00018", body)
+
+
+@kiwoom_app.post("/api/us/acnt")
+async def kiwoom_us(request: Request) -> JSONResponse:
+    body = {**KIWOOM_OK, "tot_evlt_amt": "156464.6701", "result_list": KIWOOM_US}
+    return await _kiwoom_data(request, "ust21070", body)
+
+
+@kiwoom_app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def kiwoom_other(path: str, request: Request) -> JSONResponse:
+    C.broker_calls["kiwoom"].append(f"UNEXPECTED {request.method} {request.url.path}")
+    return JSONResponse({"return_code": 1, "return_msg": "없는 경로"}, 404)
+
+
+def _meritz_ok(data: Any) -> dict[str, Any]:
+    return {"rsp_cd": "5766", "rsp_msg": "조회가 완료되었습니다.", "data": data, "tr_cont": "0"}
+
+
+MERITZ_KR = [
+    {"iscd": "A000660", "isnm": "SK하이닉스", "pros_trgt_cls_code": "1", "mksc_cls_name": "주식일반",
+     "rmnd_qty": 1, "hldn_issu_rmnd_qty": "1", "byng_unpr": "202000.00"},
+    {"iscd": "AAPL.OQ", "isnm": "애플", "pros_trgt_cls_code": "J", "mksc_cls_name": "해외주식",
+     "rmnd_qty": 1, "hldn_issu_rmnd_qty": "1", "byng_unpr": "0.00"},
+]  # fmt: skip
+MERITZ_US = [
+    {"iscd": "AAPL.OQ", "ovrs_stck_symb_iscd": "AAPL", "isnm": "애플",
+     "rmnd_dqty": "1.0000000000", "avrg_unpr": "188.000000", "crcd": "USD"},
+]  # fmt: skip
+
+
+async def _meritz_data(request: Request, data: Any) -> JSONResponse:
+    _record("meritz", request)
+    mode = C.broker_mode["meritz"]
+    if mode == "down":
+        return JSONResponse({"rsp_cd": "EGW00002", "rsp_msg": "서버 오류"}, status_code=500)
+    token = request.headers.get("authorization", "")
+    if mode == "auth" or not token.startswith("Bearer fake-"):
+        return JSONResponse({"rsp_cd": "EGW00123", "rsp_msg": "토큰 만료"}, status_code=401)
+    if not request.headers.get("mac_address"):
+        return JSONResponse({"rsp_cd": "IGW50024", "rsp_msg": "MAC 주소 필요"}, status_code=500)
+    return JSONResponse(_meritz_ok(data))
+
+
+@meritz_app.post("/oauth2/token")
+async def meritz_token(request: Request) -> JSONResponse:
+    _record("meritz", request)
+    mode = C.broker_mode["meritz"]
+    if mode == "down":
+        return JSONResponse({"rsp_cd": "EGW00002", "rsp_msg": "서버 오류"}, status_code=500)
+    if mode == "auth":
+        return JSONResponse(
+            {"error": "invalid_client", "error_description": "앱키 확인"}, status_code=401
+        )
+    return JSONResponse(
+        {"access_token": f"fake-meritz-token-{len(C.broker_calls['meritz'])}",
+         "token_type": "Bearer", "expires_in": 43200, "scope": "login"}
+    )  # fmt: skip
+
+
+@meritz_app.get("/accounts/v1/me/holdings")
+async def meritz_kr(request: Request) -> JSONResponse:
+    return await _meritz_data(request, MERITZ_KR)
+
+
+@meritz_app.get("/accounts/v1/me/overseas/holdings")
+async def meritz_us(request: Request) -> JSONResponse:
+    return await _meritz_data(request, MERITZ_US)
+
+
+@meritz_app.get("/accounts/v1/me/valuation/by-asset")
+async def meritz_asset(request: Request) -> JSONResponse:
+    return await _meritz_data(request, {"vltn_amt": 1000, "byng_amt": 900})
+
+
+@meritz_app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def meritz_other(path: str, request: Request) -> JSONResponse:
+    C.broker_calls["meritz"].append(f"UNEXPECTED {request.method} {request.url.path}")
+    return JSONResponse({"rsp_cd": "EGW00404", "rsp_msg": "없는 경로"}, 404)
 
 
 # ── 가짜 엔진·브리핑 ───────────────────────────────────────────────────────────
@@ -496,9 +735,23 @@ def build(data_dir: Path, token: str) -> tuple[AppDeps, AlertMonitor]:
         return Collected(briefing_data(market, session), [])
 
     def interpret(market: str, data: dict[str, Any], run: LlmRun) -> dict[str, str]:
+        # 실제 프롬프트 조립 코드로 AI에 갈 요청 전체를 만들어 기록한다(V10이 개인정보가 없는지 본다)
+        C.ai_inputs.append(json.dumps(build_messages(market, data), ensure_ascii=False))
         if C.llm_fail:
             raise VaterError("BRIEFING_LLM_FAILED", "AI 해석에 실패했습니다 (RateLimit).", status=502)
         return dict(BRIEFING_TEXT)
+
+    def daily_now() -> datetime:  # 브리핑 시계 + 제어 서버가 앞당긴 분(재시도 간격을 건너뛴다)
+        return briefing_now() + timedelta(minutes=C.skew_min)
+
+    deps.daily = DailyRecorder(
+        deps, clock=MarketClock(weekdays, now=daily_now), now=daily_now
+    )  # 자동 반복은 켜지 않고 제어 서버가 check_once를 부른다
+    deps.portfolio = PortfolioService(deps, now=lambda: daily_now().astimezone(KST))
+    daily = deps.daily
+
+    async def assets(market: Any, session: date) -> dict[str, Any] | None:
+        return await daily.my_assets(market, session)
 
     tier = TierChoice("google", "gemini-fake", None)
     deps.briefing = BriefingService(
@@ -510,6 +763,7 @@ def build(data_dir: Path, token: str) -> tuple[AppDeps, AlertMonitor]:
         interpret_fn=interpret,
         notify_fn=notify,
         now=briefing_now,
+        assets_fn=assets,
     )
     return deps, monitor
 
@@ -576,13 +830,47 @@ def control_app(deps: AppDeps, monitor: AlertMonitor) -> FastAPI:
         C.llm_fail = bool(body.get("fail"))
         return {"ok": True}
 
+    @app.post("/broker")
+    async def broker(body: dict[str, Any]) -> dict[str, bool]:
+        C.broker_mode[str(body["broker"])] = str(body["mode"])
+        return {"ok": True}
+
+    @app.post("/fx")
+    async def fx(body: dict[str, Any]) -> dict[str, bool]:
+        C.fx_off = bool(body.get("off"))
+        return {"ok": True}
+
+    @app.post("/skew")
+    async def skew(body: dict[str, Any]) -> dict[str, bool]:
+        C.skew_min += int(body["minutes"])
+        return {"ok": True}
+
+    @app.post("/daily/seed")
+    async def daily_seed(body: dict[str, Any]) -> dict[str, bool]:
+        assert deps.db is not None
+        DailyRepo(deps.db).fill(
+            date.fromisoformat(str(body["day"])),
+            body.get("kr_value"), body.get("kr_cost"), body.get("us_value"), body.get("us_cost"),
+            body.get("usdkrw"), backfilled=False,
+        )  # fmt: skip
+        return {"ok": True}
+
+    @app.post("/daily/check")
+    async def daily_check() -> dict[str, bool]:
+        assert deps.daily is not None
+        await deps.daily.check_once()
+        return {"ok": True}
+
     @app.get("/state")
     async def state() -> dict[str, Any]:
         return {
+            "broker_calls": C.broker_calls,
+            "ai_inputs": C.ai_inputs,
             "subscribed": C.subscribed,
             "ws_open": len(C.ws_connections),
             "ws_accepted": C.ws_accepted,
             "rest_paths": C.rest_paths,
+            "rest_trs": C.rest_trs,
             "tokens_issued": C.tokens_issued,
             "monitor": monitor.status(),
             "pid": os.getpid(),
@@ -613,6 +901,11 @@ def main() -> None:
     for server in KisServer:  # 이 판에서만: 한투 주소를 로컬 가짜로
         kis_config.REST_HOST[server] = f"http://{HOST}:{C.rest_port}"
 
+    kiwoom_sock, meritz_sock = bind(), bind()
+    kiwoom.BASE_URL = f"http://{HOST}:{kiwoom_sock.getsockname()[1]}"  # 어댑터가 부를 때마다 읽는다
+    meritz.BASE_URL = f"http://{HOST}:{meritz_sock.getsockname()[1]}"
+    meritz.mac_address = lambda: "AABBCCDDEEFF"  # 이 PC의 MAC 주소를 읽지 않는다
+
     sidecar_sock = bind()
     control_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     control_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -621,6 +914,8 @@ def main() -> None:
 
     sidecar = uvicorn.Server(uvicorn.Config(create_app(deps), log_config=None, access_log=False))
     fake_rest = quiet_server(kis_rest)
+    fake_kiwoom = quiet_server(kiwoom_app)
+    fake_meritz = quiet_server(meritz_app)
     control = quiet_server(control_app(deps, monitor))
 
     def request_exit() -> None:
@@ -645,6 +940,8 @@ def main() -> None:
             )
             tasks = [
                 asyncio.create_task(fake_rest.serve(sockets=[rest_sock])),
+                asyncio.create_task(fake_kiwoom.serve(sockets=[kiwoom_sock])),
+                asyncio.create_task(fake_meritz.serve(sockets=[meritz_sock])),
                 asyncio.create_task(control.serve(sockets=[control_sock])),
             ]
             try:
@@ -655,7 +952,8 @@ def main() -> None:
                 await deps.analysis.stop()
                 if deps.briefing is not None:
                     await deps.briefing.stop()
-                fake_rest.should_exit = control.should_exit = True
+                fake_rest.should_exit = fake_kiwoom.should_exit = fake_meritz.should_exit = True
+                control.should_exit = True
                 await asyncio.gather(*tasks, return_exceptions=True)
                 if deps.http is not None:
                     await deps.http.aclose()

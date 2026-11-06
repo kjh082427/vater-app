@@ -41,6 +41,11 @@ export interface StackState {
   ws_open: number;
   ws_accepted: number;
   rest_paths: string[];
+  rest_trs: string[];
+  /** 가짜 키움·메리츠가 받은 호출("METHOD /경로"). 허용 밖은 "UNEXPECTED"로 시작한다. */
+  broker_calls: { kiwoom: string[]; meritz: string[] };
+  /** 브리핑 AI 흉내가 받은 요청 전체(프롬프트 조립 결과). */
+  ai_inputs: string[];
   tokens_issued: number;
   monitor: { state: string; realtime: number; polling: number };
   pid: number;
