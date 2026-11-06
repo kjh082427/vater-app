@@ -10,6 +10,7 @@ import { AnalysisDetailScreen } from '../screens/analysis/AnalysisDetailScreen';
 import { BriefingDetailScreen } from '../screens/briefing/BriefingDetailScreen';
 import { BriefingsScreen } from '../screens/briefing/BriefingsScreen';
 import { HomeScreen } from '../dashboard/HomeScreen';
+import { HoldingsScreen } from '../screens/holdings/HoldingsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { WelcomeScreen } from '../screens/welcome/WelcomeScreen';
 import { formatClock } from '../screens/common/time';
@@ -22,6 +23,7 @@ import { SidebarFooter } from './SidebarFooter';
 const NAV: { id: string; label: string; icon: NavItem['icon']; href: string }[] = [
   { id: 'home', label: '홈', icon: 'home', href: '#/home' },
   { id: 'analyses', label: '분석', icon: 'analysis', href: '#/analyses' },
+  { id: 'holdings', label: '보유 종목', icon: 'holdings', href: '#/holdings' },
   { id: 'alerts', label: '감시·알림', icon: 'alerts', href: '#/alerts' },
   { id: 'briefings', label: '브리핑', icon: 'briefing', href: '#/briefings' },
   { id: 'settings', label: '설정', icon: 'settings', href: '#/settings' },
@@ -154,6 +156,8 @@ function screenFor(route: Route): ReactNode {
       return <AnalysesScreen />;
     case 'analysis':
       return <AnalysisDetailScreen key={route.id} id={route.id} />;
+    case 'holdings':
+      return <HoldingsScreen />;
     case 'alerts':
       return <AlertsScreen focus={null} />;
     case 'symbol':

@@ -100,6 +100,8 @@ export interface EventMap {
     elapsed_sec: number;
     wait?: { reason: 'busy' | 'rate'; message: string; seconds: number } | null;
   };
+  /** 지운 분석(21장). 이 id의 목록 줄과 상세는 버린다. */
+  'analysis.deleted': { ids: number[] };
   'briefing.status': {
     market: MarketCode;
     date: string;
@@ -136,6 +138,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'quote',
   'analysis.status',
   'analysis.progress',
+  'analysis.deleted',
   'briefing.status',
   'llm.pull',
   'llm.install',

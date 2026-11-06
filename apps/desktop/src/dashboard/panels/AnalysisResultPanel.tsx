@@ -35,6 +35,9 @@ export function AnalysisResultPanel({ options }: PanelProps) {
   const detail = useShared(id === undefined ? null : analysisSource(id));
 
   const error = list.error ?? detail.error;
+  if (!list.error && detail.error?.status === 404) {
+    return <PanelEmpty>지워진 분석입니다 · 칸 설정에서 다른 분석을 고르세요</PanelEmpty>;
+  }
   if (error) {
     const retry = () => {
       list.reload();

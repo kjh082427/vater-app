@@ -17,6 +17,7 @@ import {
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
 import { ScreenHeader } from '../common/ScreenHeader';
+import { InterpretRetry } from './InterpretRetry';
 import common from '../common/screen.module.css';
 import { formatDay, formatDayTime } from '../common/time';
 import styles from './briefing.module.css';
@@ -158,7 +159,10 @@ function Body({ b }: { b: BriefingDetail }) {
             {lead}
           </AiText>
         ) : (
-          <p className={common.meta}>AI 해석 없음(데이터만)</p>
+          <>
+            <p className={common.meta}>AI 해석 없음(데이터만)</p>
+            <InterpretRetry b={b} />
+          </>
         )}
         {missing.length > 0 ? (
           <p className={styles.missing}>{`빠진 항목: ${missing.map(missingLabel).join(', ')}`}</p>
@@ -238,10 +242,11 @@ function ledeNote(missing: string[]): string {
 export function BriefingDetailScreen({ id }: { id: number }) {
   const detail = useResource<BriefingDetail>(`/briefings/${id}`);
   const { reload } = detail;
-  useEvent('briefing.status', (event) => {
-    if (event.id === id) reload();
-  });
   const b = detail.data;
+  useEvent('briefing.status', (event) => {
+    // 같은 날·시장의 브리핑이면 id가 없는 소식(만드는 중)도 해석 상태를 바꿀 수 있다
+    if (event.id === id || (b && event.market === b.market && event.date === b.date)) reload();
+  });
   return (
     <>
       <ScreenHeader

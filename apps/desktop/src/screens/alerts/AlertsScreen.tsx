@@ -6,7 +6,6 @@ import type {
   AlertKindInfo,
   AlertRule,
   BrokerOut,
-  ConnectionOut,
   HoldingOut,
   MarketCode,
   WatchItem,
@@ -16,14 +15,15 @@ import { Banner, Button, Card } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
+import { brokerInfo } from '../common/brokers';
 import { ScreenHeader } from '../common/ScreenHeader';
 import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { AlertHistory } from './AlertHistory';
 import styles from './alerts.module.css';
 import { ManualDialog } from '../holdings/ManualForm';
-import { UploadButtons, UploadDialog } from '../holdings/UploadDialog';
-import { WatchPanel } from './WatchPanel';
+import { uploadMessage, UploadDialog } from '../holdings/UploadDialog';
+import { WatchPanel, type HeldBroker } from './WatchPanel';
 
 export interface AlertsScreenProps {
   /** #/symbols/:market/:code로 열었으면 그 종목(펼친 상태). */
@@ -36,13 +36,13 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const watch = useResource<WatchItem[]>('/watchlist');
   const rules = useResource<AlertRule[]>('/alerts/rules');
   const kinds = useResource<AlertKindInfo[]>('/alerts/kinds');
-  const brokers = useResource<BrokerOut[]>('/brokers');
-  const connections = useResource<ConnectionOut[]>('/connections');
+  // 보유 여부와 증권사는 화면 표시에만 쓴다(AI로는 보내지 않는다, 스펙 8-1)
   const holdings = useResource<HoldingOut[]>('/holdings');
-  // 업로드 확인 창: brokerId null은 연결한 증권사 모두
-  const [uploading, setUploading] = useState<{ brokerId: string | null } | null>(null);
-  const [uploaded, setUploaded] = useState<string | null>(null);
+  const brokers = useResource<BrokerOut[]>('/brokers');
+  // [보유 종목 직접 추가]는 이 화면에도 둔다(스펙 21-2, 사용자 정정). CSV를 넣으면 올리기 창을 잇는다
   const [manual, setManual] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
@@ -51,6 +51,29 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const items = watch.data;
   const watchedKeys = new Set((items ?? []).map(symbolKey));
   const focusMissing = Boolean(focus && items && !watchedKeys.has(focusKey ?? ''));
+  // 종목 키 → 그 종목을 가진 증권사들(같은 증권사는 한 번만)
+  const heldBy = new Map<string, HeldBroker[]>();
+  for (const h of holdings.data ?? []) {
+    if (h.market === null || Number(h.quantity) <= 0) continue;
+    const key = `${h.market}:${h.code}`;
+    const list = heldBy.get(key) ?? [];
+    if (!list.some((b) => b.id === h.broker_id)) list.push(brokerInfo(brokers.data, h.broker_id));
+    heldBy.set(key, list);
+  }
+  const heldKeys = new Set(heldBy.keys());
+  const held = (items ?? []).filter((w) => heldKeys.has(symbolKey(w)));
+  // 보유한 종목이 하나라도 있을 때만 나눈다
+  const groups =
+    held.length > 0
+      ? [
+          { label: '보유 중', aria: '보유 중인 감시 종목', list: held },
+          {
+            label: '보유하지 않음',
+            aria: '보유하지 않은 감시 종목',
+            list: (items ?? []).filter((w) => !heldKeys.has(symbolKey(w))),
+          },
+        ].filter((g) => g.list.length > 0)
+      : [{ label: null, aria: '감시 종목', list: items ?? [] }];
 
   async function add(market: string, code: string) {
     const key = `${market}:${code}`;
@@ -73,11 +96,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
 
   function uploadDone(result: WatchResult) {
     setUploading(null);
-    setUploaded(
-      result.added === 0 && result.skipped === 0
-        ? '확인했습니다. 감시 종목에는 올리지 않았습니다.'
-        : `${result.added}종목을 감시 종목에 올렸습니다.${result.skipped > 0 ? ` ${result.skipped}종목은 이미 있거나 찾지 못해 건너뛰었습니다.` : ''}${result.rules > 0 ? ` 알림 규칙 ${result.rules}개를 만들었습니다.` : ''}`,
-    );
+    setUploaded(uploadMessage(result));
     watch.reload();
     rules.reload();
     holdings.reload();
@@ -94,11 +113,6 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
       <ScreenHeader
         title="감시·알림"
         lede="종목을 펼쳐 알림 규칙을 만듭니다. 조건을 새로 만족할 때만 알리고, 같은 규칙은 하루에 한 번만 알립니다."
-        end={
-          <Button variant="primary" onClick={() => setAdding(true)}>
-            종목 추가
-          </Button>
-        }
       />
       <div className={common.twoUp}>
         <div className={common.twoUpGrid}>
@@ -106,19 +120,15 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
             title="감시 종목"
             description={items && items.length > 0 ? `${items.length}종목` : undefined}
           >
-            <UploadButtons
-              brokers={brokers.data ?? []}
-              connections={connections.data ?? []}
-              holdings={holdings.data ?? []}
-              watchedKeys={watchedKeys}
-              ready={Boolean(brokers.data && connections.data && holdings.data)}
-              onOpen={(brokerId) => {
-                setUploaded(null);
-                setUploading({ brokerId });
-              }}
-            >
+            <div className={styles.addBar}>
+              <Button variant="primary" onClick={() => setAdding(true)}>
+                종목 검색으로 추가
+              </Button>
               <Button onClick={() => setManual(true)}>보유 종목 직접 추가</Button>
-            </UploadButtons>
+              <span className={common.meta}>
+                증권사 연결과 올리기는 <a href="#/holdings">보유 종목</a> 탭에서 합니다.
+              </span>
+            </div>
             {uploaded ? (
               <p role="status" className={common.meta}>
                 {uploaded}
@@ -187,66 +197,80 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
             ) : null}
             {items && items.length === 0 ? (
               <p className={common.empty}>
-                아직 감시 종목이 없습니다. 종목 추가를 눌러 종목을 찾고, 알림 규칙을 만드세요.
+                아직 감시 종목이 없습니다. 종목 검색으로 추가를 눌러 종목을 찾고, 알림 규칙을
+                만드세요.
               </p>
             ) : null}
-            {items && items.length > 0 ? (
-              <ul className={styles.watchList}>
-                {items.map((item) => {
-                  const key = symbolKey(item);
-                  const expanded = key === focusKey;
-                  return (
-                    <WatchPanel
-                      key={item.id}
-                      item={item}
-                      rules={(rules.data ?? []).filter((r) => r.watchlist_id === item.id)}
-                      kinds={kinds.data}
-                      expanded={expanded}
-                      onToggle={() =>
-                        navigate(
-                          expanded
-                            ? { name: 'alerts' }
-                            : {
-                                name: 'symbol',
-                                market: item.market === 'US' ? 'US' : 'KR',
-                                code: item.code,
-                              },
-                        )
-                      }
-                      onRulesChanged={rules.reload}
-                      onRuleUpdated={(rule) =>
-                        rules.mutate((list) => list?.map((r) => (r.id === rule.id ? rule : r)))
-                      }
-                      onRemoved={() => removed(item)}
-                    />
-                  );
-                })}
-              </ul>
-            ) : null}
+            {groups.map((group) =>
+              group.list.length > 0 ? (
+                <div key={group.aria} className={styles.watchGroup}>
+                  {group.label ? (
+                    <p
+                      className={styles.groupLabel}
+                    >{`${group.label} · ${group.list.length}종목`}</p>
+                  ) : null}
+                  <ul
+                    className={styles.watchList}
+                    aria-label={group.label ? group.aria : undefined}
+                  >
+                    {group.list.map((item) => {
+                      const key = symbolKey(item);
+                      const expanded = key === focusKey;
+                      return (
+                        <WatchPanel
+                          key={item.id}
+                          item={item}
+                          heldBrokers={heldBy.get(key)}
+                          rules={(rules.data ?? []).filter((r) => r.watchlist_id === item.id)}
+                          kinds={kinds.data}
+                          expanded={expanded}
+                          onToggle={() =>
+                            navigate(
+                              expanded
+                                ? { name: 'alerts' }
+                                : {
+                                    name: 'symbol',
+                                    market: item.market === 'US' ? 'US' : 'KR',
+                                    code: item.code,
+                                  },
+                            )
+                          }
+                          onRulesChanged={rules.reload}
+                          onRuleUpdated={(rule) =>
+                            rules.mutate((list) => list?.map((r) => (r.id === rule.id ? rule : r)))
+                          }
+                          onRemoved={() => removed(item)}
+                        />
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null,
+            )}
           </Card>
-          {uploading ? (
-            <UploadDialog
-              brokerId={uploading.brokerId}
-              brokers={brokers.data ?? []}
-              kinds={kinds.data}
-              onClose={() => setUploading(null)}
-              onUploaded={uploadDone}
-            />
-          ) : null}
           {manual ? (
             <ManualDialog
               onClose={() => setManual(false)}
               onChanged={() => {
                 holdings.reload();
-                connections.reload();
+                watch.reload();
               }}
               onCsvDone={(brokerId) => {
                 setManual(false);
                 holdings.reload();
                 brokers.reload();
                 setUploaded(null);
-                setUploading({ brokerId });
+                setUploading(brokerId);
               }}
+            />
+          ) : null}
+          {uploading ? (
+            <UploadDialog
+              brokerId={uploading}
+              brokers={brokers.data ?? []}
+              kinds={kinds.data}
+              onClose={() => setUploading(null)}
+              onUploaded={uploadDone}
             />
           ) : null}
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />

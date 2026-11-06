@@ -4,6 +4,7 @@ import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
 import type { AnalysisCreate, AnalysisQueued, SymbolOut, WatchItem } from '../../api/types';
 import { Button } from '../../design-system';
+import { HeldSymbolChoices } from '../holdings/HeldSymbolChoices';
 import { navigate } from '../../app/router';
 import { PRESET_LABEL } from '../../app/status';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -118,6 +119,13 @@ export function NewAnalysisForm() {
               </ul>
             </div>
           ) : null}
+          {/* 보유 여부·수량은 AI로 가지 않고, 고른 한 종목만 간다. 고른 뒤에는 보유 표시를 남기지 않는다 */}
+          <HeldSymbolChoices
+            onPick={(s) => {
+              setPicked(s);
+              setMissingSymbol(false);
+            }}
+          />
           <SymbolSearch
             actionLabel="선택"
             onPick={(s) => {

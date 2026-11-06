@@ -14,6 +14,12 @@ const PATHS = {
       <path d="M14 3v5h5M8.5 12.5h7M8.5 16.5h4.5" />
     </>
   ),
+  holdings: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 3.5V12h8.5" />
+    </>
+  ),
   alerts: (
     <>
       <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />

@@ -77,6 +77,7 @@ describe('Icon', () => {
   it.each([
     'home',
     'analysis',
+    'holdings',
     'alerts',
     'briefing',
     'settings',

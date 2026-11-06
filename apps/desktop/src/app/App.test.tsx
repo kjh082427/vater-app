@@ -21,7 +21,14 @@ describe('앱 틀', () => {
   it('사이드바 5개 메뉴와 지금 화면 표시', async () => {
     renderApp('#/alerts');
     const links = within(sidebar()).getAllByRole('link');
-    expect(links.map((a) => a.textContent)).toEqual(['홈', '분석', '감시·알림', '브리핑', '설정']);
+    expect(links.map((a) => a.textContent)).toEqual([
+      '홈',
+      '분석',
+      '보유 종목',
+      '감시·알림',
+      '브리핑',
+      '설정',
+    ]);
     expect(within(sidebar()).getByRole('link', { name: '감시·알림' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -36,6 +43,7 @@ describe('앱 틀', () => {
     ['#/home', '홈', '홈'],
     ['#/analyses', '분석', '분석'],
     ['#/analyses/7', '삼성전자 분석', '분석'],
+    ['#/holdings', '보유 종목', '보유 종목'],
     ['#/alerts', '감시·알림', '감시·알림'],
     ['#/symbols/KR/005930', '감시·알림', '감시·알림'],
     ['#/briefings', '브리핑', '브리핑'],

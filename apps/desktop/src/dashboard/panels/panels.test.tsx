@@ -407,3 +407,37 @@ describe('알림 이력 칸: 좁으면 종목 열을 뺀다', () => {
     expect(within(table).getAllByRole('columnheader')).toHaveLength(3);
   });
 });
+
+describe('분석 결과 칸: 지운 분석', () => {
+  it('고른 분석이 지워졌으면(404) "지워진 분석입니다"를 보이고 죽지 않는다', async () => {
+    renderPanel('analysis-result', { analysis: '999' });
+    const card = section('분석 결과');
+    expect(await within(card).findByText(/지워진 분석입니다/)).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  });
+
+  it('SSE analysis.deleted: 보던 분석이 지워지면 안내로 바뀌고, "가장 최근"은 다음 분석을 고른다', async () => {
+    const { stream } = renderPanel('analysis-result', { analysis: '7' });
+    const card = section('분석 결과');
+    await within(card).findByText(/삼성전자/);
+    const source = await stream();
+    mock.db.analyses = mock.db.analyses.filter((a) => a.id !== 7);
+    emit(source, 'analysis.deleted', { ids: [7] });
+    expect(await within(card).findByText(/지워진 분석입니다/)).toBeInTheDocument();
+  });
+
+  it('다른 분석이 지워지면 보던 분석을 다시 받지 않는다', async () => {
+    const { stream } = renderPanel('analysis-result', { analysis: '7' });
+    const card = section('분석 결과');
+    await within(card).findByText(/삼성전자/);
+    const gets: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      if (request.method === 'GET' && path === '/analyses/7') gets.push(path);
+    });
+    emit(await stream(), 'analysis.deleted', { ids: [6] });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(gets).toEqual([]);
+    expect(within(card).getByText(/삼성전자/)).toBeInTheDocument();
+  });
+});

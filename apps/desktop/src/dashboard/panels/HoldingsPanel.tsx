@@ -85,7 +85,7 @@ export function HoldingsPanel({ size }: PanelProps) {
     return (
       <PanelEmpty>
         보유 내역이 없습니다 · <a href="#/settings">증권사 연결</a> 또는{' '}
-        <a href="#/alerts">보유 종목 직접 추가</a>
+        <a href="#/holdings">보유 종목 직접 추가</a>
       </PanelEmpty>
     );
   }

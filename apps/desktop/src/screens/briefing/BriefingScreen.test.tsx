@@ -432,3 +432,222 @@ describe('브리핑 상세: 내 자산 구역(스펙 15장)', () => {
     expect(await screen.findByText('빠진 항목: 내 자산')).toBeInTheDocument();
   });
 });
+
+describe('브리핑 상세: AI 해석이 없을 때(v0.2.1 21장 5번)', () => {
+  /** 미국 브리핑(20번)의 해석이 빠진 이유를 정한다. */
+  function failWith(code: string) {
+    const us = mock.db.briefings.find((b) => b.id === 20);
+    if (!us) throw new Error('fixture');
+    us.interpret_error = { code, message: '사이드카 문구' };
+  }
+
+  it.each([
+    ['LLM_BUSY', '구글 AI 서버가 혼잡합니다. 잠시 후 자동으로 다시 시도합니다.'],
+    ['LLM_RATE_LIMITED', '무료 사용량의 분당 한도에 걸려 잠시 기다립니다.'],
+    [
+      'LLM_DAILY_LIMIT',
+      '오늘 무료 사용량을 다 썼습니다. 내일 다시 시도하거나 로컬 AI로 바꿔 주세요.',
+    ],
+    [
+      'BRIEFING_LLM_FAILED',
+      'AI 해석을 끝내지 못했습니다. 잠시 뒤 [AI 해석 다시 만들기]를 눌러 주세요.',
+    ],
+  ])('%s: 이유를 보이고 [AI 해석 다시 만들기]를 둔다', async (code, text) => {
+    failWith(code);
+    renderAt('#/briefings/20');
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByText('AI 해석 없음(데이터만)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+    expect(screen.queryByRole('link', { name: '설정 열기' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['LLM_KEY_INVALID', 'AI 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.'],
+    ['LLM_KEY_MISSING', 'AI 키가 없습니다. 설정에서 키를 넣어 주세요.'],
+  ])('%s: [설정 열기]와 함께 키를 고친 뒤 다시 만들 수 있다', async (code, text) => {
+    failWith(code);
+    renderAt('#/briefings/20');
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '설정 열기' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('모르는 코드는 사이드카가 준 문구를 그대로 보인다', async () => {
+    failWith('SOMETHING_NEW');
+    renderAt('#/briefings/20');
+    expect(await screen.findByText('사이드카 문구')).toBeInTheDocument();
+  });
+
+  it('이유가 없어도(옛 브리핑) 다시 만들기는 쓸 수 있다', async () => {
+    renderAt('#/briefings/20');
+    expect(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('해석이 있는 브리핑에는 다시 만들기를 두지 않는다', async () => {
+    renderAt('#/briefings/21');
+    await screen.findByRole('heading', { level: 1, name: /국내 시장 브리핑/ });
+    expect(screen.queryByRole('button', { name: 'AI 해석 다시 만들기' })).not.toBeInTheDocument();
+  });
+
+  it('[AI 해석 다시 만들기] → POST → 만드는 중 → SSE done이면 해석이 나타난다', async () => {
+    failWith('LLM_BUSY');
+    const calls: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (request.method === 'POST') calls.push(url.pathname);
+    });
+    const { stream } = renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await waitFor(() => expect(calls).toEqual(['/briefings/20/interpret']));
+    expect(await screen.findByText(/AI 해석을 만드는 중입니다/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /AI 해석/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    // 이전 이유는 만드는 동안 숨긴다
+    expect(screen.queryByText(/구글 AI 서버가 혼잡합니다/)).not.toBeInTheDocument();
+
+    const source = await stream();
+    emit(source, 'briefing.status', { market: 'US', date: '2026-11-02', status: 'running' });
+    expect(screen.getByText(/AI 해석을 만드는 중입니다/)).toBeInTheDocument();
+    const us = mock.db.briefings.find((b) => b.id === 20);
+    if (!us) throw new Error('fixture');
+    Object.assign(us, {
+      status: 'done',
+      missing: [],
+      interpret_error: null,
+      headline: '나스닥이 올랐습니다. (예시)',
+      text: { headline: '나스닥이 올랐습니다. (예시)', market: '지수가 올랐습니다.' },
+    });
+    emit(source, 'briefing.status', { market: 'US', date: '2026-11-02', status: 'done', id: 20 });
+    expect(await screen.findByText('나스닥이 올랐습니다. (예시)')).toBeInTheDocument();
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'AI 해석 다시 만들기' })).not.toBeInTheDocument();
+  });
+
+  it('SSE가 실패로 끝나면 새 이유를 보이고 다시 누를 수 있다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await screen.findByText(/AI 해석을 만드는 중입니다/);
+    const source = await stream();
+    const us = mock.db.briefings.find((b) => b.id === 20);
+    if (!us) throw new Error('fixture');
+    us.interpret_error = { code: 'LLM_DAILY_LIMIT', message: '사이드카 문구' };
+    emit(source, 'briefing.status', {
+      market: 'US',
+      date: '2026-11-02',
+      status: 'failed',
+      id: 20,
+      error: { code: 'LLM_DAILY_LIMIT', message: '사이드카 문구', hint: null },
+    });
+    expect(await screen.findByText(/오늘 무료 사용량을 다 썼습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('SSE 실패가 BRIEFING_BUSY면 다른 브리핑을 만드는 중이라고 알린다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await screen.findByText(/AI 해석을 만드는 중입니다/);
+    const source = await stream();
+    emit(source, 'briefing.status', {
+      market: 'US',
+      date: '2026-11-02',
+      status: 'failed',
+      id: 20,
+      error: {
+        code: 'BRIEFING_BUSY',
+        message: '브리핑을 만드는 중입니다.',
+        hint: '끝난 뒤 다시 시도하세요.',
+      },
+    });
+    expect(await screen.findByText('브리핑을 만드는 중입니다.')).toBeInTheDocument();
+    expect(screen.getByText(/끝난 뒤 다시 시도하세요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('다른 브리핑을 만드는 중이면(409) 이유를 보이고 다시 누를 수 있다(만드는 중에 갇히지 않는다)', async () => {
+    server.use(
+      http.post('*/briefings/:bid/interpret', () =>
+        errorResponse(
+          409,
+          'BRIEFING_BUSY',
+          '브리핑을 만드는 중입니다.',
+          '끝난 뒤 다시 시도하세요.',
+        ),
+      ),
+    );
+    renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    expect(await screen.findByText('브리핑을 만드는 중입니다.')).toBeInTheDocument();
+    expect(screen.getByText(/끝난 뒤 다시 시도하세요/)).toBeInTheDocument();
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('SSE 끝 알림이 202 응답보다 먼저 와도 만드는 중에 갇히지 않는다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    const button = await screen.findByRole('button', { name: 'AI 해석 다시 만들기' });
+    const source = await stream();
+    server.use(
+      http.post('*/briefings/:bid/interpret', () => {
+        emit(source, 'briefing.status', {
+          market: 'US',
+          date: '2026-11-02',
+          status: 'failed',
+          id: 20,
+          error: { code: 'LLM_BUSY', message: '사이드카 문구', hint: null },
+        });
+        return HttpResponse.json({ status: 'running' }, { status: 202 });
+      }),
+    );
+    await userEvent.click(button);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled(),
+    );
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+  });
+
+  it('해석과 무관한 이유로 실패하면(SSE BRIEFING_FAILED) 그 이유를 보인다', async () => {
+    const { stream } = renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await screen.findByText(/AI 해석을 만드는 중입니다/);
+    const source = await stream();
+    emit(source, 'briefing.status', {
+      market: 'US',
+      date: '2026-11-02',
+      status: 'failed',
+      error: { code: 'BRIEFING_FAILED', message: '브리핑을 고치지 못했습니다.', hint: null },
+    });
+    expect(await screen.findByText('브리핑을 고치지 못했습니다.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI 해석 다시 만들기' })).toBeEnabled();
+  });
+
+  it('브리핑이 없으면(404) 원인을 보인다', async () => {
+    server.use(
+      http.post('*/briefings/:bid/interpret', () =>
+        errorResponse(404, 'BRIEFING_NOT_FOUND', '브리핑이 없습니다.'),
+      ),
+    );
+    renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    expect(await screen.findByText('브리핑이 없습니다.')).toBeInTheDocument();
+    expect(screen.queryByText(/AI 해석을 만드는 중입니다/)).not.toBeInTheDocument();
+  });
+
+  it('요청 본문은 비어 있다(보유·감시 정보를 보내지 않는다)', async () => {
+    let body = 'unset';
+    server.events.on('request:start', async ({ request }) => {
+      if (
+        request.method === 'POST' &&
+        new URL(request.url).pathname === '/briefings/20/interpret'
+      ) {
+        body = await request.clone().text();
+      }
+    });
+    renderAt('#/briefings/20');
+    await userEvent.click(await screen.findByRole('button', { name: 'AI 해석 다시 만들기' }));
+    await waitFor(() => expect(body).not.toBe('unset'));
+    expect(body).toBe('');
+  });
+});

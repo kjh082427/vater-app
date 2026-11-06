@@ -124,6 +124,10 @@ describe('내 보유 종목 칸', () => {
       'href',
       '#/settings',
     );
+    expect(within(card).getByRole('link', { name: '보유 종목 직접 추가' })).toHaveAttribute(
+      'href',
+      '#/holdings',
+    );
   });
 
   it('오류면 원인과 해결 방법', async () => {

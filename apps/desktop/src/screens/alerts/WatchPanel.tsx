@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import type { AlertKindInfo, AlertRule, WatchItem } from '../../api/types';
-import { Button } from '../../design-system';
+import { BrokerChip, Button } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import form from '../common/form.module.css';
 import { marketLabel } from '../common/quotes';
@@ -14,8 +14,17 @@ import { ruleSummary, TIMING_LABEL, type Timing } from './kinds';
 import { StockOverview } from '../holdings/StockOverview';
 import { RuleEditor } from './RuleEditor';
 
+/** 이 종목을 가진 증권사(화면 표시용, AI로 보내지 않는다). */
+export interface HeldBroker {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface WatchPanelProps {
   item: WatchItem;
+  /** 보유했으면 그 증권사들. 없으면 "보유"를 붙이지 않는다. */
+  heldBrokers?: HeldBroker[];
   rules: AlertRule[];
   kinds: AlertKindInfo[] | undefined;
   expanded: boolean;
@@ -134,6 +143,7 @@ function RuleRow({
 /** 감시 종목 하나: 펼치기 단추, 펼치면 규칙 목록·편집기·빼기. */
 export function WatchPanel({
   item,
+  heldBrokers,
   rules,
   kinds,
   expanded,
@@ -184,6 +194,16 @@ export function WatchPanel({
           <span
             className={`${common.stockMeta} vt-num`}
           >{`${marketLabel(item.market)} ${item.code}`}</span>
+          {heldBrokers && heldBrokers.length > 0 ? (
+            <span className={styles.held}>
+              <span className={styles.heldLabel}>보유</span>
+              {heldBrokers.map((b) => (
+                <BrokerChip key={b.id} id={b.id} color={b.color}>
+                  {b.name}
+                </BrokerChip>
+              ))}
+            </span>
+          ) : null}
           <span className={styles.count}>{count > 0 ? `규칙 ${count}개` : '규칙 없음'}</span>
           <span className={styles.chevron} aria-hidden="true">
             ›

@@ -4,16 +4,16 @@ React 18 + TypeScript 화면입니다. Tauri 셸(`src-tauri`, `shell/tauri` 브�
 
 ## 폴더
 
-| 폴더                 | 하는 일                                                                                                                                                                                                                                                          |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/design-system/` | 색·글꼴·부품·숫자 표기(`format/money.ts`). `ui/design-system` 브랜치가 맡는다                                                                                                                                                                                    |
-| `src/api/`           | 사이드카 계약: OpenAPI에서 만든 타입(`schema.d.ts`, `npm run gen:api`), 토큰을 붙이는 클라이언트(오류 `{code, message, hint}` → `ApiError`, 재시작 뒤 새 포트로 한 번 더), SSE 허브(`?token=`, 끊기면 다시 연결), `useResource`(SSE가 다시 열리면 다시 불러오기) |
-| `src/platform/`      | 셸 어댑터(스펙 9-3): Tauri(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`) / 브라우저(`VITE_SIDECAR_URL`, `VITE_SIDECAR_TOKEN`)                                                                                                            |
-| `src/app/`           | 해시 라우터(알림 클릭 경로와 같음), 앱 틀(사이드바, 상태 표시줄, 오프라인·연결 끊김 배너, 마법사로 보내기)                                                                                                                                                       |
-| `src/dashboard/`     | 홈 대시보드: 배치 엔진(`layout/`, 순수 함수), 문서 저장(`store.ts`, `/ui/dashboards`), 칸 내용(`panels/`), 같이 쓰는 자료(`shared.ts`), 보기·편집 화면(`DashboardView`, `DashboardEditor`, `editor/`)                                                            |
-| `src/screens/`       | 화면: `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `holdings`(v2: 증권사 연결, 업로드 창, 내 보유 카드·주가 그래프, 직접 입력·CSV), `common`(입력 칸, 종목 검색과 분류 탐색, 시각 표기)                                   |
-| `src/mocks/`         | 사이드카 흉내(MSW 처리기와 예시 자료). 테스트와 견본 화면 `mock.html`이 함께 쓴다                                                                                                                                                                                |
-| `e2e/`               | 흐름 테스트(Playwright, 실제 개발 모드 사이드카)                                                                                                                                                                                                                 |
+| 폴더                 | 하는 일                                                                                                                                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/design-system/` | 색·글꼴·부품·숫자 표기(`format/money.ts`). `ui/design-system` 브랜치가 맡는다                                                                                                                                                                                            |
+| `src/api/`           | 사이드카 계약: OpenAPI에서 만든 타입(`schema.d.ts`, `npm run gen:api`), 토큰을 붙이는 클라이언트(오류 `{code, message, hint}` → `ApiError`, 재시작 뒤 새 포트로 한 번 더), SSE 허브(`?token=`, 끊기면 다시 연결), `useResource`(SSE가 다시 열리면 다시 불러오기)         |
+| `src/platform/`      | 셸 어댑터(스펙 9-3): Tauri(`get_sidecar_info`, `sidecar-state`, `navigate`, `get/set_autostart`) / 브라우저(`VITE_SIDECAR_URL`, `VITE_SIDECAR_TOKEN`)                                                                                                                    |
+| `src/app/`           | 해시 라우터(알림 클릭 경로와 같음), 앱 틀(사이드바, 상태 표시줄, 오프라인·연결 끊김 배너, 마법사로 보내기)                                                                                                                                                               |
+| `src/dashboard/`     | 홈 대시보드: 배치 엔진(`layout/`, 순수 함수), 문서 저장(`store.ts`, `/ui/dashboards`), 칸 내용(`panels/`), 같이 쓰는 자료(`shared.ts`), 보기·편집 화면(`DashboardView`, `DashboardEditor`, `editor/`)                                                                    |
+| `src/screens/`       | 화면: `alerts`(감시·알림), `analysis`, `briefing`, `settings`, `welcome`(첫 실행 마법사), `holdings`(v2: 보유 종목 탭, 증권사 연결, 업로드 창, 내 보유 카드·주가 그래프, 직접 입력·CSV, 분석 창의 보유 종목 고르기), `common`(입력 칸, 종목 검색과 분류 탐색, 시각 표기) |
+| `src/mocks/`         | 사이드카 흉내(MSW 처리기와 예시 자료). 테스트와 견본 화면 `mock.html`이 함께 쓴다                                                                                                                                                                                        |
+| `e2e/`               | 흐름 테스트(Playwright, 실제 개발 모드 사이드카)                                                                                                                                                                                                                         |
 
 ## 실행
 
@@ -51,6 +51,14 @@ npm run e2e:holdings # v2 보유 흐름(견본 자료, 사이드카 없이): 아
 - 대시보드(`e2e/dashboard.spec.ts`): 탭 추가 → 3칸 틀 → 내용 → 저장 → 새로 고침 뒤 그대로, 경계선 끌기 뒤 비율 유지, 1024×600에서 가로 4열 막힘. 키를 넣지 않고 기본 탭은 바꾸지 않는다(flows보다 먼저 돌아도 됨)
 - 화면 캡처: `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`(로컬 `design-preview/화면/`에도 복사)
 - CI에는 아직 넣지 않았다(Ubuntu 러너에 uv·사이드카 의존성과 Chromium이 필요)
+
+### v0.2.1 화면 (스펙 21장)
+
+- 분석 이력 지우기: 목록은 `POST /analyses/delete`(여러 건), 상세는 `DELETE /analyses/{id}`. 확인 창을 거치고 대기·진행 중은 막는다. SSE `analysis.deleted`가 오면 목록과 대시보드 칸에서 빼고, 지워진 분석의 주소·칸은 "지워진 분석입니다"를 보인다.
+- 왼쪽 메뉴 "보유 종목"(`#/holdings`): 증권사 연결과 보유 내역 올리기는 여기서 한다. [보유 종목 직접 추가](직접 입력·CSV)는 이 탭과 감시·알림 두 곳에 있다(API가 없는 증권사 수량 등록용). 감시·알림의 첫 동작은 [종목 검색으로 추가]이고, 감시 종목은 보유 중/보유하지 않음 두 묶음으로 나누며 보유 종목에는 "보유"와 증권사 색 점 칩을 붙인다(화면 전용, AI로 보내지 않는다). 등락은 감시 중인 종목만 시세가 있어 그 종목만 보인다(`/portfolio/summary`에 전일 대비가 없다).
+- 분석 창의 "보유 종목에서 고르기"는 `screens/holdings/HeldSymbolChoices.tsx` 하나가 맡고, 고른 종목의 market·code·name만 넘긴다. `src/privacy.test.ts`가 분석 화면의 보유 모듈 가져오기를 이 부품 하나로 제한한다.
+- 보유 내역 직접 입력 뒤 감시 중이 아닌 종목이면 "감시 종목에도 추가할까요?"를 묻는다.
+- 브리핑 상세: `interpret_error`의 이유(분석 화면 20장과 같은 문구)와 [AI 해석 다시 만들기](`POST /briefings/{id}/interpret`). 진행·결과는 SSE `briefing.status`.
 
 ### v2 보유 흐름 (`npm run e2e:holdings`)
 

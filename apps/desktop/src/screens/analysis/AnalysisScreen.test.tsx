@@ -485,7 +485,7 @@ describe('실패', () => {
 
   it('없는 분석이면 안내와 목록 링크', async () => {
     renderAt('#/analyses/999');
-    expect(await screen.findByText('요청한 경로가 없습니다.')).toBeInTheDocument();
+    expect(await screen.findByText('지워진 분석입니다')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '분석 목록' })).toHaveAttribute('href', '#/analyses');
   });
 });
