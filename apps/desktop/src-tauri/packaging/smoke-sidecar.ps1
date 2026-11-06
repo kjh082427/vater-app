@@ -1,5 +1,5 @@
 # PyInstaller로 만든 vater-core.exe를 실제로 띄워 확인한다:
-# ready 줄 → GET /health 200 → POST /shutdown 202 → 종료 코드 0.
+# ready 줄 → GET /health 200 → GET /categories(분류표 포함) → POST /shutdown 202 → 종료 코드 0.
 # 토큰은 화면·로그에 쓰지 않는다.
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../../../..')).Path
@@ -46,6 +46,12 @@ try {
     $expected = (Select-String -Path (Join-Path $repo 'sidecar/pyproject.toml') -Pattern '^version = "(.+)"$').Matches[0].Groups[1].Value
     $actual = ($health.Content | ConvertFrom-Json).version
     if ($actual -ne $expected) { throw "/health version '$actual' != pyproject '$expected'" }
+
+    # 분류표(categories/catalog.json)가 포장본에 들어 있어야 분류 탐색이 동작한다
+    $cats = Invoke-WebRequest -Uri "http://127.0.0.1:$port/categories" -Headers $headers -UseBasicParsing
+    $groups = @($cats.Content | ConvertFrom-Json)
+    "GET /categories -> $($cats.StatusCode), $($groups.Count) groups"
+    if ($cats.StatusCode -ne 200 -or $groups.Count -lt 1) { throw 'categories catalog missing from the package' }
 
     $shutdown = Invoke-WebRequest -Uri "http://127.0.0.1:$port/shutdown" -Method Post -Headers $headers -UseBasicParsing
     "POST /shutdown -> $($shutdown.StatusCode)"

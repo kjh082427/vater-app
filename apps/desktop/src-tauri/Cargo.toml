@@ -4,7 +4,7 @@ resolver = "3"
 
 [package]
 name = "vater"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Vater 데스크톱 셸 (Tauri 2): 창·트레이·단일 인스턴스·자동 실행·Windows 알림, 사이드카 관리"
 publish = false
