@@ -274,3 +274,53 @@
   gap: var(--space-1);
   min-width: 12rem;
 }
+
+/* 분석 창의 보유 종목 고르기: 감시 종목 고르기(analysis.module.css watchChoices)와 같은 모양 */
+.heldPick {
+  display: grid;
+  gap: var(--space-1-5);
+}
+
+.heldChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+  max-height: 10rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heldChoice {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1-5);
+  min-height: var(--size-control-sm);
+  padding: 0 var(--space-2-5);
+  border: var(--rule-hair) solid var(--color-control);
+  border-radius: var(--radius-round);
+  background: var(--color-card);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.heldChoice:hover {
+  border-color: var(--color-ink-3);
+}
+
+.heldChoice span {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
+/* 직접 입력 뒤 "감시 종목에도 추가할까요?" */
+.ask {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-row-alt);
+}

@@ -26,7 +26,7 @@ function open() {
     <ManualDialog onClose={onClose} onChanged={onSaved} onCsvDone={onCsvDone} />,
   );
 }
-const dialog = () => screen.findByRole('dialog', { name: '보유 종목 직접 추가' });
+const dialog = () => screen.findByRole('dialog', { name: '보유 내역 직접 입력' });
 
 async function pickStock(d: HTMLElement, query: string, name: string) {
   await userEvent.type(within(d).getByLabelText('종목 검색'), query);
@@ -38,7 +38,7 @@ beforeEach(() => {
   onSaved.mockClear();
 });
 
-describe('보유 종목 직접 추가', () => {
+describe('보유 내역 직접 입력', () => {
   it('증권사는 클릭으로 고른다: 삼성과 미래에셋이 기본, 연결 중인 증권사는 없다', async () => {
     mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
     open();
@@ -262,5 +262,95 @@ describe('리뷰 지적: 입력 흐름', () => {
     await userEvent.click(within(d).getByRole('button', { name: '저장' }));
     expect(await within(d).findByText('국내 종목 수량은 정수여야 합니다.')).toBeInTheDocument();
     expect(puts).toEqual([]);
+  });
+});
+
+describe('보유 내역을 넣는 곳이라는 안내', () => {
+  it('제목과 설명이 보유 내역을 넣는 곳이고 감시 종목 추가가 아니라고 알려 준다', async () => {
+    open();
+    const d = await dialog();
+    expect(
+      within(d).getByText(/보유 내역\(수량과 평균 매수가\)을 넣는 곳입니다/),
+    ).toBeInTheDocument();
+    expect(within(d).getByText(/감시 종목을 추가하려면 감시·알림 화면/)).toBeInTheDocument();
+  });
+});
+
+describe('직접 입력 뒤 감시 종목 제안(21장 4번)', () => {
+  async function saveNaver(d: HTMLElement) {
+    await pickStock(d, 'NAVER', 'NAVER');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    await userEvent.type(within(d).getByLabelText('수량'), '3');
+    await userEvent.type(within(d).getByLabelText('평균 매수가(1주당, 원)'), '200000');
+    await userEvent.click(within(d).getByRole('button', { name: '저장' }));
+  }
+
+  it('감시하지 않는 종목을 저장하면 "감시 종목에도 추가할까요?"를 묻고, 추가하면 그 종목만 보낸다', async () => {
+    const posts = capture('POST', '/watchlist');
+    open();
+    const d = await dialog();
+    await saveNaver(d);
+    const ask = await within(d).findByRole('group', { name: '감시 종목에도 추가할까요?' });
+    expect(within(ask).getByText(/NAVER/)).toBeInTheDocument();
+    expect(posts).toEqual([]);
+    await userEvent.click(within(ask).getByRole('button', { name: '감시 종목에 추가' }));
+    await waitFor(() =>
+      expect(posts).toEqual([{ path: '/watchlist', body: { market: 'KR', code: '035420' } }]),
+    );
+    expect(await within(d).findByText(/NAVER.* 감시 종목에 추가했습니다/)).toBeInTheDocument();
+    expect(
+      within(d).queryByRole('group', { name: '감시 종목에도 추가할까요?' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('[추가 안 함]이면 감시 종목을 건드리지 않는다', async () => {
+    const posts = capture('POST', '/watchlist');
+    open();
+    const d = await dialog();
+    await saveNaver(d);
+    const ask = await within(d).findByRole('group', { name: '감시 종목에도 추가할까요?' });
+    await userEvent.click(within(ask).getByRole('button', { name: '추가 안 함' }));
+    expect(
+      within(d).queryByRole('group', { name: '감시 종목에도 추가할까요?' }),
+    ).not.toBeInTheDocument();
+    expect(posts).toEqual([]);
+  });
+
+  it('이미 감시 중인 종목이면 묻지 않는다', async () => {
+    const puts = capture('PUT', '/holdings/manual');
+    open();
+    const d = await dialog();
+    await pickStock(d, '삼성전자', '삼성전자');
+    await userEvent.click(within(d).getByRole('radio', { name: '삼성' }));
+    await userEvent.type(within(d).getByLabelText('수량'), '10');
+    await userEvent.type(within(d).getByLabelText('평균 매수가(1주당, 원)'), '64000');
+    await userEvent.click(within(d).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    await within(d).findByRole('list', { name: '직접 입력한 보유' });
+    expect(
+      within(d).queryByRole('group', { name: '감시 종목에도 추가할까요?' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('보유 내역을 고쳐 저장할 때는 묻지 않는다', async () => {
+    mock.db.holdings = [
+      holding({
+        code: '035420',
+        name: 'NAVER',
+        broker_id: 'samsung',
+        source: 'manual',
+        quantity: '3',
+      }),
+    ];
+    open();
+    const d = await dialog();
+    await userEvent.click(await within(d).findByRole('button', { name: 'NAVER 수정' }));
+    await userEvent.clear(within(d).getByLabelText('수량'));
+    await userEvent.type(within(d).getByLabelText('수량'), '4');
+    await userEvent.click(within(d).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(
+      within(d).queryByRole('group', { name: '감시 종목에도 추가할까요?' }),
+    ).not.toBeInTheDocument();
   });
 });

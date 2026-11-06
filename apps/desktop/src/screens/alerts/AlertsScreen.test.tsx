@@ -7,6 +7,7 @@ import { App } from '../../app/App';
 import { emit, renderWithServices } from '../../test/render';
 import { mock, server } from '../../test/server';
 import { choose, findSelectButton } from '../../test/select';
+import { connection, holding } from '../../test/holdings';
 
 function renderAlerts(hash = '#/alerts') {
   window.location.hash = hash;
@@ -70,7 +71,7 @@ describe('감시 종목 목록', () => {
     renderAlerts();
     expect(
       await within(watchSection()).findByText(
-        '아직 감시 종목이 없습니다. 종목 추가를 눌러 종목을 찾고, 알림 규칙을 만드세요.',
+        '아직 감시 종목이 없습니다. 종목 검색으로 추가를 눌러 종목을 찾고, 알림 규칙을 만드세요.',
       ),
     ).toBeInTheDocument();
   });
@@ -91,10 +92,58 @@ describe('감시 종목 목록', () => {
   });
 });
 
+describe('보유한 종목과 보유하지 않은 종목', () => {
+  it('보유가 있으면 두 묶음으로 나눠 보인다(삼성전자만 보유)', async () => {
+    mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
+    mock.db.holdings = [holding({ code: '005930', name: '삼성전자' })];
+    renderAlerts();
+    const held = await within(watchSection()).findByRole('list', { name: '보유 중인 감시 종목' });
+    expect(
+      within(held)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual([expect.stringMatching(/^삼성전자/)]);
+    const rest = within(watchSection()).getByRole('list', { name: '보유하지 않은 감시 종목' });
+    expect(within(rest).getAllByRole('button')).toHaveLength(2);
+    expect(within(rest).getByRole('button', { name: /^SK하이닉스/ })).toBeInTheDocument();
+    expect(within(rest).getByRole('button', { name: /^애플/ })).toBeInTheDocument();
+    expect(within(watchSection()).getByText(/보유 중 · 1종목/)).toBeInTheDocument();
+    expect(within(watchSection()).getByText(/보유하지 않음 · 2종목/)).toBeInTheDocument();
+  });
+
+  it('보유 내역이 없으면 나누지 않는다', async () => {
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    expect(within(watchSection()).queryByText(/보유 중 ·/)).not.toBeInTheDocument();
+    expect(
+      within(watchSection()).queryByRole('list', { name: /감시 종목$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('보유 내역을 올리거나 직접 넣는 버튼은 이 화면에 없다(보유 종목 탭으로 옮겼다)', async () => {
+    mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    expect(screen.queryByRole('button', { name: /직접 (추가|입력)/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '한국투자' })).not.toBeInTheDocument();
+    expect(within(watchSection()).getByRole('link', { name: '보유 종목' })).toHaveAttribute(
+      'href',
+      '#/holdings',
+    );
+  });
+
+  it('감시 종목 카드의 첫 동작은 종목 검색으로 추가하기', async () => {
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    const first = within(watchSection()).getAllByRole('button')[0];
+    expect(first).toHaveAccessibleName('종목 검색으로 추가');
+  });
+});
+
 describe('감시 종목 추가·삭제', () => {
   it('검색해서 추가하면 그 종목을 펼친다', async () => {
     renderAlerts();
-    await userEvent.click(await screen.findByRole('button', { name: '종목 추가' }));
+    await userEvent.click(await screen.findByRole('button', { name: '종목 검색으로 추가' }));
     await userEvent.type(screen.getByRole('searchbox', { name: '종목 검색' }), 'NAVER');
     await userEvent.click(await screen.findByRole('button', { name: 'NAVER 추가' }));
     await waitFor(() => expect(window.location.hash).toBe('#/symbols/KR/035420'));
@@ -107,7 +156,7 @@ describe('감시 종목 추가·삭제', () => {
 
   it('이미 감시 중인 종목은 버튼 대신 "감시 중"', async () => {
     renderAlerts();
-    await userEvent.click(await screen.findByRole('button', { name: '종목 추가' }));
+    await userEvent.click(await screen.findByRole('button', { name: '종목 검색으로 추가' }));
     await userEvent.type(screen.getByRole('searchbox', { name: '종목 검색' }), '삼성');
     const results = await screen.findByRole('list', { name: '검색 결과' });
     const item = within(results).getByText('삼성전자').closest('li') as HTMLElement;
@@ -122,7 +171,7 @@ describe('감시 종목 추가·삭제', () => {
       ),
     );
     renderAlerts();
-    await userEvent.click(await screen.findByRole('button', { name: '종목 추가' }));
+    await userEvent.click(await screen.findByRole('button', { name: '종목 검색으로 추가' }));
     await userEvent.type(screen.getByRole('searchbox', { name: '종목 검색' }), 'NAVER');
     await userEvent.click(await screen.findByRole('button', { name: 'NAVER 추가' }));
     expect(await screen.findByText('이미 감시 중인 종목입니다: NAVER')).toBeInTheDocument();
@@ -130,7 +179,7 @@ describe('감시 종목 추가·삭제', () => {
 
   it('검색 결과가 없으면 안내', async () => {
     renderAlerts();
-    await userEvent.click(await screen.findByRole('button', { name: '종목 추가' }));
+    await userEvent.click(await screen.findByRole('button', { name: '종목 검색으로 추가' }));
     await userEvent.type(screen.getByRole('searchbox', { name: '종목 검색' }), 'zzzz');
     expect(await screen.findByText(/검색 결과가 없습니다/)).toBeInTheDocument();
   });

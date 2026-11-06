@@ -88,7 +88,7 @@ test('감시 종목과 규칙을 만들면 목록에 남고, 실제 422 오류�
   const watch = page.getByRole('region', { name: '감시 종목' });
   await expect(watch.getByText(/아직 감시 종목이 없습니다/)).toBeVisible();
 
-  await page.getByRole('button', { name: '종목 추가' }).click();
+  await page.getByRole('button', { name: '종목 검색으로 추가' }).click();
   await page.getByRole('searchbox', { name: '종목 검색' }).fill('삼성');
   await page.getByRole('button', { name: '삼성전자 추가' }).click();
   await expect(page).toHaveURL(/#\/symbols\/KR\/005930$/);

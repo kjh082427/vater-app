@@ -2,11 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { AlertsScreen } from '../alerts/AlertsScreen';
 import { renderWithServices } from '../../test/render';
 import { connection, holding } from '../../test/holdings';
 import { choose } from '../../test/select';
 import { mock, server } from '../../test/server';
+import { HoldingsScreen } from './HoldingsScreen';
 
 function capture(method: string, pathPrefix: string) {
   const seen: { path: string; body: unknown }[] = [];
@@ -58,7 +58,7 @@ function setup() {
   });
 }
 
-const render = () => renderWithServices(<AlertsScreen focus={null} />);
+const render = () => renderWithServices(<HoldingsScreen />);
 const dialog = () => screen.getByRole('dialog');
 
 describe('업로드 버튼', () => {
@@ -73,10 +73,10 @@ describe('업로드 버튼', () => {
     expect(screen.getByText('새 종목 2개')).toBeInTheDocument();
   });
 
-  it('[보유 종목 직접 추가]는 연결이 없어도 늘 있고, 누르면 직접 추가 창을 연다', async () => {
+  it('[보유 내역 직접 입력]는 연결이 없어도 늘 있고, 누르면 직접 추가 창을 연다', async () => {
     render();
-    await userEvent.click(await screen.findByRole('button', { name: '보유 종목 직접 추가' }));
-    expect(await screen.findByRole('dialog', { name: '보유 종목 직접 추가' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: '보유 내역 직접 입력' }));
+    expect(await screen.findByRole('dialog', { name: '보유 내역 직접 입력' })).toBeInTheDocument();
   });
 
   it('연결도 보유도 없으면 버튼 대신 연결 안내', async () => {
@@ -142,8 +142,8 @@ describe('업로드 확인 창', () => {
     });
     expect(await screen.findByText(/1종목을 감시 종목에 올렸습니다/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // 새로 올린 종목이 목록에 있다
-    expect(await screen.findByRole('button', { name: /^NAVER/ })).toBeInTheDocument();
+    // 새로 올린 종목이 감시 목록에 들어갔다
+    expect(mock.db.watchItems.some((w) => w.code === '035420')).toBe(true);
   });
 
   it('전부 해제하고 [확인만 하기]를 누르면 items 없이 본 종목을 seen으로만 보낸다', async () => {
@@ -175,7 +175,7 @@ describe('업로드 확인 창', () => {
       }),
     );
     render();
-    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
+    await screen.findByRole('button', { name: '보유 내역 직접 입력' });
     expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
     release();
     expect(await screen.findByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe('업로드 확인 창', () => {
       ),
     );
     render();
-    await screen.findByRole('button', { name: '보유 종목 직접 추가' });
+    await screen.findByRole('button', { name: '보유 내역 직접 입력' });
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByText(/증권사를 연결하면 보유 종목을 불러옵니다/)).not.toBeInTheDocument();
   });

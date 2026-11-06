@@ -7,6 +7,7 @@ describe('parseHash: 라우트 9개 (알림 클릭 경로와 같음)', () => {
     ['#/home', { name: 'home' }],
     ['#/analyses', { name: 'analyses' }],
     ['#/analyses/12', { name: 'analysis', id: 12 }],
+    ['#/holdings', { name: 'holdings' }],
     ['#/alerts', { name: 'alerts' }],
     ['#/symbols/KR/005930', { name: 'symbol', market: 'KR', code: '005930' }],
     ['#/symbols/US/BRK.B', { name: 'symbol', market: 'US', code: 'BRK.B' }],

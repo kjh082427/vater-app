@@ -16,7 +16,7 @@ async function openCsv() {
   renderWithServices(
     <ManualDialog onClose={() => undefined} onChanged={() => undefined} onCsvDone={onSaved} />,
   );
-  const d = await screen.findByRole('dialog', { name: '보유 종목 직접 추가' });
+  const d = await screen.findByRole('dialog', { name: '보유 내역 직접 입력' });
   await userEvent.click(within(d).getByRole('button', { name: '파일로 가져오기' }));
   return d;
 }

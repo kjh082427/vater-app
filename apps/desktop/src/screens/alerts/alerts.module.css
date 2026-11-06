@@ -157,3 +157,26 @@
   white-space: nowrap;
   color: var(--color-ink-2);
 }
+
+/* 감시 종목 카드의 첫 줄: 종목 검색으로 추가 */
+.addBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* 보유 중 / 보유하지 않음 묶음 */
+.watchGroup + .watchGroup {
+  margin-top: var(--space-4);
+}
+
+.groupLabel {
+  margin: 0;
+  padding: var(--space-1-5) 0;
+  border-bottom: var(--rule-hair) solid var(--color-control);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
+}

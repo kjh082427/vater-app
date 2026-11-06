@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { toApiError, type ApiError } from '../../api/errors';
 import { useApi } from '../../api/services';
 import { useResource } from '../../api/useResource';
-import type { BrokerOut, ConnectionOut, HoldingOut, SymbolOut } from '../../api/types';
+import type { BrokerOut, ConnectionOut, HoldingOut, SymbolOut, WatchItem } from '../../api/types';
 import { BrokerChip, Button, Dialog, formatPrice, formatQuantity } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { Field } from '../common/Field';
@@ -46,10 +46,13 @@ export interface ManualDialogProps {
   onCsvDone: (brokerId: string) => void;
 }
 
+type Stock = NonNullable<Draft['stock']>;
+
 /**
- * 보유 종목 직접 추가(스펙 5장, 14장): 종목 검색 → 증권사 클릭 → 수량 → 평균 매수가(1주당), 네 가지 모두 필수.
+ * 보유 내역 직접 입력(스펙 5장, 14장): 종목 검색 → 증권사 클릭 → 수량 → 평균 매수가(1주당), 네 가지 모두 필수.
  * 수정·삭제, "직접 입력" 표시와 입력 날짜. [파일로 가져오기]는 CSV(CsvImport).
- * 수동 입력은 감시 종목을 바꾸지 않는다. 보유 값은 이 화면 밖으로(특히 AI로) 나가지 않는다.
+ * 수동 입력은 감시 종목을 바꾸지 않는다. 새로 넣은 종목이 감시 중이 아니면 저장 뒤에 감시 종목에도 넣을지 묻는다
+ * (21장 4번, 묻고 사용자가 고를 때만 추가). 보유 값은 이 화면 밖으로(특히 AI로) 나가지 않는다.
  */
 export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProps) {
   const api = useApi();
@@ -62,6 +65,10 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
   const [failed, setFailed] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // 저장한 새 종목이 감시 중이 아닐 때 묻는 중인 종목, 그리고 추가 결과 문구
+  const [asking, setAsking] = useState<Stock | null>(null);
+  const [watchBusy, setWatchBusy] = useState(false);
+  const [watched, setWatched] = useState<string | null>(null);
   const choices = manualBrokers(brokers.data ?? [], connections.data ?? []);
   const brokerOf = (id: string) => brokers.data?.find((b) => b.id === id);
   const saved = (holdings.data ?? []).filter((h) => h.source !== 'api' && h.market !== null);
@@ -100,13 +107,44 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
           avg_price: avg,
         },
       });
+      const added = !draft.editing ? draft.stock : null;
       setDraft({ ...EMPTY, brokerId: draft.brokerId });
+      setAsking(null);
+      setWatched(null);
       holdings.reload();
       onChanged();
+      if (added) await askToWatch(added);
     } catch (e) {
       setFailed(toApiError(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** 이미 감시 중이면 묻지 않는다. 감시 목록을 읽지 못하면 묻지 않고 넘어간다(보유 저장은 이미 끝났다). */
+  async function askToWatch(stock: Stock) {
+    try {
+      const list = await api.request<WatchItem[]>('/watchlist');
+      if (!list.some((w) => w.market === stock.market && w.code === stock.code)) setAsking(stock);
+    } catch {
+      // 제안만 건너뛴다
+    }
+  }
+
+  async function addWatch(stock: Stock) {
+    setWatchBusy(true);
+    setFailed(null);
+    try {
+      await api.request('/watchlist', {
+        method: 'POST',
+        body: { market: stock.market, code: stock.code },
+      });
+      setAsking(null);
+      setWatched(`${withObjectParticle(stock.name)} 감시 종목에 추가했습니다.`);
+    } catch (e) {
+      setFailed(toApiError(e));
+    } finally {
+      setWatchBusy(false);
     }
   }
 
@@ -141,14 +179,15 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
     <Dialog
       open
       wide={csv}
-      title="보유 종목 직접 추가"
+      title="보유 내역 직접 입력"
       onClose={onClose}
       footer={<Button onClick={onClose}>닫기</Button>}
     >
       <div className={styles.stack}>
         <p className={styles.note}>
-          직접 입력한 보유 내역은 이 PC에만 저장되고, 증권사 갱신이 덮어쓰지 않습니다. 보유 수량과
-          평단가는 AI로 보내지 않습니다.
+          여기는 보유 내역(수량과 평균 매수가)을 넣는 곳입니다. 감시 종목을 추가하려면 감시·알림
+          화면에서 종목을 검색하세요. 직접 입력한 보유 내역은 이 PC에만 저장되고, 증권사 갱신이
+          덮어쓰지 않습니다. 보유 수량과 평단가는 AI로 보내지 않습니다.
         </p>
         {csv ? (
           <>
@@ -253,6 +292,24 @@ export function ManualDialog({ onClose, onChanged, onCsvDone }: ManualDialogProp
             </div>
           </form>
         )}
+        {asking && !csv ? (
+          <div role="group" aria-label="감시 종목에도 추가할까요?" className={styles.ask}>
+            <p className={styles.note}>
+              {`${withObjectParticle(asking.name)} 감시 종목에도 추가할까요? 감시 종목은 시세 알림과 브리핑에 쓰이고, 종목 이름은 브리핑 작성 때 AI로 전송됩니다(보유 여부와 수량은 보내지 않습니다).`}
+            </p>
+            <div className={styles.actions}>
+              <Button variant="primary" busy={watchBusy} onClick={() => void addWatch(asking)}>
+                감시 종목에 추가
+              </Button>
+              <Button onClick={() => setAsking(null)}>추가 안 함</Button>
+            </div>
+          </div>
+        ) : null}
+        {watched && !csv ? (
+          <p role="status" className={styles.note}>
+            {watched}
+          </p>
+        ) : null}
         {saved.length > 0 && !csv ? (
           <ul className={styles.list} aria-label="직접 입력한 보유">
             {saved.map((h) => {

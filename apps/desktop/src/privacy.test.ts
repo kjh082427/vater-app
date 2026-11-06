@@ -24,6 +24,13 @@ const AI_REACHING = [
   },
 ];
 
+/**
+ * 분석 창이 보유 종목에서 고르기에 쓰는 단 하나의 예외(21장 3번). 이 부품은 고른 종목의
+ * market·code·name만 돌려주고(아래 시험), 분석 화면은 그 밖의 보유 모듈을 가져오지 않는다.
+ */
+const HELD_PICK_IMPORT = "import { HeldSymbolChoices } from '../holdings/HeldSymbolChoices';";
+const withoutAllowed = (text: string) => text.replace(HELD_PICK_IMPORT, '');
+
 const FORBIDDEN: [string, RegExp][] = [
   ['보유 화면 모듈', /from ['"][^'"]*\/holdings\//],
   ['보유 내역 API', /['"`]\/holdings/],
@@ -39,8 +46,30 @@ describe('AI에 닿는 화면 코드는 보유 내역을 모른다', () => {
   });
 
   it.each(FORBIDDEN)('%s를 쓰지 않는다', (_, pattern) => {
-    const hits = AI_REACHING.filter((f) => pattern.test(f.text)).map((f) => f.name);
+    const hits = AI_REACHING.filter((f) => pattern.test(withoutAllowed(f.text))).map((f) => f.name);
     expect(hits).toEqual([]);
+  });
+
+  it('보유 종목 고르기 부품만 예외이고, 분석 화면에서 쓰는 곳은 NewAnalysisForm 하나다', () => {
+    const using = AI_REACHING.filter((f) => f.text.includes(HELD_PICK_IMPORT)).map((f) => f.name);
+    expect(using).toEqual(['screens/analysis/NewAnalysisForm.tsx']);
+    const importsOfHoldings = AI_REACHING.flatMap((f) =>
+      [...f.text.matchAll(/from ['"][^'"]*\/holdings\/[^'"]*['"]/g)].map(
+        (m) => `${f.name} ${m[0]}`,
+      ),
+    );
+    expect(importsOfHoldings).toEqual([
+      "screens/analysis/NewAnalysisForm.tsx from '../holdings/HeldSymbolChoices'",
+    ]);
+  });
+
+  it('HeldSymbolChoices는 고른 종목의 market·code·name만 밖으로 넘긴다', () => {
+    const text = readFileSync(join(here, 'screens/holdings/HeldSymbolChoices.tsx'), 'utf8');
+    const picks = [...text.matchAll(/onPick\(([^)]*)\)/g)].map((m) =>
+      m[1]?.replace(/\s+/g, ' ').trim(),
+    );
+    expect(picks).toEqual(['{ market: s.market, code: s.code, name: s.name }']);
+    expect(text).not.toMatch(/\bonPick:[^;]*(quantity|avg_price|broker)/);
   });
 
   it('분석 시작 요청 본문은 market·code·기준일·프리셋뿐이다(AnalysisCreate)', () => {
@@ -65,9 +94,11 @@ describe('AI에 닿는 화면 코드는 보유 내역을 모른다', () => {
       ]),
     );
     for (const [what, pattern] of FORBIDDEN) {
-      expect(posting.filter((f) => pattern.test(f.text)).map((f) => `${f.name}: ${what}`)).toEqual(
-        [],
-      );
+      expect(
+        posting
+          .filter((f) => pattern.test(withoutAllowed(f.text)))
+          .map((f) => `${f.name}: ${what}`),
+      ).toEqual([]);
     }
   });
 });

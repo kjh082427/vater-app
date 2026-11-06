@@ -120,3 +120,76 @@ describe('감시 종목 고르기 목록', () => {
     expect(rule).toMatch(/overflow-y:\s*auto/);
   });
 });
+
+describe('분석 창에서 보유 종목 고르기(v0.2.1 21장 3번)', () => {
+  /** 삼성전자(감시 중)는 두 증권사에, NAVER(감시 안 함)는 한 곳에 있다. */
+  function setupHeld() {
+    mock.db.connections = [
+      connection({ id: 1, broker_id: 'kis' }),
+      connection({ id: 2, broker_id: 'meritz' }),
+    ];
+    mock.db.holdings = [
+      holding({ code: '005930', name: '삼성전자', quantity: '15', avg_price: 64000 }),
+      holding({
+        broker_id: 'meritz',
+        connection_id: 2,
+        code: '005930',
+        name: '삼성전자',
+        quantity: '5',
+      }),
+      holding({ code: '035420', name: 'NAVER', quantity: '7', avg_price: 200000 }),
+    ];
+  }
+
+  it('"감시 종목에서 고르기" 옆에 "보유 종목에서 고르기"가 있고, 같은 종목은 한 번만 나온다', async () => {
+    setupHeld();
+    renderForm();
+    const form = await formEl();
+    const list = await within(form).findByRole('list', { name: '보유 종목에서 고르기' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(form).getByRole('list', { name: '감시 종목에서 고르기' })).toBeInTheDocument();
+    // 목록에는 이름과 코드만 보인다(수량·평단가·증권사 없음)
+    expect(list).not.toHaveTextContent(/주|평단|\d{2,3},\d{3}|한국투자|메리츠|15|7주/);
+  });
+
+  it('보유 종목을 누르면 검색 없이 선택되고, 요청 본문에는 그 종목 하나만 들어간다', async () => {
+    setupHeld();
+    const posts = postedAnalyses();
+    const all: string[] = [];
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method !== 'GET') all.push(await request.clone().text());
+    });
+    renderForm();
+    const form = await formEl();
+    await userEvent.click(await within(form).findByRole('button', { name: '보유 종목 NAVER' }));
+    // 고른 뒤에도 보유 여부를 표시하지 않는다
+    expect(within(form).getByText('NAVER')).toBeInTheDocument();
+    expect(form).not.toHaveTextContent(/보유/);
+    await userEvent.click(within(form).getByRole('button', { name: '분석 시작' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({ market: 'KR', code: '035420' });
+    const text = all.join('\n');
+    for (const secret of ['7', 'quantity', 'avg_price', '200000', 'holdings', '삼성전자']) {
+      expect(text, secret).not.toContain(secret);
+    }
+  });
+
+  it('보유 종목이 없거나 지원하지 않는 종목뿐이면 목록을 숨긴다', async () => {
+    mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
+    mock.db.holdings = [
+      holding({ code: '530031', name: '삼성 레버리지 ETN', market: null, supported: false }),
+    ];
+    renderForm();
+    const form = await formEl();
+    await within(form).findByRole('searchbox', { name: '종목 검색' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(within(form).queryByText('보유 종목에서 고르기')).not.toBeInTheDocument();
+  });
+
+  it('목록은 높이 제한 안에서 스크롤한다', () => {
+    const css = readFileSync('src/screens/holdings/holdings.module.css', 'utf8');
+    const rule = /\.heldChoices\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/max-height:\s*[\d.]+rem/);
+    expect(rule).toMatch(/overflow-y:\s*auto/);
+  });
+});

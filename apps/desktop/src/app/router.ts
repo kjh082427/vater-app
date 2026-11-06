@@ -11,6 +11,7 @@ export type Route =
   | { name: 'home'; tab?: string }
   | { name: 'analyses' }
   | { name: 'analysis'; id: number }
+  | { name: 'holdings' }
   | { name: 'alerts' }
   | { name: 'symbol'; market: MarketCode; code: string }
   | { name: 'briefings' }
@@ -22,6 +23,7 @@ export type Route =
 const SIMPLE = {
   home: { name: 'home' },
   analyses: { name: 'analyses' },
+  holdings: { name: 'holdings' },
   alerts: { name: 'alerts' },
   briefings: { name: 'briefings' },
   settings: { name: 'settings' },

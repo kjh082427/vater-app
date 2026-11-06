@@ -31,7 +31,7 @@ export interface UploadButtonsProps {
   /** 증권사·연결·보유를 모두 받았다. 받는 중이거나 실패했으면 연결 안내를 보이지 않는다. */
   ready: boolean;
   onOpen: (brokerId: string | null) => void;
-  /** 이 버튼 줄 뒤에 붙는 것(보유 종목 직접 추가). */
+  /** 이 버튼 줄 뒤에 붙는 것(보유 내역 직접 입력). */
   children?: ReactNode;
 }
 
