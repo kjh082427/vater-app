@@ -348,7 +348,9 @@ export function createHandlers(db: MockDb) {
     }),
     http.get('*/analyses/:aid', ({ params }) => {
       const found = db.analyses.find((a) => a.id === Number(params.aid));
-      return found ? HttpResponse.json(found) : notFound();
+      return found
+        ? HttpResponse.json(found)
+        : errorResponse(404, 'ANALYSIS_NOT_FOUND', '분석 기록이 없습니다.');
     }),
     http.post('*/analyses', async ({ request }) => {
       const body = (await request.json()) as AnalysisCreate;
@@ -411,6 +413,30 @@ export function createHandlers(db: MockDb) {
       };
       db.analyses.push(next);
       return HttpResponse.json({ id: next.id, status: 'queued' }, { status: 202 });
+    }),
+
+    http.delete('*/analyses/:aid', ({ params }) => {
+      const found = db.analyses.find((a) => a.id === Number(params.aid));
+      if (!found) return errorResponse(404, 'ANALYSIS_NOT_FOUND', '분석 기록이 없습니다.');
+      if (found.status === 'queued' || found.status === 'running') {
+        return errorResponse(409, 'ANALYSIS_IN_PROGRESS', '진행 중인 분석은 지울 수 없습니다.');
+      }
+      db.analyses = db.analyses.filter((a) => a !== found);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post('*/analyses/delete', async ({ request }) => {
+      const { ids } = (await request.json()) as { ids: number[] };
+      const deleted: number[] = [];
+      const skipped: { id: number; code: 'ANALYSIS_NOT_FOUND' | 'ANALYSIS_IN_PROGRESS' }[] = [];
+      for (const id of ids) {
+        const found = db.analyses.find((a) => a.id === id);
+        if (!found) skipped.push({ id, code: 'ANALYSIS_NOT_FOUND' });
+        else if (found.status === 'queued' || found.status === 'running')
+          skipped.push({ id, code: 'ANALYSIS_IN_PROGRESS' });
+        else deleted.push(id);
+      }
+      db.analyses = db.analyses.filter((a) => !deleted.includes(a.id));
+      return HttpResponse.json({ deleted, skipped });
     }),
 
     // ---- 브리핑 ----

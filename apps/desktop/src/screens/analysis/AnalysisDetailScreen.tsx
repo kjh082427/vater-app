@@ -13,8 +13,9 @@ import common from '../common/screen.module.css';
 import { formatDay, formatDayTime, formatDuration } from '../common/time';
 import styles from './analysis.module.css';
 import { AnalysisResult } from './AnalysisResult';
+import { DELETED_ANALYSIS, DeleteAnalysisDialog } from './DeleteAnalysisDialog';
 import { StageTimeline } from './StageTimeline';
-import { STATUS_LABEL } from './stages';
+import { isActiveStatus, STATUS_LABEL } from './stages';
 
 function useAction() {
   const [busy, setBusy] = useState(false);
@@ -149,13 +150,72 @@ function Stopped({ detail }: { detail: AnalysisDetail }) {
   );
 }
 
+/** 지우기: 진행 중이면 막고 이유를 보인다. 지우면 분석 목록으로 간다. */
+function DeleteAction({ detail }: { detail: AnalysisDetail }) {
+  const api = useApi();
+  const del = useAction();
+  const [confirming, setConfirming] = useState(false);
+  const active = isActiveStatus(detail.status);
+
+  async function remove() {
+    const done = await del.run(() =>
+      api.request(`/analyses/${detail.id}`, { method: 'DELETE' }).then(() => true),
+    );
+    if (done) navigate({ name: 'analyses' });
+  }
+
+  return (
+    <>
+      <Button disabled={active} onClick={() => setConfirming(true)}>
+        분석 지우기
+      </Button>
+      {active ? (
+        <p className={common.meta}>진행 중인 분석은 끝나거나 취소한 뒤 지울 수 있습니다.</p>
+      ) : null}
+      {confirming ? (
+        <DeleteAnalysisDialog
+          count={1}
+          busy={del.busy}
+          error={del.error}
+          onConfirm={remove}
+          onClose={() => setConfirming(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 /** 분석 하나(#/analyses/:id): 대기·실행 중이면 진행 타임라인, 끝나면 결과, 실패·취소면 원인과 다시 시도. */
 export function AnalysisDetailScreen({ id }: { id: number }) {
   const detail = useResource<AnalysisDetail>(`/analyses/${id}`);
   const { reload } = detail;
+  const [deleted, setDeleted] = useState(false);
   useEvent('analysis.status', (event) => {
     if (event.id === id) reload();
   });
+  useEvent('analysis.deleted', (event) => {
+    if (event.ids.includes(id)) setDeleted(true);
+  });
+
+  // 지워진 분석(알림 경로 등): 404도 같은 안내
+  if (deleted || detail.error?.status === 404) {
+    return (
+      <>
+        <ScreenHeader title="분석" />
+        <Banner
+          tone="info"
+          title={DELETED_ANALYSIS}
+          action={
+            <a className={common.textLink} href="#/analyses">
+              분석 목록
+            </a>
+          }
+        >
+          분석 이력에서 지운 분석입니다.
+        </Banner>
+      </>
+    );
+  }
 
   const d = detail.data;
   const title = d ? `${d.name ?? d.code} 분석` : '분석';
@@ -186,6 +246,7 @@ export function AnalysisDetailScreen({ id }: { id: number }) {
         <ApiErrorNotice error={detail.error} title="분석을 불러오지 못했습니다" onRetry={reload} />
       ) : null}
       {body}
+      {d ? <DeleteAction detail={d} /> : null}
     </>
   );
 }

@@ -149,17 +149,26 @@ export const alertEventsSource: Source<AlertEvent[]> = {
 export const analysesSource: Source<AnalysisItem[]> = {
   key: '/analyses?limit=20',
   load: (api) => api.request<AnalysisItem[]>('/analyses', { query: { limit: 20 } }),
-  live: ({ events, get, mutate, reload }) =>
-    events.subscribe('analysis.status', (event) => {
-      if (get()?.some((a) => a.id === event.id)) {
-        mutate((items) =>
-          items?.map((a) => (a.id === event.id ? { ...a, status: event.status } : a)),
-        );
-        if (event.status === 'done') reload(); // 결정·요약이 생겼다
-      } else {
-        reload(); // 새 분석: 종목 이름이 필요하다
-      }
-    }),
+  live: ({ events, get, mutate, reload }) => {
+    const offs = [
+      events.subscribe('analysis.status', (event) => {
+        if (get()?.some((a) => a.id === event.id)) {
+          mutate((items) =>
+            items?.map((a) => (a.id === event.id ? { ...a, status: event.status } : a)),
+          );
+          if (event.status === 'done') reload(); // 결정·요약이 생겼다
+        } else {
+          reload(); // 새 분석: 종목 이름이 필요하다
+        }
+      }),
+      // 지운 분석은 뺀다(20건 밖에 있던 분석이 올라올 수 있어 다시도 받는다)
+      events.subscribe('analysis.deleted', ({ ids }) => {
+        mutate((items) => items?.filter((a) => !ids.includes(a.id)));
+        reload();
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  },
 };
 
 export const activeOf = (items: AnalysisItem[] | undefined) =>
@@ -169,7 +178,11 @@ const detailSources = new Map<number, Source<AnalysisDetail>>();
 export function analysisSource(id: number): Source<AnalysisDetail> {
   let s = detailSources.get(id);
   if (!s) {
-    s = { key: `/analyses/${id}`, load: (api) => api.request<AnalysisDetail>(`/analyses/${id}`) };
+    s = {
+      key: `/analyses/${id}`,
+      load: (api) => api.request<AnalysisDetail>(`/analyses/${id}`),
+      refreshOn: ['analysis.deleted'], // 지워졌으면 404가 되어 칸이 "지워진 분석입니다"를 보인다
+    };
     detailSources.set(id, s);
   }
   return s;
