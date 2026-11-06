@@ -353,3 +353,41 @@ async def test_history_events_stay_without_a_link_to_the_deleted_analysis(
         "name",
         "kind",
     }
+
+
+async def test_deleting_a_cancelled_queued_analysis_does_not_trouble_the_worker(
+    client: httpx.AsyncClient, queue: AnalysisQueue, caplog: pytest.LogCaptureFixture
+) -> None:
+    engine = queue._engine
+    assert isinstance(engine, Engine)
+    engine.gate = threading.Event()
+    first = (await client.post("/analyses", json={"market": "US", "code": "AAPL"})).json()["id"]
+    await until(client, first, "running")
+    second = (await client.post("/analyses", json={"market": "US", "code": "AAPL"})).json()["id"]
+    assert (await client.post(f"/analyses/{second}/cancel")).json()["status"] == "cancelled"
+    assert (await client.delete(f"/analyses/{second}")).status_code == 204  # 큐에는 id가 남아 있다
+
+    with caplog.at_level("ERROR"):
+        engine.gate.set()
+        await until(client, first, "done")
+        third = (await client.post("/analyses", json={"market": "US", "code": "AAPL"})).json()["id"]
+        await until(client, third, "done")  # 워커가 계속 돈다
+    assert caplog.records == []
+
+
+async def test_checkpoints_are_cleared_without_yielding_to_new_analyses(
+    client: httpx.AsyncClient,
+    queue: AnalysisQueue,
+    deps: AppDeps,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """확인과 지우기 사이에 루프가 새 분석 제출·시작을 하지 못하게 루프 안에서 지운다."""
+    import vater_core.analysis.queue as queue_module
+
+    aid = row(deps, "failed")
+    ran_in: list[int] = []
+    monkeypatch.setattr(
+        queue_module, "clear_checkpoints", lambda *a: ran_in.append(threading.get_ident())
+    )
+    assert (await client.delete(f"/analyses/{aid}")).status_code == 204
+    assert ran_in == [threading.get_ident()]

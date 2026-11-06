@@ -233,9 +233,11 @@ class AnalysisQueue:
             repo.delete(aid)
             deleted.append(aid)
             if not keep:
+                # 확인부터 지우기까지 이벤트 루프에서 await 없이 끝낸다. 스레드로 돌리면 그 사이
+                # 같은 종목·기준일의 새 분석이 시작되어 방금 만든 체크포인트까지 지울 수 있다.
                 cache = TaPaths.under(self._deps.data_dir).data_cache_dir
                 try:
-                    await asyncio.to_thread(clear_checkpoints, cache, a.market, a.code, a.as_of)
+                    clear_checkpoints(cache, a.market, a.code, a.as_of)
                 except Exception:  # 기록은 이미 지웠다. 남은 체크포인트는 다음 분석에 쓰이지 않는다
                     logger.warning("could not clear checkpoints of analysis %s", aid, exc_info=True)
         if deleted:
@@ -289,7 +291,12 @@ class AnalysisQueue:
 
     async def _run_one(self, aid: int) -> None:
         repo = self._repo()
-        a = repo.get(aid)
+        try:
+            a = repo.get(aid)
+        except VaterError as e:
+            if e.status == 404:
+                return  # 대기 중에 취소하고 지운 분석: 큐에 id만 남았다
+            raise
         cancel = self._cancels.get(aid)
         if a.status != "queued" or cancel is None:
             return  # 기다리는 동안 취소됨
