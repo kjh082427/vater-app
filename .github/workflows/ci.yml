@@ -26,6 +26,13 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy src
       - run: uv run pytest -m "not kis_live and not broker_live and not llm" -q
+      # 잠긴 의존성의 알려진 취약점 검사. tradingagents는 PyPI가 아닌 git 의존성이라 검사 대상에서 뺀다.
+      # CVE-2026-126190(soupsieve 3.0.4, 중첩이 깊은 HTML에서 선택자가 느려지는 DoS)은 고칠 버전(4.x)이
+      # 배포 2주 미만이라 보류. 앱은 신뢰할 수 없는 HTML에 CSS 선택자를 돌리지 않는다. 4.x가 2주 지나면 올리고 이 줄을 지운다.
+      - name: pip-audit (uv.lock)
+        run: |
+          uv export --frozen --no-hashes --no-emit-project --no-emit-package tradingagents --format requirements-txt -o "$RUNNER_TEMP/req.txt"
+          uvx pip-audit -r "$RUNNER_TEMP/req.txt" --no-deps --disable-pip --strict --ignore-vuln CVE-2026-126190
 
   desktop-ui:
     runs-on: ubuntu-latest
@@ -45,3 +52,4 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high  # 배포되는 의존성의 high 이상만 실패

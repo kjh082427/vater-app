@@ -65,6 +65,15 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: apps/desktop/src-tauri
+      - name: cargo audit (RustSec)
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo install cargo-audit --locked
+          # zip 4.6.1의 RUSTSEC-2026-0367/0368/0369/0429(ZipArchive::extract 계열)는 tauri-plugin-updater 2.14.0이
+          # 끌고 오는 간접 의존성이라 직접 못 올린다(고친 zip은 9.0 이상). 우리 업데이트는 NSIS 설치 파일(.exe)이라
+          # zip 풀기를 쓰지 않는다. updater가 zip 9로 올라간 버전이 2주 지나면 올리고 이 무시를 지운다.
+          # 경고(unmaintained, unsound)는 실패가 아니다(기본 동작).
+          cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369 --ignore RUSTSEC-2026-0429
       - name: cargo fmt --check
         working-directory: apps/desktop/src-tauri
         run: cargo fmt --all --check
