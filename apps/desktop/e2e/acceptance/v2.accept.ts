@@ -194,15 +194,17 @@ test('V1 연결 → 업로드 → 체크 해제: 세 증권사를 화면에서 �
   });
 
   await test.step('업로드: 모두 갱신 → 새 종목 5개, 지원하지 않는 시장은 막힘, 엔비디아 체크 해제', async () => {
-    await goto(page, '#/alerts');
+    // 올리기 버튼은 보유 종목 탭에만 있다(v0.2.1 21-2)
+    await goto(page, '#/holdings');
     await page.getByRole('button', { name: '연결한 증권사 모두' }).click();
     const dialog = page.getByRole('dialog', { name: /보유 종목 올리기/ });
     for (const name of ['삼성전자', 'SK하이닉스', '애플', 'NAVER', '엔비디아']) {
-      await expect(dialog.getByRole('checkbox', { name: new RegExp(name) })).toBeChecked();
+      await expect(dialog.getByRole('checkbox', { name: new RegExp(name) })).not.toBeChecked();
     }
     await expect(dialog.getByRole('checkbox', { name: /토요타/ })).toBeDisabled();
     await expect(dialog.getByText('국내·미국 외 시장은 지원하지 않습니다.')).toBeVisible();
     await expect(dialog.getByText('감시 종목은 브리핑 작성 때 AI로 전송됩니다.')).toBeVisible();
+    await dialog.getByRole('button', { name: '모두 선택' }).click();
     await dialog.getByRole('checkbox', { name: /엔비디아/ }).uncheck();
     await dialog.getByRole('button', { name: /감시 종목에 올리기/ }).click();
     await expect(page.getByText(/4종목을 감시 종목에 올렸습니다/)).toBeVisible();

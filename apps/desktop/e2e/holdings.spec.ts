@@ -70,11 +70,13 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
     await expect(page.getByText('새 종목 2개')).toBeVisible();
     await page.getByRole('button', { name: '연결한 증권사 모두' }).click();
     const dialog = page.getByRole('dialog', { name: /보유 종목 올리기/ });
-    await expect(dialog.getByRole('checkbox', { name: /NAVER/ })).toBeChecked();
+    // 처음에는 모두 해제(v0.2.2 22-4)
+    await expect(dialog.getByRole('checkbox', { name: /NAVER/ })).not.toBeChecked();
     await expect(dialog.getByRole('checkbox', { name: /삼성전자/ })).toBeDisabled();
     await expect(dialog.getByText('이미 감시 중')).toBeVisible();
     await expect(dialog.getByText('감시 종목은 브리핑 작성 때 AI로 전송됩니다.')).toBeVisible();
     await shoot(page, 'upload-dialog');
+    await dialog.getByRole('button', { name: '모두 선택' }).click();
     await dialog.getByRole('checkbox', { name: /엔비디아/ }).uncheck();
     await dialog.getByRole('button', { name: /감시 종목에 올리기/ }).click();
     await expect(page.getByText(/1종목을 감시 종목에 올렸습니다/)).toBeVisible();
