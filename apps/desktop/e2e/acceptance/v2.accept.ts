@@ -268,7 +268,7 @@ test('V2 같은 종목 합산·토글: 증권사 셋의 같은 종목은 한 줄
   await expect(holding.getByRole('button', { name: '키움 33.3%' })).toBeVisible();
   // 화면을 떠났다 돌아와도 비중 보기를 기억한다
   await goto(page, '#/alerts');
-  await expect(page.getByRole('button', { name: '연결한 증권사 모두' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '보유 종목에서 불러오기' })).toBeVisible();
   await goto(page, '#/symbols/KR/005930');
   await expect(asset(page, '내 보유').getByRole('button', { name: '키움 33.3%' })).toBeVisible();
 
@@ -586,7 +586,7 @@ test('V7 분류 탐색: 대분류 → 중분류, 시장(통합·한국·미국)�
   void shell;
   await stack.setup();
   await openApp(page, '#/alerts');
-  await page.getByRole('button', { name: '종목 추가' }).click();
+  await page.getByRole('button', { name: '종목 검색으로 추가' }).click();
   await page.getByRole('button', { name: '분류로 찾기' }).click();
   const names = (list: Locator) =>
     list.getByRole('listitem').evaluateAll((els) => els.map((e) => e.textContent ?? ''));
