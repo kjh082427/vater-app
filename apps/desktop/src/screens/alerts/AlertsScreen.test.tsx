@@ -291,14 +291,45 @@ describe('보유 종목에서 불러오기(v0.2.2 22-5)', () => {
     expect(await screen.findByText(/1종목을 감시 종목에 올렸습니다/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     const post = sent.find((r) => r.method === 'POST' && r.path === '/holdings/watch');
+    // 체크하지 않은 종목은 보내지 않는다(새 종목 표시는 올리기 창의 일이다)
     expect(JSON.parse(post?.body ?? '{}')).toEqual({
       items: [{ market: 'KR', code: '035420' }],
-      seen: [{ market: 'US', code: 'NVDA' }],
     });
     expect(sent.some((r) => r.path === '/holdings/sync')).toBe(false);
     expect(
       await within(watchSection()).findByRole('button', { name: /^NAVER/ }),
     ).toBeInTheDocument();
+  });
+
+  it('보유 내역을 받는 중이면 그렇게 말하고, 실패하면 원인과 다시 시도를 보인다', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let fail = false;
+    server.use(
+      http.get('*/holdings', async () => {
+        await gate;
+        return fail
+          ? errorResponse(
+              503,
+              'DB_UNAVAILABLE',
+              '저장소가 준비되지 않았습니다.',
+              '앱을 다시 시작해 주세요.',
+            )
+          : HttpResponse.json(mock.db.holdings);
+      }),
+    );
+    renderAlerts();
+    await userEvent.click(
+      await within(watchSection()).findByRole('button', { name: '보유 종목에서 불러오기' }),
+    );
+    const d = await screen.findByRole('dialog');
+    expect(within(d).getByText('보유 내역을 불러오는 중…')).toBeInTheDocument();
+    expect(within(d).queryByText(/불러올 보유 종목이 없습니다/)).not.toBeInTheDocument();
+    fail = true;
+    release();
+    expect(await within(d).findByText(/앱을 다시 시작해 주세요/)).toBeInTheDocument();
+    expect(within(d).queryByText(/불러올 보유 종목이 없습니다/)).not.toBeInTheDocument();
+    expect(within(d).getByRole('button', { name: /다시 시도/ })).toBeInTheDocument();
   });
 
   it('넣을 종목이 없으면 그렇게 말하고 버튼을 막는다', async () => {
@@ -342,6 +373,20 @@ describe('[새로고침](v0.2.2 22-6)', () => {
     );
     expect(posts).toEqual([]);
     expect(gets).not.toContain('/holdings/sync');
+  });
+
+  it('새로고침해도 고른 그래프 기간은 그대로다(다시 그리지 않고 다시 받기만)', async () => {
+    renderAlerts('#/symbols/KR/005930');
+    const part = await waitFor(() => panel('삼성전자'));
+    await userEvent.click(within(part).getByRole('radio', { name: '1년' }));
+    const urls: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      urls.push(request.url);
+    });
+    await userEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    await waitFor(() => expect(urls.some((u) => u.includes('/bars?range=1y'))).toBe(true));
+    expect(urls.some((u) => u.includes('range=3m'))).toBe(false);
+    expect(within(panel('삼성전자')).getByRole('radio', { name: '1년' })).toBeChecked();
   });
 });
 
@@ -404,6 +449,47 @@ describe('감시 종목 한꺼번에 빼기(v0.2.2 22-3)', () => {
     expect(mock.db.watchItems.map((w) => w.name)).toEqual(['SK하이닉스', '애플']);
     // 실패한 종목은 체크가 남아 다시 시도할 수 있다
     expect(within(watchSection()).getByText('1종목 선택')).toBeInTheDocument();
+    // [새로고침]하면 실패 안내를 지운다
+    await userEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    await waitFor(() =>
+      expect(within(watchSection()).queryByText(/빼지 못했습니다/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('이미 없는 종목(404)은 뺀 것으로 본다', async () => {
+    server.use(
+      http.delete('*/watchlist/2', () =>
+        errorResponse(404, 'WATCHLIST_NOT_FOUND', '감시 종목을 찾을 수 없습니다.'),
+      ),
+    );
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    await pick('삼성전자');
+    await pick('SK하이닉스');
+    await userEvent.click(within(watchSection()).getByRole('button', { name: '선택한 종목 빼기' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: '빼기' }),
+    );
+    await waitFor(() =>
+      expect(within(watchSection()).queryByRole('button', { name: /^SK하이닉스/ })).toBeNull(),
+    );
+    expect(within(watchSection()).queryByText(/빼지 못했습니다/)).not.toBeInTheDocument();
+    expect(within(watchSection()).queryByText(/종목 선택$/)).not.toBeInTheDocument();
+  });
+
+  it('선택 수는 지금 목록에 있는 종목만 센다(새로고침으로 사라진 종목은 빠진다)', async () => {
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    await pick('삼성전자');
+    await pick('애플');
+    expect(within(watchSection()).getByText('2종목 선택')).toBeInTheDocument();
+    mock.db.watchItems = mock.db.watchItems.filter((w) => w.name !== '애플');
+    await userEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    expect(await within(watchSection()).findByText('1종목 선택')).toBeInTheDocument();
+    await userEvent.click(within(watchSection()).getByRole('button', { name: '선택한 종목 빼기' }));
+    expect(
+      await screen.findByRole('dialog', { name: '감시 종목 1개를 뺄까요?' }),
+    ).toBeInTheDocument();
   });
 });
 

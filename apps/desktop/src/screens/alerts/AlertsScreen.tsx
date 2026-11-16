@@ -41,20 +41,24 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const brokers = useResource<BrokerOut[]>('/brokers');
   // [보유 종목 직접 추가]는 보유 종목 탭에만 둔다(v0.2.2 22-5). 여기서는 올린 보유 종목을 불러오기만 한다
   const [importing, setImporting] = useState(false);
-  // [새로고침]마다 늘려 자기 자료를 가진 부품(알림 이력, 펼친 종목의 그래프·내 보유)을 다시 그린다
-  const [round, setRound] = useState(0);
+  // [새로고침] 신호: 자기 자료를 가진 부품(알림 이력, 펼친 종목의 그래프·내 보유)이 받아 다시 불러온다
+  const [refreshKey, setRefreshKey] = useState(0);
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
-  // 한꺼번에 빼기(v0.2.2 22-3): 일괄 API가 없어 DELETE /watchlist/{id}를 차례로 부른다
-  const [selected, setSelected] = useState<number[]>([]);
+  // 한꺼번에 빼기(v0.2.2 22-3): 일괄 API가 없어 DELETE /watchlist/{id}를 한꺼번에 부른다
+  const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [bulkFailed, setBulkFailed] = useState<{ name: string; error: ApiError }[]>([]);
+  const [bulkFailed, setBulkFailed] = useState<{ id: number; name: string; error: ApiError }[]>([]);
 
   const focusKey = focus ? symbolKey(focus) : null;
   const items = watch.data;
+  // 체크와 실패 안내는 지금 목록에 있는 종목만 본다(새로고침·불러오기·SSE 뒤에도 수가 실제와 맞게)
+  const present = new Set((items ?? []).map((w) => w.id));
+  const selected = checkedIds.filter((id) => present.has(id));
+  const failedNow = bulkFailed.filter((f) => present.has(f.id));
   const watchedKeys = new Set((items ?? []).map(symbolKey));
   const focusMissing = Boolean(focus && items && !watchedKeys.has(focusKey ?? ''));
   // 종목 키 → 그 종목을 가진 증권사들(같은 증권사는 한 번만)
@@ -109,25 +113,28 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   // [새로고침](v0.2.2 22-6): 목록과 시세만 다시 받는다. 증권사(/holdings/sync)는 부르지 않는다
   function reloadAll() {
     for (const r of [watch, rules, kinds, holdings, brokers]) r.reload();
-    setRound((n) => n + 1);
+    setRefreshKey((n) => n + 1);
+    setBulkFailed([]);
   }
 
   async function removeSelected() {
     setBulkBusy(true);
     const targets = (items ?? []).filter((w) => selected.includes(w.id));
+    const results = await Promise.allSettled(
+      targets.map((w) => api.request(`/watchlist/${w.id}`, { method: 'DELETE' })),
+    );
     const done: number[] = [];
-    const failed: { name: string; error: ApiError }[] = [];
-    for (const w of targets) {
-      try {
-        await api.request(`/watchlist/${w.id}`, { method: 'DELETE' });
-        done.push(w.id);
-      } catch (e) {
-        failed.push({ name: w.name, error: toApiError(e) });
-      }
-    }
+    const failed: { id: number; name: string; error: ApiError }[] = [];
+    results.forEach((r, i) => {
+      const w = targets[i] as WatchItem;
+      const error = r.status === 'rejected' ? toApiError(r.reason) : null;
+      // 이미 없는 종목(404)은 뺀 것으로 본다
+      if (!error || error.status === 404 || error.code === 'WATCHLIST_NOT_FOUND') done.push(w.id);
+      else failed.push({ id: w.id, name: w.name, error });
+    });
     watch.mutate((list) => list?.filter((w) => !done.includes(w.id)));
     rules.mutate((list) => list?.filter((r) => !done.includes(r.watchlist_id)));
-    setSelected((prev) => prev.filter((id) => !done.includes(id)));
+    setCheckedIds((prev) => prev.filter((id) => !done.includes(id)));
     setBulkFailed(failed);
     setBulkBusy(false);
     setConfirmBulk(false);
@@ -139,7 +146,8 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const selectedRules = (rules.data ?? []).filter((r) => selected.includes(r.watchlist_id)).length;
 
   function removed(item: WatchItem) {
-    setSelected((prev) => prev.filter((id) => id !== item.id));
+    setCheckedIds((prev) => prev.filter((id) => id !== item.id));
+    setBulkFailed([]);
     watch.mutate((list) => list?.filter((w) => w.id !== item.id));
     rules.mutate((list) => list?.filter((r) => r.watchlist_id !== item.id));
     navigate({ name: 'alerts' });
@@ -225,9 +233,9 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                 <Button onClick={() => setConfirmBulk(true)}>선택한 종목 빼기</Button>
               </div>
             ) : null}
-            {bulkFailed.length > 0 ? (
-              <Banner tone="caution" title={`${bulkFailed.length}종목은 빼지 못했습니다.`}>
-                {bulkFailed.map((f) => `${f.name}: ${f.error.message}`).join(' ')}
+            {failedNow.length > 0 ? (
+              <Banner tone="caution" title={`${failedNow.length}종목은 빼지 못했습니다.`}>
+                {failedNow.map((f) => `${f.name}: ${f.error.message}`).join(' ')}
               </Banner>
             ) : null}
             {watch.error ? (
@@ -296,10 +304,10 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                             rules.mutate((list) => list?.map((r) => (r.id === rule.id ? rule : r)))
                           }
                           onRemoved={() => removed(item)}
-                          round={round}
+                          refreshKey={refreshKey}
                           selected={selected.includes(item.id)}
                           onSelect={(on) =>
-                            setSelected((prev) =>
+                            setCheckedIds((prev) =>
                               on ? [...prev, item.id] : prev.filter((id) => id !== item.id),
                             )
                           }
@@ -313,7 +321,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
           </Card>
           {importing ? (
             <ImportHeldDialog
-              holdings={holdings.data ?? []}
+              holdings={holdings}
               watchedKeys={watchedKeys}
               onClose={() => setImporting(false)}
               onDone={importDone}
@@ -340,7 +348,12 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               </p>
             </Dialog>
           ) : null}
-          <AlertHistory key={round} watchItems={items} kinds={kinds.data} focusKey={focusKey} />
+          <AlertHistory
+            refreshKey={refreshKey}
+            watchItems={items}
+            kinds={kinds.data}
+            focusKey={focusKey}
+          />
         </div>
       </div>
     </>

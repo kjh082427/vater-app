@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useEvent } from '../../api/services';
-import { useResource } from '../../api/useResource';
+import { useReloadOn, useResource } from '../../api/useResource';
 import type { AlertEvent, AlertKindInfo, WatchItem } from '../../api/types';
 import { Card, DataTable, type Column } from '../../design-system';
 import { navigate } from '../../app/router';
@@ -33,13 +33,16 @@ export interface AlertHistoryProps {
   kinds: AlertKindInfo[] | undefined;
   /** 종목 주소(#/symbols/...)로 열었으면 그 종목. 사용자가 고르기 전까지 필터가 따라간다. */
   focusKey: string | null;
+  /** 화면의 [새로고침] 신호. 바뀌면 이력을 다시 받는다. */
+  refreshKey?: number;
 }
 
 /** 알림 이력(GET /alerts/events + SSE alert.fired), 종목·종류 필터. 행을 누르면 그 종목으로. */
-export function AlertHistory({ watchItems, kinds, focusKey }: AlertHistoryProps) {
+export function AlertHistory({ watchItems, kinds, focusKey, refreshKey }: AlertHistoryProps) {
   const events = useResource<AlertEvent[]>(`/alerts/events?limit=${LIMIT}`, (api) =>
     api.request<AlertEvent[]>('/alerts/events', { query: { limit: LIMIT } }),
   );
+  useReloadOn(refreshKey, events.reload);
   useEvent('alert.fired', (fired) =>
     events.mutate((list) => [fired, ...(list ?? []).filter((e) => e.id !== fired.id)]),
   );

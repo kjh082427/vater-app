@@ -15,17 +15,23 @@ export function useAreaSize(): [RefObject<HTMLDivElement>, Size] {
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const read = () => {
-      // clientWidth는 반올림이라(868.5 → 869) 캔버스가 상자보다 0.5px 커져 스크롤바가 생겼다 사라지기를
-      // 되풀이할 수 있다(배율 125%·150%, v0.2.2 22-1). 실제 상자를 내림하고 스크롤바 두께만 뺀다.
-      const box = node.getBoundingClientRect();
-      const w = Math.floor(box.width) - (node.offsetWidth - node.clientWidth);
-      const h = Math.floor(box.height) - (node.offsetHeight - node.clientHeight);
+    // clientWidth는 반올림이라(853.6 → 854) 캔버스가 상자보다 커져 스크롤바가 생겼다 사라지기를
+    // 되풀이할 수 있다(배율 125%·150%, v0.2.2 22-1). 소수점 안쪽 크기 하나를 내림하고, 어떤 경우에도
+    // clientWidth보다 크지 않게 한다. 안쪽 크기는 ResizeObserver의 contentRect(스크롤바·테두리 제외,
+    // 이 영역은 padding이 없다), 처음 한 번은 바깥 상자에서 테두리·스크롤바 몫을 뺀 값이다.
+    const read = (inner?: { width: number; height: number }) => {
+      const outer = inner ? null : node.getBoundingClientRect();
+      const box = inner ?? {
+        width: (outer?.width ?? 0) - (node.offsetWidth - node.clientWidth),
+        height: (outer?.height ?? 0) - (node.offsetHeight - node.clientHeight),
+      };
+      const w = Math.min(Math.floor(box.width), node.clientWidth);
+      const h = Math.min(Math.floor(box.height), node.clientHeight);
       if (w > 0 && h > 0) setSize((s) => (s.w === w && s.h === h ? s : { w, h }));
     };
     read();
     if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(read);
+    const observer = new ResizeObserver((entries) => read(entries[0]?.contentRect));
     observer.observe(node);
     return () => observer.disconnect();
   }, []);

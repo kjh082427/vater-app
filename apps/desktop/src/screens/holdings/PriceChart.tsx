@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useResource } from '../../api/useResource';
+import { useReloadOn, useResource } from '../../api/useResource';
 import type { Bar } from '../../api/types';
 import { formatPrice, LineChart, SegmentedControl } from '../../design-system';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
@@ -20,14 +20,17 @@ export interface PriceChartProps {
   name: string;
   /** 보유 중이면 내 평단가(점선). 보유하지 않으면 없다. */
   avgPrice: number | null;
+  /** 화면의 [새로고침] 신호. 바뀌면 일봉을 다시 받는다(고른 기간은 그대로). */
+  refreshKey?: number;
 }
 
 /** 일봉 종가 선 그래프(스펙 4-4). 선 색은 기간 처음과 끝의 방향, 보유 중이면 평단가를 점선으로 긋는다. */
-export function PriceChart({ market, code, name, avgPrice }: PriceChartProps) {
+export function PriceChart({ market, code, name, avgPrice, refreshKey }: PriceChartProps) {
   const [range, setRange] = useState<Range>('3m');
   const bars = useResource<Bar[]>(`/symbols/${market}/${code}/bars?range=${range}`, (api) =>
     api.request<Bar[]>(`/symbols/${market}/${code}/bars`, { query: { range } }),
   );
+  useReloadOn(refreshKey, bars.reload);
   const currency = currencyOf(market);
   const data = bars.data;
   const first = data?.[0]?.close;

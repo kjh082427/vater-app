@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -114,6 +114,51 @@ describe('영역 재기(v0.2.2 22-1 흔들림)', () => {
       expect(canvas?.style.height).toBe('676px');
     } finally {
       spies.forEach((s) => s.mockRestore());
+    }
+  });
+});
+
+describe('영역 재기: 스크롤바가 있을 때', () => {
+  it('ResizeObserver의 소수점 내용 크기를 내림하고, clientWidth(반올림)를 넘지 않는다', () => {
+    // 상자 868.6px, 세로 스크롤바 15px → 안쪽 853.6px. clientWidth는 854로 올림된다
+    let notify: ((entries: ResizeObserverEntry[]) => void) | null = null;
+    class FakeObserver {
+      constructor(cb: (entries: ResizeObserverEntry[]) => void) {
+        notify = cb;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeObserver);
+    const spies = [
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(854),
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600),
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(869),
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600),
+      vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue({ width: 868.6, height: 600 } as DOMRect),
+    ];
+    try {
+      render(
+        <SplitLayout
+          root={templateRoot('cols-2')}
+          mins={[PANEL_MINS.kpi, PANEL_MINS.kpi]}
+          gap={GAP}
+          renderPanel={() => null}
+        />,
+      );
+      act(() =>
+        notify?.([
+          { contentRect: { width: 853.6, height: 600 } } as unknown as ResizeObserverEntry,
+        ]),
+      );
+      const canvas = document.querySelector<HTMLElement>('[data-panel="0"]')?.parentElement;
+      expect(canvas?.style.width).toBe('853px');
+      expect(canvas?.style.height).toBe('600px');
+    } finally {
+      spies.forEach((s) => s.mockRestore());
+      vi.unstubAllGlobals();
     }
   });
 });

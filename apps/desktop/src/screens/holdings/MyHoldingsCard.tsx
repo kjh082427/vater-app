@@ -41,6 +41,8 @@ export interface MyHoldingsCardProps {
   rules: AlertRule[];
   onRulesChanged: () => void;
   onRefreshed: () => void;
+  /** 다시 받는 중([새로 고침] 진행 중 표시). */
+  refreshing: boolean;
 }
 
 /** "내 보유" 카드(스펙 4-2, 4-3): 평가금액·손익, 총 수량·평단가, 증권사 막대와 칩, 평단가 알림. */
@@ -53,10 +55,11 @@ export function MyHoldingsCard({
   rules,
   onRulesChanged,
   onRefreshed,
+  refreshing,
 }: MyHoldingsCardProps) {
   const api = useApi();
   const [mode, setMode] = useState<Mode>(readMode);
-  const [busy, setBusy] = useState<'rule' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const currency = currencyOf(market);
   const shares = holdings.brokers;
@@ -75,20 +78,20 @@ export function MyHoldingsCard({
     }
   }
 
-  async function run<T>(what: 'rule', job: () => Promise<T>): Promise<void> {
-    setBusy(what);
+  async function run<T>(job: () => Promise<T>): Promise<void> {
+    setBusy(true);
     setError(null);
     try {
       await job();
     } catch (e) {
       setError(toApiError(e));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
   const toggleRule = (on: boolean) =>
-    run('rule', async () => {
+    run(async () => {
       if (on) {
         await api.request('/alerts/rules', {
           method: 'POST',
@@ -114,7 +117,15 @@ export function MyHoldingsCard({
       headingLevel={3}
       actions={
         // 저장된 보유와 시세만 다시 받는다. 증권사 보유 내역은 [올리기]로만 받는다(v0.2.2 22-9)
-        <Button size="sm" variant="quiet" onClick={onRefreshed}>
+        <Button
+          size="sm"
+          variant="quiet"
+          busy={refreshing}
+          onClick={() => {
+            setError(null);
+            onRefreshed();
+          }}
+        >
           새로 고침
         </Button>
       }
@@ -175,7 +186,7 @@ export function MyHoldingsCard({
           <Toggle
             label="평단가 대비 알림"
             checked={rule !== undefined}
-            disabled={busy === 'rule'}
+            disabled={busy}
             onChange={(on) => void toggleRule(on)}
           />
           <span className={styles.meta}>

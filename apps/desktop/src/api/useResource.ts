@@ -111,3 +111,18 @@ export function useResource<T = unknown>(
     mutate,
   };
 }
+
+/**
+ * 화면의 [새로고침] 신호(누를 때마다 커지는 수)가 바뀌면 reload를 부른다. 처음 그릴 때는 부르지 않는다.
+ * 부품을 다시 그리지(key) 않으므로 고른 기간 같은 화면 상태가 남는다(v0.2.2 22-6).
+ */
+export function useReloadOn(signal: number | undefined, reload: () => void) {
+  const first = useRef(signal);
+  const reloadRef = useRef(reload);
+  useEffect(() => {
+    reloadRef.current = reload;
+  });
+  useEffect(() => {
+    if (signal !== first.current) reloadRef.current();
+  }, [signal]);
+}

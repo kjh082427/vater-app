@@ -195,6 +195,24 @@ describe('내 보유 카드', () => {
     expect(syncs).toEqual([]);
   });
 
+  it('[새로 고침]은 받는 동안 진행 중으로 보인다', async () => {
+    held();
+    view();
+    const c = await card();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.get('*/portfolio/summary', async () => {
+        await gate; // 아무것도 돌려주지 않으면 기본 처리기로 넘어간다
+      }),
+    );
+    const button = within(c).getByRole('button', { name: '새로 고침' });
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+    release();
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'));
+  });
+
   it('평단가 알림은 기본이 꺼짐, 켜면 기본값(−10%)으로 규칙을 만든다', async () => {
     held();
     const posts: unknown[] = [];

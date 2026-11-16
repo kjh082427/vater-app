@@ -1,4 +1,5 @@
 import type { AlertRule, WatchItem } from '../../api/types';
+import { useReloadOn } from '../../api/useResource';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { MyHoldingsCard } from './MyHoldingsCard';
 import { PriceChart } from './PriceChart';
@@ -9,11 +10,14 @@ export interface StockOverviewProps {
   /** 이 종목의 평단가 알림 규칙 전부(꺼 둔 것 포함). */
   rules: AlertRule[];
   onRulesChanged: () => void;
+  /** 화면의 [새로고침] 신호. 바뀌면 그래프와 내 보유를 다시 받는다. */
+  refreshKey?: number;
 }
 
 /** 종목 화면의 주가 그래프와 바로 아래 "내 보유" 카드(스펙 4-2). 보유하지 않으면 그래프만. */
-export function StockOverview({ item, rules, onRulesChanged }: StockOverviewProps) {
+export function StockOverview({ item, rules, onRulesChanged, refreshKey }: StockOverviewProps) {
   const sym = useSymbolValue(item.market, item.code);
+  useReloadOn(refreshKey, sym.reload);
   return (
     <>
       <PriceChart
@@ -21,6 +25,7 @@ export function StockOverview({ item, rules, onRulesChanged }: StockOverviewProp
         code={item.code}
         name={item.name}
         avgPrice={sym.held ? (sym.holdings?.avg_price ?? null) : null}
+        refreshKey={refreshKey}
       />
       {sym.error ? (
         <ApiErrorNotice
@@ -39,6 +44,7 @@ export function StockOverview({ item, rules, onRulesChanged }: StockOverviewProp
           rules={rules}
           onRulesChanged={onRulesChanged}
           onRefreshed={sym.reload}
+          refreshing={sym.loading}
         />
       ) : null}
     </>

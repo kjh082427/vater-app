@@ -185,15 +185,11 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
     setBusy(true);
     setError(null);
     try {
-      const target = (r: (typeof rows)[number]) => ({
-        market: r.market as 'KR' | 'US',
-        code: r.code,
-      });
       const result = await api.request<WatchResult>('/holdings/watch', {
         method: 'POST',
         body: {
-          items: selected.map(target),
-          seen: selectable.filter((r) => !checked.has(r.key)).map(target),
+          items: watchTargets(selected),
+          seen: watchTargets(selectable.filter((r) => !checked.has(r.key))),
           ...(rule && selected.length > 0 ? { rule } : {}),
         },
       });
@@ -303,6 +299,11 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
       </div>
     </Dialog>
   );
+}
+
+/** POST /holdings/watch의 items·seen 한 줄: market·code만 보낸다(수량·평단가·증권사는 넣지 않는다). */
+export function watchTargets(rows: UploadRow[]): { market: 'KR' | 'US'; code: string }[] {
+  return rows.map((r) => ({ market: r.market as 'KR' | 'US', code: r.code }));
 }
 
 /**

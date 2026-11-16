@@ -33,8 +33,8 @@ export interface WatchPanelProps {
   onRulesChanged: () => void;
   onRuleUpdated: (rule: AlertRule) => void;
   onRemoved: () => void;
-  /** [새로고침] 횟수: 바뀌면 그래프·내 보유를 다시 받는다. */
-  round: number;
+  /** 화면의 [새로고침] 신호: 바뀌면 그래프·내 보유를 다시 받는다. */
+  refreshKey: number;
   /** 한꺼번에 빼기 체크(v0.2.2 22-3). */
   selected: boolean;
   onSelect: (on: boolean) => void;
@@ -156,7 +156,7 @@ export function WatchPanel({
   onRulesChanged,
   onRuleUpdated,
   onRemoved,
-  round,
+  refreshKey,
   selected,
   onSelect,
 }: WatchPanelProps) {
@@ -229,7 +229,7 @@ export function WatchPanel({
       {expanded ? (
         <div id={panelId} role="region" aria-labelledby={buttonId} className={styles.panel}>
           <StockOverview
-            key={round}
+            refreshKey={refreshKey}
             item={item}
             rules={rules.filter((r) => r.kind === 'avg_price_pct')}
             onRulesChanged={onRulesChanged}
