@@ -11,7 +11,7 @@ import type {
   WatchItem,
   WatchResult,
 } from '../../api/types';
-import { Banner, Button, Card } from '../../design-system';
+import { Banner, Button, Card, Dialog } from '../../design-system';
 import { navigate } from '../../app/router';
 import { ApiErrorNotice } from '../common/ApiErrorNotice';
 import { marketLabel } from '../common/quotes';
@@ -46,6 +46,11 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
   const [addError, setAddError] = useState<ApiError | null>(null);
+  // 한꺼번에 빼기(v0.2.2 22-3): 일괄 API가 없어 DELETE /watchlist/{id}를 차례로 부른다
+  const [selected, setSelected] = useState<number[]>([]);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkFailed, setBulkFailed] = useState<{ name: string; error: ApiError }[]>([]);
 
   const focusKey = focus ? symbolKey(focus) : null;
   const items = watch.data;
@@ -102,7 +107,34 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     holdings.reload();
   }
 
+  async function removeSelected() {
+    setBulkBusy(true);
+    const targets = (items ?? []).filter((w) => selected.includes(w.id));
+    const done: number[] = [];
+    const failed: { name: string; error: ApiError }[] = [];
+    for (const w of targets) {
+      try {
+        await api.request(`/watchlist/${w.id}`, { method: 'DELETE' });
+        done.push(w.id);
+      } catch (e) {
+        failed.push({ name: w.name, error: toApiError(e) });
+      }
+    }
+    watch.mutate((list) => list?.filter((w) => !done.includes(w.id)));
+    rules.mutate((list) => list?.filter((r) => !done.includes(r.watchlist_id)));
+    setSelected((prev) => prev.filter((id) => !done.includes(id)));
+    setBulkFailed(failed);
+    setBulkBusy(false);
+    setConfirmBulk(false);
+    if (focus && targets.some((w) => done.includes(w.id) && symbolKey(w) === focusKey)) {
+      navigate({ name: 'alerts' });
+    }
+  }
+
+  const selectedRules = (rules.data ?? []).filter((r) => selected.includes(r.watchlist_id)).length;
+
   function removed(item: WatchItem) {
+    setSelected((prev) => prev.filter((id) => id !== item.id));
     watch.mutate((list) => list?.filter((w) => w.id !== item.id));
     rules.mutate((list) => list?.filter((r) => r.watchlist_id !== item.id));
     navigate({ name: 'alerts' });
@@ -174,6 +206,17 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               />
             ) : null}
             {!adding && addError ? <ApiErrorNotice error={addError} /> : null}
+            {selected.length > 0 ? (
+              <div className={styles.addBar}>
+                <span className={common.meta}>{`${selected.length}종목 선택`}</span>
+                <Button onClick={() => setConfirmBulk(true)}>선택한 종목 빼기</Button>
+              </div>
+            ) : null}
+            {bulkFailed.length > 0 ? (
+              <Banner tone="caution" title={`${bulkFailed.length}종목은 빼지 못했습니다.`}>
+                {bulkFailed.map((f) => `${f.name}: ${f.error.message}`).join(' ')}
+              </Banner>
+            ) : null}
             {watch.error ? (
               <ApiErrorNotice
                 error={watch.error}
@@ -240,6 +283,12 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                             rules.mutate((list) => list?.map((r) => (r.id === rule.id ? rule : r)))
                           }
                           onRemoved={() => removed(item)}
+                          selected={selected.includes(item.id)}
+                          onSelect={(on) =>
+                            setSelected((prev) =>
+                              on ? [...prev, item.id] : prev.filter((id) => id !== item.id),
+                            )
+                          }
                         />
                       );
                     })}
@@ -272,6 +321,27 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               onClose={() => setUploading(null)}
               onUploaded={uploadDone}
             />
+          ) : null}
+          {confirmBulk ? (
+            <Dialog
+              open
+              title={`감시 종목 ${selected.length}개를 뺄까요?`}
+              onClose={() => setConfirmBulk(false)}
+              footer={
+                <>
+                  <Button onClick={() => setConfirmBulk(false)}>취소</Button>
+                  <Button variant="primary" busy={bulkBusy} onClick={() => void removeSelected()}>
+                    빼기
+                  </Button>
+                </>
+              }
+            >
+              <p className={common.meta}>
+                {selectedRules > 0
+                  ? `알림 규칙 ${selectedRules}개도 함께 지워집니다.`
+                  : '보유 내역은 그대로 둡니다.'}
+              </p>
+            </Dialog>
           ) : null}
           <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
         </div>

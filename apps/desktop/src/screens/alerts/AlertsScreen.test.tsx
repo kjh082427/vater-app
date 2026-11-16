@@ -233,6 +233,68 @@ describe('감시 종목 추가·삭제', () => {
   });
 });
 
+describe('감시 종목 한꺼번에 빼기(v0.2.2 22-3)', () => {
+  const pick = (name: string) =>
+    userEvent.click(within(watchSection()).getByRole('checkbox', { name: `${name} 선택` }));
+
+  it('체크한 종목 수를 보이고, 확인 창에서 빼면 규칙도 함께 지운다', async () => {
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    expect(within(watchSection()).queryByText(/종목 선택$/)).not.toBeInTheDocument();
+    await pick('삼성전자');
+    await pick('SK하이닉스');
+    expect(within(watchSection()).getByText('2종목 선택')).toBeInTheDocument();
+    await userEvent.click(within(watchSection()).getByRole('button', { name: '선택한 종목 빼기' }));
+    const dialog = await screen.findByRole('dialog', { name: '감시 종목 2개를 뺄까요?' });
+    expect(dialog).toHaveTextContent('알림 규칙 3개도 함께 지워집니다.');
+    await userEvent.click(within(dialog).getByRole('button', { name: '빼기' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mock.db.watchItems.map((w) => w.name)).toEqual(['애플']);
+    expect(within(watchSection()).queryByRole('button', { name: /^삼성전자/ })).toBeNull();
+    expect(within(watchSection()).queryByText(/종목 선택$/)).not.toBeInTheDocument();
+  });
+
+  it('취소하면 그대로', async () => {
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    await pick('애플');
+    await userEvent.click(within(watchSection()).getByRole('button', { name: '선택한 종목 빼기' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: '취소' }),
+    );
+    expect(mock.db.watchItems).toHaveLength(3);
+    expect(within(watchSection()).getByText('1종목 선택')).toBeInTheDocument();
+  });
+
+  it('일부가 실패하면 뺀 것은 빼고, 실패한 종목과 이유를 보인다', async () => {
+    server.use(
+      http.delete('*/watchlist/2', () =>
+        errorResponse(
+          503,
+          'DB_UNAVAILABLE',
+          '저장소가 준비되지 않았습니다.',
+          '앱을 다시 시작해 주세요.',
+        ),
+      ),
+    );
+    renderAlerts();
+    await within(watchSection()).findByRole('button', { name: /^삼성전자/ });
+    await pick('삼성전자');
+    await pick('SK하이닉스');
+    await userEvent.click(within(watchSection()).getByRole('button', { name: '선택한 종목 빼기' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: '빼기' }),
+    );
+    const failed = await within(watchSection()).findByText('1종목은 빼지 못했습니다.');
+    expect(failed.closest('[role="status"]')).toHaveTextContent(
+      'SK하이닉스: 저장소가 준비되지 않았습니다.',
+    );
+    expect(mock.db.watchItems.map((w) => w.name)).toEqual(['SK하이닉스', '애플']);
+    // 실패한 종목은 체크가 남아 다시 시도할 수 있다
+    expect(within(watchSection()).getByText('1종목 선택')).toBeInTheDocument();
+  });
+});
+
 describe('규칙 편집기', () => {
   async function openEditor(hash = '#/symbols/KR/000660', name = 'SK하이닉스') {
     renderAlerts(hash);
