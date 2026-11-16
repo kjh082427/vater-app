@@ -18,7 +18,7 @@ import { Field } from '../common/Field';
 import form from '../common/form.module.css';
 import { SelectField } from '../common/SelectField';
 import styles from './holdings.module.css';
-import { holdingKey, newSymbolCount, uploadRows } from './model';
+import { holdingKey, newSymbolCount, uploadRows, type UploadRow } from './model';
 
 /** 목표가 규칙은 종목마다 값이 달라 일괄 적용에서 뺀다(스펙 6장). */
 const NO_BULK = new Set(['price_above', 'price_below']);
@@ -145,13 +145,6 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
           maxRealtime: Number(settings['kis.ws_max_subscriptions'] ?? 41),
           pollSec: Number(settings['alerts.poll_interval_sec'] ?? 30),
         });
-        setChecked(
-          new Set(
-            uploadRows(mine, watched)
-              .filter((r) => r.supported && !r.watched)
-              .map((r) => r.key),
-          ),
-        );
       } catch (e) {
         if (alive) setError(toApiError(e));
       }
@@ -192,15 +185,11 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
     setBusy(true);
     setError(null);
     try {
-      const target = (r: (typeof rows)[number]) => ({
-        market: r.market as 'KR' | 'US',
-        code: r.code,
-      });
       const result = await api.request<WatchResult>('/holdings/watch', {
         method: 'POST',
         body: {
-          items: selected.map(target),
-          seen: selectable.filter((r) => !checked.has(r.key)).map(target),
+          items: watchTargets(selected),
+          seen: watchTargets(selectable.filter((r) => !checked.has(r.key))),
           ...(rule && selected.length > 0 ? { rule } : {}),
         },
       });
@@ -211,13 +200,6 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
     }
   }
 
-  const toggle = (key: string, on: boolean) =>
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(key);
-      else next.delete(key);
-      return next;
-    });
   const realtime = kind?.timing === 'realtime';
 
   return (
@@ -257,50 +239,7 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
           <p className={styles.empty}>올릴 보유 종목이 없습니다.</p>
         ) : null}
         {loaded && rows.length > 0 ? (
-          <>
-            <div className={styles.pickHead}>
-              <label className={form.choice}>
-                <input
-                  type="checkbox"
-                  aria-label="전체 선택"
-                  disabled={selectable.length === 0}
-                  checked={selectable.length > 0 && selected.length === selectable.length}
-                  onChange={(e) =>
-                    setChecked(e.target.checked ? new Set(selectable.map((r) => r.key)) : new Set())
-                  }
-                />
-                <span aria-hidden="true">전체 선택</span>
-              </label>
-              <span className="vt-num">{`${selected.length}종목 선택`}</span>
-            </div>
-            <ul className={styles.pick} aria-label="보유 종목">
-              {rows.map((r) => {
-                const off = !r.supported || r.watched;
-                const state = !r.supported
-                  ? (r.reason ?? '지원하지 않는 종목')
-                  : r.watched
-                    ? '이미 감시 중'
-                    : r.isNew
-                      ? '새 종목'
-                      : '';
-                return (
-                  <li key={r.key} className={styles.pickRow}>
-                    <label className={`${styles.pickLabel} ${off ? styles.pickDisabled : ''}`}>
-                      <input
-                        type="checkbox"
-                        disabled={off}
-                        checked={!off && checked.has(r.key)}
-                        onChange={(e) => toggle(r.key, e.target.checked)}
-                      />
-                      <b>{r.name}</b>
-                      <span className="vt-num">{r.code}</span>
-                    </label>
-                    <span className={styles.pickState}>{state}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
+          <PickList rows={rows} checked={checked} onChange={setChecked} />
         ) : null}
         {loaded && rows.length > 0 && kinds ? (
           <>
@@ -359,6 +298,78 @@ export function UploadDialog({ brokerId, brokers, kinds, onClose, onUploaded }: 
         {error ? <ApiErrorNotice error={error} title="올리지 못했습니다" /> : null}
       </div>
     </Dialog>
+  );
+}
+
+/** POST /holdings/watch의 items·seen 한 줄: market·code만 보낸다(수량·평단가·증권사는 넣지 않는다). */
+export function watchTargets(rows: UploadRow[]): { market: 'KR' | 'US'; code: string }[] {
+  return rows.map((r) => ({ market: r.market as 'KR' | 'US', code: r.code }));
+}
+
+/**
+ * 종목 체크 목록: 위에 [모두 선택]·[모두 해제]와 선택 수. 처음 체크는 부르는 쪽이 정한다(v0.2.2 22-4는 모두 해제).
+ * 감시 중이거나 지원하지 않는 종목은 체크할 수 없다. 올리기 창과 [보유 종목에서 불러오기] 창이 같이 쓴다.
+ */
+export function PickList({
+  rows,
+  checked,
+  onChange,
+}: {
+  rows: UploadRow[];
+  checked: ReadonlySet<string>;
+  onChange: (next: ReadonlySet<string>) => void;
+}) {
+  const selectable = rows.filter((r) => r.supported && !r.watched);
+  const count = selectable.filter((r) => checked.has(r.key)).length;
+  const toggle = (key: string, on: boolean) => {
+    const next = new Set(checked);
+    if (on) next.add(key);
+    else next.delete(key);
+    onChange(next);
+  };
+  return (
+    <>
+      <div className={styles.pickHead}>
+        <Button
+          size="sm"
+          disabled={selectable.length === 0}
+          onClick={() => onChange(new Set(selectable.map((r) => r.key)))}
+        >
+          모두 선택
+        </Button>
+        <Button size="sm" disabled={count === 0} onClick={() => onChange(new Set())}>
+          모두 해제
+        </Button>
+        <span className="vt-num">{`${count}종목 선택`}</span>
+      </div>
+      <ul className={styles.pick} aria-label="보유 종목">
+        {rows.map((r) => {
+          const off = !r.supported || r.watched;
+          const state = !r.supported
+            ? (r.reason ?? '지원하지 않는 종목')
+            : r.watched
+              ? '이미 감시 중'
+              : r.isNew
+                ? '새 종목'
+                : '';
+          return (
+            <li key={r.key} className={styles.pickRow}>
+              <label className={`${styles.pickLabel} ${off ? styles.pickDisabled : ''}`}>
+                <input
+                  type="checkbox"
+                  disabled={off}
+                  checked={!off && checked.has(r.key)}
+                  onChange={(e) => toggle(r.key, e.target.checked)}
+                />
+                <b>{r.name}</b>
+                <span className="vt-num">{r.code}</span>
+              </label>
+              <span className={styles.pickState}>{state}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 

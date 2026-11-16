@@ -22,7 +22,7 @@ npm ci
 npm run dev                 # http://localhost:5173
 ```
 
-- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`, `?six=1`(6칸 탭), `?broken=1`(깨진 대시보드 문서), `?brokers=1`(흉내 증권사 서버: 키움·메리츠를 연결하면 보유 종목이 들어오고 시세·일봉·자산 추이 예시가 있다)
+- **견본 자료로 보기**: `http://localhost:5173/mock.html#/home` (사이드카 없이 MSW 처리기). 쿼리로 상황을 고른다: `?empty=1`, `?offline=1`, `?stream=down`, `?nokey=1`, `?running=1`, `?six=1`(6칸 탭), `?broken=1`(깨진 대시보드 문서), `?brokers=1`(흉내 증권사 서버: 키움·메리츠를 연결하고 [올리기]를 누르면 보유 종목이 들어오고 시세·일봉·자산 추이 예시가 있다)
 - **실제 사이드카와**: 사이드카를 `VATER_DEV=1`로 띄우고(`sidecar/README.md`), 출력된 포트와 토큰을 넘긴다. 개발 모드 사이드카는 `http://localhost:5173` 출처만 CORS로 허용한다.
   ```bash
   VITE_SIDECAR_URL=http://127.0.0.1:<포트> VITE_SIDECAR_TOKEN=<토큰> npm run dev
@@ -52,10 +52,18 @@ npm run e2e:holdings # v2 보유 흐름(견본 자료, 사이드카 없이): 아
 - 화면 캡처: `VATER_SHOTS=1 npm run e2e -- shots` → `docs/design/screens/shots/`(로컬 `design-preview/화면/`에도 복사)
 - CI에는 아직 넣지 않았다(Ubuntu 러너에 uv·사이드카 의존성과 Chromium이 필요)
 
+### v0.2.2 화면 (스펙 22장)
+
+- 보유 내역은 [올리기](`POST /holdings/sync`)로만 받는다. 설정의 보유 수량 주기는 없고, 내 보유 카드의 [새로 고침]과 보유 종목·감시·알림 오른쪽 위 [새로고침]은 저장된 자료와 시세만 다시 받는다(그 화면의 `useResource`를 모두 `reload`).
+- 올리기 창은 처음에 모두 해제이고 위에 [모두 선택]·[모두 해제]가 있다. 목록·체크 부분(`PickList`, `UploadDialog.tsx`)은 감시·알림의 [보유 종목에서 불러오기] 창(`alerts/ImportHeldDialog.tsx`)과 같이 쓴다. 이 창은 저장된 보유(`GET /holdings`) 가운데 감시 중이 아닌 종목만 보이고, 체크한 것만 규칙 없이 `POST /holdings/watch`로 넣는다(체크하지 않은 것은 `seen`).
+- 감시 종목은 체크해서 한꺼번에 뺀다. 일괄 API가 없어 `DELETE /watchlist/{id}`를 차례로 부르고, 실패한 종목은 이름과 이유를 보이며 체크를 남긴다.
+- 분석 창의 보유 종목 고르기는 한국·미국 두 묶음이다.
+- 홈 칸 배치 영역은 `getBoundingClientRect()`를 내림해 잰다(`clientWidth`는 반올림이라 배율 125%·150%에서 캔버스가 상자보다 0.5px 커질 수 있었다).
+
 ### v0.2.1 화면 (스펙 21장)
 
 - 분석 이력 지우기: 목록은 `POST /analyses/delete`(여러 건), 상세는 `DELETE /analyses/{id}`. 확인 창을 거치고 대기·진행 중은 막는다. SSE `analysis.deleted`가 오면 목록과 대시보드 칸에서 빼고, 지워진 분석의 주소·칸은 "지워진 분석입니다"를 보인다.
-- 왼쪽 메뉴 "보유 종목"(`#/holdings`): 증권사 연결과 보유 내역 올리기는 여기서 한다. [보유 종목 직접 추가](직접 입력·CSV)는 이 탭과 감시·알림 두 곳에 있다(API가 없는 증권사 수량 등록용). 감시·알림의 첫 동작은 [종목 검색으로 추가]이고, 감시 종목은 보유 중/보유하지 않음 두 묶음으로 나누며 보유 종목에는 "보유"와 증권사 색 점 칩을 붙인다(화면 전용, AI로 보내지 않는다). 등락은 감시 중인 종목만 시세가 있어 그 종목만 보인다(`/portfolio/summary`에 전일 대비가 없다).
+- 왼쪽 메뉴 "보유 종목"(`#/holdings`): 증권사 연결과 보유 내역 올리기는 여기서 한다. [보유 종목 직접 추가](직접 입력·CSV)는 이 탭에만 있다(API가 없는 증권사 수량 등록용, v0.2.2에서 감시·알림에서 뺌). 감시·알림의 첫 동작은 [종목 검색으로 추가]이고, 감시 종목은 보유 중/보유하지 않음 두 묶음으로 나누며 보유 종목에는 "보유"와 증권사 색 점 칩을 붙인다(화면 전용, AI로 보내지 않는다). 등락은 감시 중인 종목만 시세가 있어 그 종목만 보인다(`/portfolio/summary`에 전일 대비가 없다).
 - 분석 창의 "보유 종목에서 고르기"는 `screens/holdings/HeldSymbolChoices.tsx` 하나가 맡고, 고른 종목의 market·code·name만 넘긴다. `src/privacy.test.ts`가 분석 화면의 보유 모듈 가져오기를 이 부품 하나로 제한한다.
 - 보유 내역 직접 입력 뒤 감시 중이 아닌 종목이면 "감시 종목에도 추가할까요?"를 묻는다.
 - 브리핑 상세: `interpret_error`의 이유(분석 화면 20장과 같은 문구)와 [AI 해석 다시 만들기](`POST /briefings/{id}/interpret`). 진행·결과는 SSE `briefing.status`.
@@ -90,7 +98,7 @@ impeccable 검출기(2026-11-03): 소스 0건, 화면 12개(1280×800)·8개(102
 **v2 보유 화면 (`ui/holdings`)이 사이드카에 바라는 것**
 
 - (해결) 실제 사이드카와 가짜 증권사 서버 흐름은 `e2e:acceptance`의 `v2.accept.ts`가 돈다. 확인 판은 환경 변수 없이 모듈 값(`brokers.kiwoom.BASE_URL`, `meritz.BASE_URL`, 한투 `REST_HOST`)을 프로세스 안에서 바꾼다(설치본에 주소를 바꾸는 우회로를 두지 않으려고 사이드카는 고치지 않았다).
-- 연결 상태가 `lost`로 바뀌거나 보유 수량이 갱신되어도 SSE 이벤트가 없다. 화면은 화면을 옮길 때 `/connections`를 다시 받고, 평가(`/portfolio/summary`)는 주가 주기마다 다시 받는다.
+- 연결 상태가 `lost`로 바뀌어도 SSE 이벤트가 없다. 보유 수량은 [올리기]를 누를 때만 바뀐다. 화면은 화면을 옮길 때 `/connections`를 다시 받고, 평가(`/portfolio/summary`)는 주가 주기마다 다시 받는다.
 - `GET /portfolio/summary`의 `at`을 "시세 시각"으로 쓴다. 종목별 시세 시각이 따로 오지 않는다.
 - 브리핑 `my_assets`에는 `missing_prices`가 없어 어느 종목이 합계에서 빠졌는지 알 수 없다(통화 하나가 불완전하면 그 통화의 변화는 null). 대시보드 칸과 숫자 카드는 `/portfolio/summary`의 `missing_prices`로 알린다.
 - `GET /alerts/kinds`에 `avg_price_pct`의 이름·방향 문구가 없어 화면이 `screens/alerts/kinds.ts`에 옮겨 적었다.

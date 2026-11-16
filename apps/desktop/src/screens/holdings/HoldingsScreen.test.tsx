@@ -1,9 +1,9 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { connection, holding } from '../../test/holdings';
 import { renderWithServices } from '../../test/render';
-import { mock } from '../../test/server';
+import { mock, server } from '../../test/server';
 import { HoldingsScreen } from './HoldingsScreen';
 
 /** 삼성전자는 한투·메리츠에 나눠 보유(감시 중, 등락 있음), NAVER는 감시하지 않는 종목. */
@@ -91,5 +91,34 @@ describe('보유 종목 화면', () => {
     ];
     renderWithServices(<HoldingsScreen />);
     expect(await screen.findByText(/지원하지 않는 1종목/)).toBeInTheDocument();
+  });
+});
+
+describe('[새로고침](v0.2.2 22-6)', () => {
+  it('오른쪽 위 [새로고침]은 이 화면의 자료를 모두 다시 받고, 증권사(/holdings/sync)는 부르지 않는다', async () => {
+    setup();
+    renderWithServices(<HoldingsScreen />);
+    await screen.findAllByText('삼성전자');
+    const gets: string[] = [];
+    const posts: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      (request.method === 'GET' ? gets : posts).push(path);
+    });
+    await userEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    await waitFor(() =>
+      expect(new Set(gets)).toEqual(
+        new Set([
+          '/brokers',
+          '/connections',
+          '/holdings',
+          '/portfolio/summary',
+          '/watchlist/quotes',
+          '/watchlist',
+          '/alerts/kinds',
+        ]),
+      ),
+    );
+    expect(posts).toEqual([]);
   });
 });

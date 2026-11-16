@@ -108,10 +108,10 @@ const QUOTE_LABEL: Record<number, string> = {
   1800: '30분',
   3600: '1시간',
 };
-const HOLDINGS_MINUTES = [0, 10, 30, 60] as const;
-const HOLDINGS_LABEL: Record<number, string> = { 0: '끔', 10: '10분', 30: '30분', 60: '1시간' };
-
-/** 갱신 주기(스펙 3장): 주가(기본 10분)와 보유 수량(기본 끔). 둘 다 장이 열린 시간에만 돈다. */
+/**
+ * 주가 갱신 주기(스펙 3장, 기본 10분). 장이 열린 시간에만 돈다.
+ * 보유 수량은 주기 조회가 없다: [올리기]를 누를 때만 받는다(v0.2.2 22-9).
+ */
 function RefreshSettings({
   settings,
   save,
@@ -121,7 +121,6 @@ function RefreshSettings({
 }) {
   if (!settings) return null;
   const quotes = Number(settings['quotes.refresh_sec'] ?? 600);
-  const holdings = Number(settings['holdings.sync_minutes'] ?? 0);
   return (
     <>
       <SelectField
@@ -132,16 +131,6 @@ function RefreshSettings({
         options={QUOTE_SECONDS.map((n) => ({
           value: String(n),
           label: QUOTE_LABEL[n] ?? `${n}초`,
-        }))}
-      />
-      <SelectField
-        label="보유 수량 갱신 주기"
-        hint="앱을 켤 때 한 번과 [새로 고침]은 늘 합니다. 주기 조회는 장이 열린 시간에만 합니다. 자산 추이를 위해 하루 한 번은 끔이어도 조회합니다."
-        value={String(holdings)}
-        onChange={(v) => void save({ 'holdings.sync_minutes': Number(v) })}
-        options={HOLDINGS_MINUTES.map((n) => ({
-          value: String(n),
-          label: HOLDINGS_LABEL[n] ?? `${n}분`,
         }))}
       />
     </>

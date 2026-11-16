@@ -405,8 +405,8 @@ export function holdingsHandlers(db: Db) {
         db.connections = db.connections.filter((c) => c.id !== body.replaces);
         db.holdings = db.holdings.filter((h) => h.connection_id !== body.replaces);
       }
+      // 연결해도 보유 내역은 받지 않는다: [올리기](POST /holdings/sync)로만 받는다(v0.2.2 22-9)
       db.connections.push(made);
-      pull(db, made);
       return HttpResponse.json(made, { status: 201 });
     }),
     http.delete('*/connections/:id', ({ params, request }) => {

@@ -178,7 +178,7 @@ describe('내 보유 카드', () => {
     expect(screen.queryByRole('region', { name: '내 보유' })).not.toBeInTheDocument();
   });
 
-  it('[새로 고침]은 보유를 다시 받고 값을 다시 그린다', async () => {
+  it('[새로 고침]은 저장된 보유와 시세를 다시 받고, 증권사(/holdings/sync)는 부르지 않는다(v0.2.2 22-9)', async () => {
     held();
     const syncs: unknown[] = [];
     server.events.on('request:start', async ({ request }) => {
@@ -192,7 +192,25 @@ describe('내 보유 카드', () => {
     mock.db.prices['KR:005930'] = 72000;
     await userEvent.click(within(c).getByRole('button', { name: '새로 고침' }));
     expect(await within(c).findByText('1,080,000원')).toBeInTheDocument();
-    expect(syncs).toEqual([{}]);
+    expect(syncs).toEqual([]);
+  });
+
+  it('[새로 고침]은 받는 동안 진행 중으로 보인다', async () => {
+    held();
+    view();
+    const c = await card();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.get('*/portfolio/summary', async () => {
+        await gate; // 아무것도 돌려주지 않으면 기본 처리기로 넘어간다
+      }),
+    );
+    const button = within(c).getByRole('button', { name: '새로 고침' });
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+    release();
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-busy'));
   });
 
   it('평단가 알림은 기본이 꺼짐, 켜면 기본값(−10%)으로 규칙을 만든다', async () => {

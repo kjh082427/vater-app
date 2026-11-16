@@ -10,7 +10,7 @@
  *   ?running=1     실행 중인 분석(#/analyses/40)과 진행 이벤트
  *   ?six=1         홈에 6칸 대시보드 탭("6칸")을 더한다
  *   ?broken=1      저장된 대시보드 문서가 깨짐(기본 배치 + 배너)
- *   ?brokers=1     흉내 증권사 서버: 키움·메리츠를 연결하면 보유 종목이 들어오고, 시세·일봉·자산 추이 예시가 있다
+ *   ?brokers=1     흉내 증권사 서버: 키움·메리츠를 연결하고 [올리기]를 누르면 보유 종목이 들어오고, 시세·일봉·자산 추이 예시가 있다
  */
 import { getResponse, type RequestHandler } from 'msw';
 import { StrictMode } from 'react';
@@ -73,7 +73,7 @@ if (params.get('six') === '1') {
   };
 }
 if (params.get('brokers') === '1') {
-  // 흉내 증권사 서버(실제 증권사는 부르지 않는다): 연결하면 아래 보유가 그 증권사의 내역이 된다
+  // 흉내 증권사 서버(실제 증권사는 부르지 않는다): 연결하고 [올리기]를 누르면 아래 보유가 그 증권사의 내역이 된다
   db.fakeBroker = {
     kiwoom: [
       { market: 'KR', code: '005930', quantity: '10', avg_price: 64000 },

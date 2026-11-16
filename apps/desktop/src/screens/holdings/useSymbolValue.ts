@@ -15,6 +15,7 @@ export function useSymbolValue(market: string, code: string) {
     at: summary.data?.at,
     held,
     error: holdings.error ?? summary.error,
+    loading: holdings.loading || summary.loading,
     reload: () => {
       holdings.reload();
       summary.reload();

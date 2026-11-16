@@ -1,6 +1,6 @@
 /**
  * v2 보유 흐름(흉내 증권사 서버): 연결 → 업로드 → 내 보유 → 해제.
- * mock.html?brokers=1: 키움·메리츠를 연결하면 정해 둔 보유 종목이 들어온다. 실제 증권사·AI는 부르지 않고,
+ * mock.html?brokers=1: 키움·메리츠를 연결하고 [올리기]를 누르면 정해 둔 보유 종목이 들어온다(v0.2.2 22-9). 실제 증권사·AI는 부르지 않고,
  * 키는 가짜 값만 넣는다. 화면 캡처는 VATER_SHOTS_DIR을 줄 때만(1280×800, 1024×600, 1280×720=1080p 배율 1.5).
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -66,15 +66,17 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
       location.hash = '#/holdings';
     });
     await expect(page.getByRole('button', { name: '연결한 증권사 모두' })).toBeVisible();
-    // NAVER, 엔비디아(삼성전자는 이미 감시 중)
-    await expect(page.getByText('새 종목 2개')).toBeVisible();
+    // 연결만으로는 보유 내역을 받지 않는다: [올리기]를 눌러야 받는다(v0.2.2 22-9)
+    await expect(page.getByText(/새 종목/)).toHaveCount(0);
     await page.getByRole('button', { name: '연결한 증권사 모두' }).click();
     const dialog = page.getByRole('dialog', { name: /보유 종목 올리기/ });
-    await expect(dialog.getByRole('checkbox', { name: /NAVER/ })).toBeChecked();
+    // 처음에는 모두 해제(v0.2.2 22-4)
+    await expect(dialog.getByRole('checkbox', { name: /NAVER/ })).not.toBeChecked();
     await expect(dialog.getByRole('checkbox', { name: /삼성전자/ })).toBeDisabled();
     await expect(dialog.getByText('이미 감시 중')).toBeVisible();
     await expect(dialog.getByText('감시 종목은 브리핑 작성 때 AI로 전송됩니다.')).toBeVisible();
     await shoot(page, 'upload-dialog');
+    await dialog.getByRole('button', { name: '모두 선택' }).click();
     await dialog.getByRole('checkbox', { name: /엔비디아/ }).uncheck();
     await dialog.getByRole('button', { name: /감시 종목에 올리기/ }).click();
     await expect(page.getByText(/1종목을 감시 종목에 올렸습니다/)).toBeVisible();
@@ -148,6 +150,14 @@ test('연결 → 업로드 → 내 보유 → 해제', async ({ page }) => {
 test('대시보드 칸: 내 보유 종목과 자산 추이, 총 평가금액', async ({ page }) => {
   await page.goto('/mock.html?brokers=1#/settings');
   await connectKey(page, '키움');
+  // 보유 내역은 [올리기]로만 받는다(v0.2.2 22-9)
+  await page.evaluate(() => {
+    location.hash = '#/holdings';
+  });
+  await page.getByRole('button', { name: '키움' }).click();
+  const upload = page.getByRole('dialog', { name: /보유 종목 올리기/ });
+  await upload.getByRole('button', { name: '확인만 하기' }).click();
+  await expect(upload).toHaveCount(0);
   await page.evaluate(() => {
     location.hash = '#/home';
   });
