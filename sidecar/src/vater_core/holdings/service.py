@@ -274,8 +274,9 @@ class HoldingsService:
             # 예외 문구에 키가 있을 수 있고, 키를 지웠으니 마스킹도 못 한다. 종류만 남긴다
             logger.warning("broker test crashed: %s %s", broker_id, type(e).__name__)
             raise bad_broker_response() from None
-        if old is not None:  # 올려 둔 수량은 새 연결로 옮긴다. 증권사에서 다시 받지 않는다(22-9)
-            self.repo.move_holdings(old.id, conn.id)
+        if old is not None:
+            # 옛 연결의 수량은 지운다. 다른 계좌·서버일 수 있어 옮기지 않고 다시 받지도 않는다.
+            # 사용자가 [올리기]를 누르면 새 연결로 받는다(22-9)
             self._forget_secrets(old.id)
             self.repo.remove_connection(old.id)
         return conn
@@ -304,7 +305,7 @@ class HoldingsService:
             if any(c.status == "ok" for c in mine):
                 raise VaterError(
                     "BROKER_CONNECTED",
-                    "연결 중인 증권사의 내역은 다음 갱신 때 다시 채워집니다.",
+                    "연결 중인 증권사의 내역은 [올리기]로 다시 받을 수 있습니다.",
                     "연결을 먼저 해제해 주세요.",
                     status=409,
                 )
@@ -339,7 +340,7 @@ class HoldingsService:
             raise VaterError(
                 "HOLDING_INVALID",
                 "API로 연결된 증권사는 직접 입력할 수 없습니다.",
-                "연결된 증권사의 보유 내역은 [새로 고침]으로 갱신됩니다.",
+                "연결된 증권사의 보유 내역은 [올리기]로 받습니다.",
                 status=422,
             )
 
@@ -365,7 +366,7 @@ class HoldingsService:
                 raise _unknown_broker(conn.broker_id)
             rows = await factory(self._context(conn)).holdings()
             self.repo.replace_api(conn.id, rows, _now())
-        except Exception as e:  # 응답 형식이 깨져도 다른 연결과 주기 조회는 계속된다
+        except Exception as e:  # 응답 형식이 깨져도 다른 연결은 계속 받는다
             err = e if isinstance(e, VaterError) else bad_broker_response()
             # 일시 오류로 "연결 끊김"이 풀리지 않게 상태는 인증 실패 때만 바꾼다
             self.repo.set_status(
@@ -377,16 +378,13 @@ class HoldingsService:
             return SyncResult(conn.id, conn.broker_id, False, err)
         return SyncResult(conn.id, conn.broker_id, True)
 
-    async def sync(
-        self, broker_id: str | None = None, *, skip_lost: bool = False
-    ) -> list[SyncResult]:
-        """`skip_lost`는 자동 조회용이다. 끊긴 연결은 사용자가 고칠 때까지 부르지 않는다."""
+    async def sync(self, broker_id: str | None = None) -> list[SyncResult]:
+        """[올리기]: 증권사에서 보유 내역을 받는다. 앱이 스스로 부르는 곳은 없다(22-9)."""
         async with self._lock:
-            skipped = {"disconnected", "lost"} if skip_lost else {"disconnected"}
             targets = [
                 c
                 for c in self.repo.connections()
-                if c.status not in skipped and (broker_id is None or c.broker_id == broker_id)
+                if c.status != "disconnected" and (broker_id is None or c.broker_id == broker_id)
             ]
             results = list(await asyncio.gather(*(self._sync_one(c) for c in targets)))
         if results:

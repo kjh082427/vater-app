@@ -138,7 +138,8 @@ test('V11 0.1.0 DB 올리기: 감시 종목·규칙·이력·분석·브리핑·
     expect(settings['alerts.poll_interval_sec']).toBe(10);
     expect(settings['briefing.kr.enabled']).toBe(false);
     // v2 설정은 기본값으로 생긴다
-    expect([settings['quotes.refresh_sec'], settings['holdings.sync_minutes']]).toEqual([600, 0]);
+    expect(settings['quotes.refresh_sec']).toBe(600);
+    expect(settings).not.toHaveProperty('holdings.sync_minutes'); // v0.2.2 22-9에서 없앴다
 
     // 4) 화면: 직접 만든 탭이 그대로 보이고, 감시 종목과 이력이 보인다
     await stack.setup();

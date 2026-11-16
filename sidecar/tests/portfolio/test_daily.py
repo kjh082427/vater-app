@@ -43,8 +43,8 @@ class FakeSync:
         self.rig = rig
         self.calls: list[bool] = []
 
-    async def sync(self, broker_id: str | None = None, *, skip_lost: bool = False) -> list[Any]:
-        self.calls.append(skip_lost)
+    async def sync(self, broker_id: str | None = None) -> list[Any]:
+        self.calls.append(True)
         self.rig.rows_at_sync.append(self.rig.repo.last_day(self.rig.at.date()))
         return []
 
@@ -164,7 +164,7 @@ async def test_rerun_is_idempotent_even_after_restart(rig: Rig) -> None:
 
 
 async def test_records_without_asking_the_broker(rig: Rig) -> None:
-    async def broken(broker_id: str | None = None, *, skip_lost: bool = False) -> list[Any]:
+    async def broken(broker_id: str | None = None) -> list[Any]:
         raise RuntimeError("broker down")
 
     rig.sync.sync = broken  # type: ignore[method-assign]

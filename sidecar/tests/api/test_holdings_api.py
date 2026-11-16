@@ -364,14 +364,24 @@ async def test_periodic_holdings_setting_is_gone(client: httpx.AsyncClient) -> N
 
 
 def test_only_the_upload_route_asks_brokers_for_holdings() -> None:
-    """증권사 보유 조회(sync)는 [올리기] API에서만 부른다(앱 시작·주기·자산 추이 기록 금지)."""
+    """증권사 보유 조회는 [올리기] API에서만 부른다(앱 시작·주기·자산 추이 기록 금지, 22-9)."""
     root = Path(holdings_service.__file__).parents[1]
-    callers = sorted(
-        str(p.relative_to(root))
-        for p in root.rglob("*.py")
-        if re.search(r"get_holdings\([^)]*\)\.sync\(|self\.sync\(", p.read_text(encoding="utf-8"))
-    )
-    assert callers == ["api/routes/holdings.py"]
+
+    def files(pattern: str) -> list[str]:
+        return sorted(
+            str(p.relative_to(root))
+            for p in root.rglob("*.py")
+            if re.search(pattern, p.read_text(encoding="utf-8"))
+        )
+
+    assert files(r"\.sync\(") == ["api/routes/holdings.py"]
+    # 어댑터의 보유 조회는 서비스의 [올리기] 처리와 각 어댑터의 연결 시험에서만 부른다
+    assert files(r"\.holdings\(\)") == [
+        "brokers/kis.py",
+        "brokers/kiwoom.py",
+        "brokers/meritz.py",
+        "holdings/service.py",
+    ]
 
 
 # ---- 연결 해제 (v2 설계 1-1장) ------------------------------------------------
@@ -533,10 +543,11 @@ async def test_reconnecting_the_same_account_replaces_kept_rows(
     fakes["kiwoom"].rows = [sam("12")]
     new = await connect(client, replaces=c["id"])  # [다시 연결]
     got = (await client.get("/holdings/symbol/KR/005930")).json()
-    # 다시 연결해도 증권사에서 받지 않는다. 올려 둔 수량을 새 연결로 옮긴다(22-9)
-    assert got["total"] == "10" and got["brokers"][0]["stale"] is False
+    # 다시 연결해도 증권사에서 받지 않는다. 옛 수량은 다른 계좌일 수 있어 지운다(22-9)
+    assert got["brokers"] == []
     await client.post("/holdings/sync", json={})
-    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "12"
+    got = (await client.get("/holdings/symbol/KR/005930")).json()
+    assert got["total"] == "12" and got["brokers"][0]["stale"] is False
     ids = [x["id"] for x in (await client.get("/connections")).json()]
     assert ids == [new["id"]]
 
@@ -661,7 +672,8 @@ async def test_reconnecting_a_lost_connection_replaces_it_and_its_keys(
     fakes["kiwoom"].sync_error = None
     new = await connect(client, replaces=c["id"])
     assert [x["id"] for x in (await client.get("/connections")).json()] == [new["id"]]
-    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "10"
+    # 옛 행은 다른 계좌 것일 수 있어 옮기지 않고 지운다(다시 [올리기])
+    assert (await client.get("/holdings")).json() == []
     assert deps.secrets is not None
     assert deps.secrets.get(broker_secret(c["id"], "APP_KEY")) is None
 
@@ -862,19 +874,6 @@ async def test_real_and_mock_kis_connections_cannot_be_mixed(
     assert r.status_code == 409 and r.json()["code"] == "BROKER_SERVER_MISMATCH"
     await client.delete(f"/connections/{first['id']}", params={"delete_data": "true"})
     assert (await client.post("/connections", json=body)).status_code == 201
-
-
-async def test_periodic_and_startup_syncs_leave_lost_connections_alone(
-    client: httpx.AsyncClient, fakes: dict[str, Fake], deps: AppDeps
-) -> None:
-    """끊긴 연결을 자동으로 계속 부르면 한투는 부를 때마다 토큰을 새로 발급한다."""
-    await connect(client)
-    fakes["kiwoom"].sync_error = AUTH
-    await client.post("/holdings/sync", json={})
-    made = len(fakes["kiwoom"].contexts)
-    assert await holdings_service.get_holdings(deps).sync(skip_lost=True) == []
-    assert len(fakes["kiwoom"].contexts) == made
-    assert len((await client.post("/holdings/sync", json={})).json()) == 1  # [새로 고침]은 시도한다
 
 
 async def test_negative_quantity_fails_instead_of_counting_as_sold(
