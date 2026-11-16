@@ -88,6 +88,36 @@ describe('SplitLayout', () => {
   });
 });
 
+describe('영역 재기(v0.2.2 22-1 흔들림)', () => {
+  it('소수점 크기(배율 125%·150%)에서도 캔버스가 실제 상자보다 크지 않다', () => {
+    // clientWidth·clientHeight는 반올림(868.5 → 869)이라 그대로 쓰면 0.5px 넘쳐 스크롤바가 생겼다 사라지기를 되풀이할 수 있다
+    const spies = [
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(869),
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(677),
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(869),
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(677),
+      vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue({ width: 868.5, height: 676.6 } as DOMRect),
+    ];
+    try {
+      render(
+        <SplitLayout
+          root={templateRoot('cols-2')}
+          mins={[PANEL_MINS.kpi, PANEL_MINS.kpi]}
+          gap={GAP}
+          renderPanel={() => null}
+        />,
+      );
+      const canvas = document.querySelector<HTMLElement>('[data-panel="0"]')?.parentElement;
+      expect(canvas?.style.width).toBe('868px');
+      expect(canvas?.style.height).toBe('676px');
+    } finally {
+      spies.forEach((s) => s.mockRestore());
+    }
+  });
+});
+
 describe('편집 캔버스(fitToArea)', () => {
   it('최소 합보다 작아도 영역에 맞춰 그린다(스크롤 없음)', () => {
     const small = { w: 500, h: 150 };

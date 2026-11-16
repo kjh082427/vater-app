@@ -16,8 +16,11 @@ export function useAreaSize(): [RefObject<HTMLDivElement>, Size] {
     const node = ref.current;
     if (!node) return;
     const read = () => {
-      const w = node.clientWidth;
-      const h = node.clientHeight;
+      // clientWidth는 반올림이라(868.5 → 869) 캔버스가 상자보다 0.5px 커져 스크롤바가 생겼다 사라지기를
+      // 되풀이할 수 있다(배율 125%·150%, v0.2.2 22-1). 실제 상자를 내림하고 스크롤바 두께만 뺀다.
+      const box = node.getBoundingClientRect();
+      const w = Math.floor(box.width) - (node.offsetWidth - node.clientWidth);
+      const h = Math.floor(box.height) - (node.offsetHeight - node.clientHeight);
       if (w > 0 && h > 0) setSize((s) => (s.w === w && s.h === h ? s : { w, h }));
     };
     read();
