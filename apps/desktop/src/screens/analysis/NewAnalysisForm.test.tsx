@@ -145,11 +145,34 @@ describe('분석 창에서 보유 종목 고르기(v0.2.1 21장 3번)', () => {
     setupHeld();
     renderForm();
     const form = await formEl();
-    const list = await within(form).findByRole('list', { name: '보유 종목에서 고르기' });
+    const list = await within(form).findByRole('list', { name: '보유 종목에서 고르기: 한국' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    // 미국 종목이 없으면 미국 묶음은 없다
+    expect(within(form).queryByRole('list', { name: /미국/ })).not.toBeInTheDocument();
     expect(within(form).getByRole('list', { name: '감시 종목에서 고르기' })).toBeInTheDocument();
     // 목록에는 이름과 코드만 보인다(수량·평단가·증권사 없음)
     expect(list).not.toHaveTextContent(/주|평단|\d{2,3},\d{3}|한국투자|메리츠|15|7주/);
+  });
+
+  it('보유 종목을 한국·미국 두 묶음으로 나눈다(v0.2.2 22-2)', async () => {
+    setupHeld();
+    mock.db.holdings.push(
+      holding({ market: 'US', code: 'AAPL', name: 'Apple', quantity: '3', avg_price: 150 }),
+    );
+    renderForm();
+    const form = await formEl();
+    const kr = await within(form).findByRole('list', { name: '보유 종목에서 고르기: 한국' });
+    const us = within(form).getByRole('list', { name: '보유 종목에서 고르기: 미국' });
+    expect(
+      within(kr)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['삼성전자005930', 'NAVER035420']);
+    expect(
+      within(us)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['AppleAAPL']);
   });
 
   it('보유 종목을 누르면 검색 없이 선택되고, 요청 본문에는 그 종목 하나만 들어간다', async () => {

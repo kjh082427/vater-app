@@ -18,24 +18,36 @@ export function HeldSymbolChoices({ onPick }: { onPick: (symbol: Picked) => void
     seen.set(`${h.market}:${h.code}`, { market: h.market, code: h.code, name: h.name });
   }
   if (seen.size === 0) return null;
+  // 한국·미국 두 묶음(v0.2.2 22-2). 종목이 없는 묶음은 그리지 않는다
+  const groups = (['KR', 'US'] as const)
+    .map((market) => ({
+      label: market === 'KR' ? '한국' : '미국',
+      list: [...seen].filter(([, s]) => s.market === market),
+    }))
+    .filter((g) => g.list.length > 0);
   return (
     <div className={styles.heldPick}>
       <span className={form.legend}>보유 종목에서 고르기</span>
-      <ul className={styles.heldChoices} aria-label="보유 종목에서 고르기">
-        {[...seen].map(([key, s]) => (
-          <li key={key}>
-            <button
-              type="button"
-              className={styles.heldChoice}
-              aria-label={`보유 종목 ${s.name}`}
-              onClick={() => onPick({ market: s.market, code: s.code, name: s.name })}
-            >
-              <b>{s.name}</b>
-              <span className="vt-num">{s.code}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {groups.map((g) => (
+        <div key={g.label} className={styles.heldGroup}>
+          <span className={styles.heldGroupLabel}>{g.label}</span>
+          <ul className={styles.heldChoices} aria-label={`보유 종목에서 고르기: ${g.label}`}>
+            {g.list.map(([key, s]) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  className={styles.heldChoice}
+                  aria-label={`보유 종목 ${s.name}`}
+                  onClick={() => onPick({ market: s.market, code: s.code, name: s.name })}
+                >
+                  <b>{s.name}</b>
+                  <span className="vt-num">{s.code}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

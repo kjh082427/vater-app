@@ -281,6 +281,16 @@
   gap: var(--space-1-5);
 }
 
+.heldGroup {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.heldGroupLabel {
+  color: var(--color-ink-3);
+  font-size: var(--text-xs);
+}
+
 .heldChoices {
   display: flex;
   flex-wrap: wrap;
