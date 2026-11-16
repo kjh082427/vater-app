@@ -26,7 +26,6 @@ concurrency:
 
 env:
   RUST_TOOLCHAIN: "1.99.1"
-  TAURI_CLI: "@tauri-apps/cli@2.12.3"
   RELEASES_REPO: kjh082427/vater-releases
 
 jobs:
@@ -76,8 +75,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: apps/desktop/package-lock.json
       - name: npm ci
         working-directory: apps/desktop
         run: npm ci
@@ -85,9 +82,6 @@ jobs:
         run: |
           rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
           rustup default $env:RUST_TOOLCHAIN
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: apps/desktop/src-tauri
 
       - name: Tauri build (서명)
         if: steps.meta.outputs.publish == 'true'
@@ -95,11 +89,11 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx --yes $env:TAURI_CLI build --bundles nsis --config src-tauri/packaging/release.tauri.conf.json -- --locked
+        run: npx --no-install tauri build --bundles nsis --config src-tauri/packaging/release.tauri.conf.json -- --locked
       - name: Tauri build (서명 없음)
         if: steps.meta.outputs.publish != 'true'
         working-directory: apps/desktop
-        run: npx --yes $env:TAURI_CLI build --bundles nsis -- --locked
+        run: npx --no-install tauri build --bundles nsis -- --locked
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
