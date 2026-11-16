@@ -32,7 +32,7 @@ from vater_core.alerts.store import BarRepo, WatchItem
 from vater_core.analysis.symbols import resolve_target
 from vater_core.api.deps import AppDeps
 from vater_core.api.errors import VaterError
-from vater_core.holdings.service import get_holdings, summarize
+from vater_core.holdings.service import summarize
 from vater_core.kis.quotes import is_domestic_trading_day
 from vater_core.kis.services import require_kis
 from vater_core.market.fx import FxRepo, fetch_usdkrw_range
@@ -253,7 +253,6 @@ class DailyRecorder:
         self._refresh = refresh or self._kis_refresh
         self._fetch_fx = fetch_fx or self._kis_fx
         self._now = now
-        self._synced: tuple[date, bool] | None = None
         self._retry_at: datetime | None = None
         self._task: asyncio.Task[None] | None = None
 
@@ -318,17 +317,6 @@ class DailyRecorder:
         return days
 
     # ---- 값 -----------------------------------------------------------------
-
-    async def _sync_once(self, today: date, recording_today: bool) -> None:
-        """자동 조회이므로 끊긴 연결은 부르지 않는다. 실패하면 마지막 수량으로 기록한다."""
-        key = (today, recording_today)
-        if self._synced == key:
-            return
-        self._synced = key
-        try:
-            await get_holdings(self._deps).sync(skip_lost=True)
-        except Exception as e:
-            logger.warning("daily: holdings sync failed: %s", type(e).__name__)
 
     async def _refresh_closes(
         self, positions: dict[MarketId, list[Position]], through: dict[MarketId, date | None]
@@ -427,8 +415,6 @@ class DailyRecorder:
         retry_days = repo.incomplete(retry_since, today) if retry_due else []
         if not new_days and not retry_days:
             return
-        if new_days:
-            await self._sync_once(today, today in new_days)
         # ponytail: 지난 날짜에도 지금 수량을 쓴다(스펙 12장). 거래 내역이 생기면 그날 수량으로
         positions = held(self._db)
         if not positions and last is None:
