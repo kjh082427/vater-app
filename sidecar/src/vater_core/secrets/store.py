@@ -1,6 +1,7 @@
 """비밀키 저장소 구현. 값은 DB·로그·응답에 절대 나가지 않는다."""
 
 import contextlib
+import json
 import os
 import tempfile
 from collections.abc import Mapping
@@ -33,6 +34,21 @@ def _check_value(value: str) -> None:
 
 def _is_fixed(name: str) -> bool:
     return name in SecretName.__members__.values()
+
+
+def _masked_forms(name: str, value: str) -> list[str]:
+    """저장된 값 그대로와, 로그에 다른 모양으로 나올 수 있는 조각도 함께 가린다."""
+    forms = [value]
+    try:  # 접근 토큰·승인키 캐시는 JSON이라 안의 값만 따로 로그에 찍힐 수 있다
+        data = json.loads(value)
+    except ValueError:
+        data = None
+    if isinstance(data, dict):
+        forms += [v for k, v in data.items() if k != "server" and isinstance(v, str)]
+    if name.endswith("_ACCOUNT"):  # 12345678-01 -> 1234567801, CANO(앞 8자리) 12345678
+        digits = "".join(c for c in value if c.isdigit())
+        forms += [digits, digits[:8]]
+    return forms
 
 
 class _IndexedStore:
@@ -76,7 +92,12 @@ class _IndexedStore:
 
     def known_values(self) -> list[str]:
         names: list[str] = [n.value for n in SecretName] + self._dynamic_names()
-        return [v for n in names if (v := self.get(n))]
+        out: dict[str, None] = {}  # 순서를 지키며 중복 제거
+        for n in names:
+            if v := self.get(n):
+                for x in _masked_forms(n, v):
+                    out[x] = None
+        return list(out)
 
 
 class KeyringSecretStore(_IndexedStore):

@@ -11,6 +11,7 @@ from vater_core.analysis.symbols import resolve_target
 from vater_core.api.deps import AppDeps, get_deps
 from vater_core.api.errors import ErrorBody, VaterError
 from vater_core.holdings.csv_import import (
+    MAX_BYTES,
     ColumnGuess,
     build_rows,
     csv_invalid,
@@ -393,7 +394,12 @@ async def csv_preview(
         raise VaterError("DB_UNAVAILABLE", "저장소가 준비되지 않았습니다.", status=503)
     service = get_holdings(deps)
     service.ensure_manual_allowed(broker_id)
-    columns, table = parse_table(decode_csv(await request.body()))
+    body = bytearray()
+    async for chunk in request.stream():  # 끝까지 메모리에 올리기 전에 상한에서 끊는다
+        body += chunk
+        if len(body) > MAX_BYTES:
+            raise csv_invalid("파일이 너무 큽니다.", "2MB 이하의 파일을 올려 주세요.")
+    columns, table = parse_table(decode_csv(bytes(body)))
     auto = guess_columns(columns)
     guess = ColumnGuess(
         name_col or auto.name,

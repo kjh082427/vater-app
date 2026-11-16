@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
 EVENT = "llm.install"
 PROGRESS_STEP = 1024 * 1024  # 다운로드 진행 이벤트는 1MB마다 1번
-SIGNER = "Ollama"
+# 서명자(CN) 정확히 일치만 허용한다. 앞부분만 같은 이름("Ollama Evil Ltd")은 거부.
+SIGNERS = frozenset({"Ollama Inc.", "Ollama, Inc."})
 
 SignatureCheck = Callable[[Path], bool]
 
@@ -82,7 +83,7 @@ def verify_authenticode(
         logger.warning("installer signature check could not run", exc_info=True)
         return False
     cn = signer_common_name(str(info.get("Subject", "")))
-    ok = info.get("Status") == "Valid" and cn is not None and cn.startswith(SIGNER)
+    ok = info.get("Status") == "Valid" and cn is not None and cn in SIGNERS
     if not ok:
         logger.warning("installer signature rejected: status=%s cn=%s", info.get("Status"), cn)
     return ok

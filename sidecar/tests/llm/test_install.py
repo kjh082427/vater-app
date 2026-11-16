@@ -75,6 +75,7 @@ def test_verify_uses_system_powershell_by_absolute_path(tmp_path: Path) -> None:
         ("Valid", 'CN="Ollama, Inc.", O="Ollama, Inc.", C=US', True),
         ("Valid", "CN=Evil Corp, O=Ollama Fans Ltd, C=US", False),  # 서명자(CN)가 아니면 안 된다
         ("Valid", "CN=Evil Corp, OU=Ollama", False),
+        ("Valid", "CN=Ollama Evil Ltd, O=Ollama Evil Ltd", False),  # 앞부분만 같은 서명자
         ("NotSigned", "CN=Ollama Inc.", False),
         ("HashMismatch", "CN=Ollama Inc.", False),
     ],

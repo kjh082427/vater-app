@@ -6,7 +6,13 @@ import httpx
 import pytest
 
 from vater_core.api.deps import AppDeps
-from vater_core.holdings.csv_import import MAX_ROWS, decode_csv, guess_columns, parse_table
+from vater_core.holdings.csv_import import (
+    MAX_BYTES,
+    MAX_ROWS,
+    decode_csv,
+    guess_columns,
+    parse_table,
+)
 
 
 def seed(deps: AppDeps) -> None:
@@ -137,7 +143,7 @@ async def test_duplicate_symbol_in_file_is_flagged(
 
 
 async def test_too_large_or_garbage_is_refused(client: httpx.AsyncClient) -> None:
-    r = await preview(client, b"a" * (2 * 1024 * 1024 + 1))
+    r = await preview(client, b"a" * (MAX_BYTES + 1))
     assert r.status_code == 422 and r.json()["code"] == "CSV_INVALID"
     r = await preview(client, b"\xff\xfe\x00\x00\xff" * 10)
     assert r.status_code == 422 and r.json()["code"] == "CSV_INVALID"
