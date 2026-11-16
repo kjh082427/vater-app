@@ -21,8 +21,8 @@ import common from '../common/screen.module.css';
 import { symbolKey, SymbolSearch } from '../common/SymbolSearch';
 import { AlertHistory } from './AlertHistory';
 import styles from './alerts.module.css';
-import { ManualDialog } from '../holdings/ManualForm';
-import { uploadMessage, UploadDialog } from '../holdings/UploadDialog';
+import { uploadMessage } from '../holdings/UploadDialog';
+import { ImportHeldDialog } from './ImportHeldDialog';
 import { WatchPanel, type HeldBroker } from './WatchPanel';
 
 export interface AlertsScreenProps {
@@ -39,9 +39,8 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   // 보유 여부와 증권사는 화면 표시에만 쓴다(AI로는 보내지 않는다, 스펙 8-1)
   const holdings = useResource<HoldingOut[]>('/holdings');
   const brokers = useResource<BrokerOut[]>('/brokers');
-  // [보유 종목 직접 추가]는 이 화면에도 둔다(스펙 21-2, 사용자 정정). CSV를 넣으면 올리기 창을 잇는다
-  const [manual, setManual] = useState(false);
-  const [uploading, setUploading] = useState<string | null>(null);
+  // [보유 종목 직접 추가]는 보유 종목 탭에만 둔다(v0.2.2 22-5). 여기서는 올린 보유 종목을 불러오기만 한다
+  const [importing, setImporting] = useState(false);
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
@@ -99,12 +98,10 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     }
   }
 
-  function uploadDone(result: WatchResult) {
-    setUploading(null);
+  function importDone(result: WatchResult) {
+    setImporting(false);
     setUploaded(uploadMessage(result));
     watch.reload();
-    rules.reload();
-    holdings.reload();
   }
 
   async function removeSelected() {
@@ -156,7 +153,14 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               <Button variant="primary" onClick={() => setAdding(true)}>
                 종목 검색으로 추가
               </Button>
-              <Button onClick={() => setManual(true)}>보유 종목 직접 추가</Button>
+              <Button
+                onClick={() => {
+                  setUploaded(null);
+                  setImporting(true);
+                }}
+              >
+                보유 종목에서 불러오기
+              </Button>
               <span className={common.meta}>
                 증권사 연결과 올리기는 <a href="#/holdings">보유 종목</a> 탭에서 합니다.
               </span>
@@ -297,29 +301,12 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               ) : null,
             )}
           </Card>
-          {manual ? (
-            <ManualDialog
-              onClose={() => setManual(false)}
-              onChanged={() => {
-                holdings.reload();
-                watch.reload();
-              }}
-              onCsvDone={(brokerId) => {
-                setManual(false);
-                holdings.reload();
-                brokers.reload();
-                setUploaded(null);
-                setUploading(brokerId);
-              }}
-            />
-          ) : null}
-          {uploading ? (
-            <UploadDialog
-              brokerId={uploading}
-              brokers={brokers.data ?? []}
-              kinds={kinds.data}
-              onClose={() => setUploading(null)}
-              onUploaded={uploadDone}
+          {importing ? (
+            <ImportHeldDialog
+              holdings={holdings.data ?? []}
+              watchedKeys={watchedKeys}
+              onClose={() => setImporting(false)}
+              onDone={importDone}
             />
           ) : null}
           {confirmBulk ? (
