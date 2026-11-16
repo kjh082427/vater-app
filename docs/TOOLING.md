@@ -32,6 +32,10 @@
 | 2026-11-03 | Rust (CI) | 1.99.1 (+ clippy) | Windows 러너 (`rustup toolchain install`) | `desktop.yml`의 clippy·test·Tauri 빌드 | 로컬과 같은 버전으로 고정 |
 | 2026-11-03 | `tauri-plugin-updater` | 2.14.0 (2026-10-14 배포) | `apps/desktop/src-tauri/Cargo.toml`(`=` 고정) | 앱 자동 업데이트 | `infra/release`. 2.14.1은 2026-10-28 배포라 2주 기준에 못 미쳐 쓰지 않음. 간접 의존성 openssl-probe 0.2.1, webpki-root-certs 1.0.10으로 맞춤. rustls-webpki 0.103.16은 2026-10-20 배포(딱 2주, 보안 민감) |
 | 2026-11-06 | SEC EDGAR 공개 자료 (`company_tickers.json`, `submissions/CIK*.json`의 `sic`) | 설치 없음, 요청 때마다 최신 | 개발 때만 `sidecar/tools/build_categories.py`가 받음 (앱은 부르지 않음). 받은 값은 저장소 밖 폴더에 쌓음 | 미국 종목의 SIC 코드 → 분류표 | `SEC_USER_AGENT` 환경 변수(루트 `.env`)로 요청자 표시, 초당 10회 이하. 이용 조건(2026-11-06 확인): https://www.sec.gov/about/privacy-information 의 Website Dissemination에서 "may be copied or further distributed ... without the SEC's permission", 출처 표기 권장, SEC 로고·상표 사용 금지. 한도: https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data. 거래소(KRX)·WICS·GICS 자료는 쓰지 않음 |
+| 2026-11-16 | `pip-audit` (`uvx`로 실행) | 최신(CI는 실행 때마다) | 설치하지 않음. `ci.yml`의 sidecar 작업 | `uv.lock`에서 내보낸 의존성의 알려진 취약점 검사 | `infra/security`. git 의존성 tradingagents는 PyPI가 아니라 제외. 무시: CVE-2026-126190(soupsieve 3.0.4, 고칠 4.x가 배포 2주 미만) |
+| 2026-11-16 | `npm audit` | npm 내장 | `ci.yml`의 desktop-ui 작업 | 배포되는 의존성(`--omit=dev`)의 high 이상 취약점 검사 | `infra/security`. 처음 돌렸을 때 취약점 0건 |
+| 2026-11-16 | `cargo-audit` | 0.23.0 (로컬 `cargo install --locked`, CI는 매번 설치) | `~/.cargo/bin`, `desktop.yml` | RustSec DB로 `Cargo.lock` 검사 | `infra/security`. 무시: RUSTSEC-2026-0367/0368/0369/0429(zip 4.6.1, tauri-plugin-updater 2.14.0의 간접 의존성, 고친 버전 9.0 이상). 경고(unmaintained/unsound)는 실패시키지 않음 |
+| 2026-11-16 | 워크플로 `uses:` 커밋 해시 고정 | 버전은 그대로 | `.github/workflows/*.yml` | 액션 태그가 바뀌어도 같은 코드만 실행 | 해시 뒤 주석에 버전을 적음. 올릴 때는 `gh api repos/<소유자>/<저장소>/git/ref/tags/<태그>`로 새 해시를 찾음 |
 
 ## 원래 설치되어 있던 것
 | 도구 | 버전 | 용도 |
