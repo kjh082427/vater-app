@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import re
 from collections.abc import Iterator
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -344,46 +346,32 @@ class _Clock:
         return self.t
 
 
-async def test_periodic_sync_only_when_enabled_and_market_open(
-    deps: AppDeps, fakes: dict[str, Fake]
+async def test_connecting_saves_no_holdings_until_upload(
+    client: httpx.AsyncClient, fakes: dict[str, Fake]
 ) -> None:
-    from vater_core.holdings.service import HoldingsService
-    from vater_core.store.settings import SettingsRepo
-
-    assert deps.db is not None
-    calls: list[str | None] = []
-    is_open = {"v": True}
-    clock = _Clock()
-    service = HoldingsService(deps, is_market_open=lambda: is_open["v"], monotonic=clock)
-
-    async def fake_sync(broker_id: str | None = None, **_: Any) -> list[Any]:
-        calls.append(broker_id)
-        return []
-
-    service.sync = fake_sync  # type: ignore[method-assign]
-    await service.tick_once()
-    assert calls == []  # 기본은 끔
-    SettingsRepo(deps.db).update({"holdings.sync_minutes": 10})
-    await service.tick_once()
-    assert len(calls) == 1
-    clock.t = 300
-    await service.tick_once()
-    assert len(calls) == 1  # 아직 10분이 안 됐다
-    clock.t = 601
-    is_open["v"] = False
-    await service.tick_once()
-    assert len(calls) == 1  # 장이 닫혔다
-    is_open["v"] = True
-    await service.tick_once()
-    assert len(calls) == 2
+    """보유 내역은 사용자가 [올리기]를 누를 때만 받는다(v2 설계 22-9)."""
+    fakes["kiwoom"].rows = [sam("10")]
+    await connect(client)
+    assert (await client.get("/holdings")).json() == []
+    await client.post("/holdings/sync", json={})
+    assert [h["quantity"] for h in (await client.get("/holdings")).json()] == ["10"]
 
 
-async def test_sync_minutes_setting_only_takes_listed_values(client: httpx.AsyncClient) -> None:
-    assert (await client.get("/settings")).json()["holdings.sync_minutes"] == 0
-    ok = await client.patch("/settings", json={"holdings.sync_minutes": 30})
-    assert ok.status_code == 200
-    bad = await client.patch("/settings", json={"holdings.sync_minutes": 5})
-    assert bad.status_code == 422 and bad.json()["code"] == "SETTING_INVALID"
+async def test_periodic_holdings_setting_is_gone(client: httpx.AsyncClient) -> None:
+    assert "holdings.sync_minutes" not in (await client.get("/settings")).json()
+    r = await client.patch("/settings", json={"holdings.sync_minutes": 30})
+    assert r.status_code in (400, 422)
+
+
+def test_only_the_upload_route_asks_brokers_for_holdings() -> None:
+    """증권사 보유 조회(sync)는 [올리기] API에서만 부른다(앱 시작·주기·자산 추이 기록 금지)."""
+    root = Path(holdings_service.__file__).parents[1]
+    callers = sorted(
+        str(p.relative_to(root))
+        for p in root.rglob("*.py")
+        if re.search(r"get_holdings\([^)]*\)\.sync\(|self\.sync\(", p.read_text(encoding="utf-8"))
+    )
+    assert callers == ["api/routes/holdings.py"]
 
 
 # ---- 연결 해제 (v2 설계 1-1장) ------------------------------------------------
@@ -545,7 +533,10 @@ async def test_reconnecting_the_same_account_replaces_kept_rows(
     fakes["kiwoom"].rows = [sam("12")]
     new = await connect(client, replaces=c["id"])  # [다시 연결]
     got = (await client.get("/holdings/symbol/KR/005930")).json()
-    assert got["total"] == "12" and got["brokers"][0]["stale"] is False
+    # 다시 연결해도 증권사에서 받지 않는다. 올려 둔 수량을 새 연결로 옮긴다(22-9)
+    assert got["total"] == "10" and got["brokers"][0]["stale"] is False
+    await client.post("/holdings/sync", json={})
+    assert (await client.get("/holdings/symbol/KR/005930")).json()["total"] == "12"
     ids = [x["id"] for x in (await client.get("/connections")).json()]
     assert ids == [new["id"]]
 
@@ -568,26 +559,6 @@ async def test_unexpected_adapter_error_fails_only_that_connection(
     assert by_id["meritz"]["ok"] is True
     conns = {x["id"]: x for x in (await client.get("/connections")).json()}
     assert conns[bad["id"]]["last_error"] == "BROKER_RESPONSE_INVALID"
-
-
-async def test_startup_sync_failure_keeps_the_periodic_loop_alive(
-    deps: AppDeps, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(holdings_service, "TICK_SEC", 0.0)
-    service = holdings_service.HoldingsService(deps)
-    ticked = asyncio.Event()
-
-    async def boom(broker_id: str | None = None, **_: Any) -> list[Any]:
-        raise RuntimeError("db locked")
-
-    async def tick() -> None:
-        ticked.set()
-
-    monkeypatch.setattr(service, "sync", boom)
-    monkeypatch.setattr(service, "tick_once", tick)
-    service.start()
-    await asyncio.wait_for(ticked.wait(), 1)
-    await service.stop()
 
 
 async def test_failed_connect_never_logs_the_key_in_an_adapter_exception(
@@ -669,7 +640,7 @@ async def test_failed_reconnect_keeps_the_old_connection_and_rows(
     fakes["kiwoom"].rows = [sam("10")]
     await client.post("/holdings/sync", json={})
     await client.delete(f"/connections/{c['id']}", params={"delete_data": "false"})
-    fakes["kiwoom"].sync_error = DOWN
+    fakes["kiwoom"].test_error = DOWN  # 다시 연결은 연결 시험만 한다(보유 내역은 받지 않는다)
     r = await client.post(
         "/connections",
         json={"broker_id": "kiwoom", "app_key": "k", "app_secret": "s", "replaces": c["id"]},

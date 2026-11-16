@@ -194,6 +194,13 @@ class HoldingsRepo:
                 (status, error, conn_id),
             )
 
+    def move_holdings(self, from_id: int, to_id: int) -> None:
+        """[다시 연결]: 옛 연결에 올려 둔 보유 내역을 새 연결로 옮긴다."""
+        with self._conn:
+            self._conn.execute(
+                "UPDATE holdings SET connection_id = ? WHERE connection_id = ?", (to_id, from_id)
+            )
+
     def remove_connection(self, conn_id: int) -> None:
         """연결과 그 보유 내역을 지운다."""
         with self._conn:
