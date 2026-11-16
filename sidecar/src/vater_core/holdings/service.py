@@ -4,13 +4,10 @@
 """
 
 import asyncio
-import contextlib
 import hashlib
 import logging
 import re
 import sqlite3
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -33,12 +30,10 @@ from vater_core.store.holdings import (
     HoldingsRepo,
     bad_broker_response,
 )
-from vater_core.store.settings import SettingsRepo
 
 logger = logging.getLogger(__name__)
 
 AUTH_ERRORS = {"BROKER_AUTH_INVALID", "KIS_AUTH_INVALID"}
-TICK_SEC = 60.0
 _FIELDS: tuple[BrokerSecretField, ...] = ("APP_KEY", "APP_SECRET", "ACCOUNT", "TOKEN")
 _MARKET_CURRENCY = {"KR": "KRW", "US": "USD"}
 
@@ -134,19 +129,9 @@ def avg_price_of(conn: sqlite3.Connection, market: str, code: str) -> float | No
 
 
 class HoldingsService:
-    def __init__(
-        self,
-        deps: AppDeps,
-        *,
-        is_market_open: Callable[[], bool] = lambda: False,
-        monotonic: Callable[[], float] = time.monotonic,
-    ) -> None:
+    def __init__(self, deps: AppDeps) -> None:
         self._deps = deps
-        self._is_market_open = is_market_open
-        self._monotonic = monotonic
         self._lock = asyncio.Lock()
-        self._last_periodic: float | None = None
-        self._task: asyncio.Task[None] | None = None
 
     # ---- 의존성 -----------------------------------------------------------
 
@@ -281,8 +266,6 @@ class HoldingsService:
                 s.set(broker_secret(conn.id, "APP_SECRET"), app_secret.strip())
             adapter = factory(self._context(conn))
             await adapter.test()
-            if old is not None:
-                self.repo.replace_api(conn.id, await adapter.holdings(), _now())
         except BaseException as e:  # 취소돼도 키와 행을 남기지 않는다
             self._forget_secrets(conn.id)
             self.repo.remove_connection(conn.id)
@@ -291,7 +274,9 @@ class HoldingsService:
             # 예외 문구에 키가 있을 수 있고, 키를 지웠으니 마스킹도 못 한다. 종류만 남긴다
             logger.warning("broker test crashed: %s %s", broker_id, type(e).__name__)
             raise bad_broker_response() from None
-        if old is not None:  # 옛 수량을 합계에 두 번 넣지 않는다
+        if old is not None:
+            # 옛 연결의 수량은 지운다. 다른 계좌·서버일 수 있어 옮기지 않고 다시 받지도 않는다.
+            # 사용자가 [올리기]를 누르면 새 연결로 받는다(22-9)
             self._forget_secrets(old.id)
             self.repo.remove_connection(old.id)
         return conn
@@ -320,7 +305,7 @@ class HoldingsService:
             if any(c.status == "ok" for c in mine):
                 raise VaterError(
                     "BROKER_CONNECTED",
-                    "연결 중인 증권사의 내역은 다음 갱신 때 다시 채워집니다.",
+                    "연결 중인 증권사의 내역은 [올리기]로 다시 받을 수 있습니다.",
                     "연결을 먼저 해제해 주세요.",
                     status=409,
                 )
@@ -355,7 +340,7 @@ class HoldingsService:
             raise VaterError(
                 "HOLDING_INVALID",
                 "API로 연결된 증권사는 직접 입력할 수 없습니다.",
-                "연결된 증권사의 보유 내역은 [새로 고침]으로 갱신됩니다.",
+                "연결된 증권사의 보유 내역은 [올리기]로 받습니다.",
                 status=422,
             )
 
@@ -381,7 +366,7 @@ class HoldingsService:
                 raise _unknown_broker(conn.broker_id)
             rows = await factory(self._context(conn)).holdings()
             self.repo.replace_api(conn.id, rows, _now())
-        except Exception as e:  # 응답 형식이 깨져도 다른 연결과 주기 조회는 계속된다
+        except Exception as e:  # 응답 형식이 깨져도 다른 연결은 계속 받는다
             err = e if isinstance(e, VaterError) else bad_broker_response()
             # 일시 오류로 "연결 끊김"이 풀리지 않게 상태는 인증 실패 때만 바꾼다
             self.repo.set_status(
@@ -393,16 +378,13 @@ class HoldingsService:
             return SyncResult(conn.id, conn.broker_id, False, err)
         return SyncResult(conn.id, conn.broker_id, True)
 
-    async def sync(
-        self, broker_id: str | None = None, *, skip_lost: bool = False
-    ) -> list[SyncResult]:
-        """`skip_lost`는 자동 조회용이다. 끊긴 연결은 사용자가 고칠 때까지 부르지 않는다."""
+    async def sync(self, broker_id: str | None = None) -> list[SyncResult]:
+        """[올리기]: 증권사에서 보유 내역을 받는다. 앱이 스스로 부르는 곳은 없다(22-9)."""
         async with self._lock:
-            skipped = {"disconnected", "lost"} if skip_lost else {"disconnected"}
             targets = [
                 c
                 for c in self.repo.connections()
-                if c.status not in skipped and (broker_id is None or c.broker_id == broker_id)
+                if c.status != "disconnected" and (broker_id is None or c.broker_id == broker_id)
             ]
             results = list(await asyncio.gather(*(self._sync_one(c) for c in targets)))
         if results:
@@ -414,51 +396,8 @@ class HoldingsService:
         stale = {c.id for c in repo.connections() if c.status != "ok"}
         return summarize(repo.by_symbol(market, code), repo.brokers(), stale)
 
-    # ---- 주기 조회 --------------------------------------------------------
-
-    async def tick_once(self) -> None:
-        """설정이 켜져 있고 장이 열려 있으면 주기마다 동기화한다."""
-        if self._deps.db is None:
-            return
-        minutes = int(SettingsRepo(self._deps.db).get("holdings.sync_minutes"))
-        if minutes <= 0 or not self._is_market_open():
-            return
-        now = self._monotonic()
-        if self._last_periodic is not None and now - self._last_periodic < minutes * 60:
-            return
-        self._last_periodic = now
-        await self.sync(skip_lost=True)
-
-    async def _run(self) -> None:
-        try:
-            await self.sync(skip_lost=True)  # 앱 시작 때 한 번
-        except Exception:
-            logger.exception("holdings startup sync failed")
-        while True:
-            await asyncio.sleep(TICK_SEC)
-            try:
-                await self.tick_once()
-            except Exception:
-                logger.exception("holdings sync loop failed")
-
-    def start(self) -> None:
-        if self._task is None:
-            self._task = asyncio.create_task(self._run())
-
-    async def stop(self) -> None:
-        task, self._task = self._task, None
-        if task is not None:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-
 
 def get_holdings(deps: AppDeps) -> HoldingsService:
     if deps.holdings is None:
-        from vater_core.alerts.monitor import get_alerts
-
-        def is_open() -> bool:
-            return "open" in get_alerts(deps).status()["markets"].values()
-
-        deps.holdings = HoldingsService(deps, is_market_open=is_open)
+        deps.holdings = HoldingsService(deps)
     return deps.holdings

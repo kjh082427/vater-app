@@ -44,7 +44,6 @@ SETTING_DEFS: dict[str, SettingDef] = {
     "llm.cloud_quick_model": SettingDef(str, ""),
     "llm.output_language": SettingDef(str, "Korean", choices=("Korean", "English")),
     "analysis.debate_rounds": SettingDef(int, 1, min=1, max=5),
-    "holdings.sync_minutes": SettingDef(int, 0, choices=(0, 10, 30, 60)),
     "quotes.refresh_sec": SettingDef(int, 600, choices=(30, 60, 300, 600, 1800, 3600)),
     "alerts.poll_interval_sec": SettingDef(int, 30, min=10, max=600),
     "briefing.kr.enabled": SettingDef(bool, True),

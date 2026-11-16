@@ -43,8 +43,8 @@ class FakeSync:
         self.rig = rig
         self.calls: list[bool] = []
 
-    async def sync(self, broker_id: str | None = None, *, skip_lost: bool = False) -> list[Any]:
-        self.calls.append(skip_lost)
+    async def sync(self, broker_id: str | None = None) -> list[Any]:
+        self.calls.append(True)
         self.rig.rows_at_sync.append(self.rig.repo.last_day(self.rig.at.date()))
         return []
 
@@ -138,7 +138,7 @@ async def test_before_16_kst_records_nothing_and_does_not_sync(rig: Rig) -> None
     assert rig.refreshes == []
 
 
-async def test_records_once_after_16_and_syncs_first_skipping_lost(rig: Rig) -> None:
+async def test_records_once_after_16_with_uploaded_quantities(rig: Rig) -> None:
     rig.hold(SAMSUNG, qty=10, avg=9000)
     rig.at = kst(TUE, 16, 0)
     await rig.recorder.check_once()
@@ -147,8 +147,7 @@ async def test_records_once_after_16_and_syncs_first_skipping_lost(rig: Rig) -> 
     assert row["kr_cost"] == 90000
     assert row["us_value"] == 0  # 달러 보유가 없음(실패가 아님)
     assert row["backfilled"] == 0
-    assert rig.sync.calls == [True]
-    assert rig.rows_at_sync == [None]  # 기록 전에 동기화한다
+    assert rig.sync.calls == []  # 보유 내역은 [올리기]로만 받는다(22-9)
 
 
 async def test_rerun_is_idempotent_even_after_restart(rig: Rig) -> None:
@@ -161,11 +160,11 @@ async def test_rerun_is_idempotent_even_after_restart(rig: Rig) -> None:
     await rig.make().check_once()  # 앱을 다시 켜도 같다
     assert rig.rows() == before
     assert len(rig.refreshes) == calls
-    assert rig.sync.calls == [True]
+    assert rig.sync.calls == []  # 보유 내역은 [올리기]로만 받는다(22-9)
 
 
-async def test_sync_failure_still_records_with_last_quantity(rig: Rig) -> None:
-    async def broken(broker_id: str | None = None, *, skip_lost: bool = False) -> list[Any]:
+async def test_records_without_asking_the_broker(rig: Rig) -> None:
+    async def broken(broker_id: str | None = None) -> list[Any]:
         raise RuntimeError("broker down")
 
     rig.sync.sync = broken  # type: ignore[method-assign]
@@ -394,7 +393,7 @@ async def test_one_market_failing_leaves_the_other_and_retries_later(deps: AppDe
     row = rig.rows()[TUE.isoformat()]
     assert row["kr_value"] == 10 * close_of("KR", TUE)
     assert row["backfilled"] == 0
-    assert rig.sync.calls == [True]  # 다시 시도할 때 동기화를 또 하지 않는다
+    assert rig.sync.calls == []  # 보유 내역은 [올리기]로만 받는다(22-9)
 
 
 async def test_one_symbol_failing_nulls_its_market_rather_than_a_partial_sum(deps: AppDeps) -> None:
@@ -467,7 +466,7 @@ async def test_retry_does_not_turn_a_failed_value_into_zero_after_selling(deps: 
     assert rig.rows()[TUE.isoformat()]["kr_value"] is None
 
 
-async def test_without_kis_keys_nothing_is_written_and_sync_runs_once(deps: AppDeps) -> None:
+async def test_without_kis_keys_nothing_is_written(deps: AppDeps) -> None:
     rig = Rig(deps, kst(TUE))
     rig.hold(SAMSUNG)
 
@@ -480,7 +479,7 @@ async def test_without_kis_keys_nothing_is_written_and_sync_runs_once(deps: AppD
     with pytest.raises(Exception, match="앱키"):
         await real.check_once()
     assert rig.rows() == {}  # 키를 넣으면 그때 채운다
-    assert rig.sync.calls == [True]
+    assert rig.sync.calls == []  # 보유 내역은 [올리기]로만 받는다(22-9)
 
 
 async def test_start_and_stop(rig: Rig) -> None:
