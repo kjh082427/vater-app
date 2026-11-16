@@ -312,6 +312,39 @@ describe('보유 종목에서 불러오기(v0.2.2 22-5)', () => {
   });
 });
 
+describe('[새로고침](v0.2.2 22-6)', () => {
+  it('목록·규칙·알림 이력·펼친 종목의 시세와 내 보유를 다시 받고, 증권사(/holdings/sync)는 부르지 않는다', async () => {
+    mock.db.connections = [connection({ id: 1, broker_id: 'kis' })];
+    mock.db.holdings = [holding({ code: '005930', name: '삼성전자' })];
+    renderAlerts('#/symbols/KR/005930');
+    await waitFor(() => panel('삼성전자'));
+    await new Promise((r) => setTimeout(r, 50));
+    const gets: string[] = [];
+    const posts: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const path = new URL(request.url).pathname;
+      (request.method === 'GET' ? gets : posts).push(path);
+    });
+    await userEvent.click(screen.getByRole('button', { name: '새로고침' }));
+    await waitFor(() =>
+      expect(gets).toEqual(
+        expect.arrayContaining([
+          '/watchlist',
+          '/alerts/rules',
+          '/alerts/kinds',
+          '/holdings',
+          '/brokers',
+          '/alerts/events',
+          '/holdings/symbol/KR/005930',
+          '/symbols/KR/005930/bars',
+        ]),
+      ),
+    );
+    expect(posts).toEqual([]);
+    expect(gets).not.toContain('/holdings/sync');
+  });
+});
+
 describe('감시 종목 한꺼번에 빼기(v0.2.2 22-3)', () => {
   const pick = (name: string) =>
     userEvent.click(within(watchSection()).getByRole('checkbox', { name: `${name} 선택` }));

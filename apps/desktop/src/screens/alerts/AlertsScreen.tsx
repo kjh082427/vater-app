@@ -41,6 +41,8 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
   const brokers = useResource<BrokerOut[]>('/brokers');
   // [보유 종목 직접 추가]는 보유 종목 탭에만 둔다(v0.2.2 22-5). 여기서는 올린 보유 종목을 불러오기만 한다
   const [importing, setImporting] = useState(false);
+  // [새로고침]마다 늘려 자기 자료를 가진 부품(알림 이력, 펼친 종목의 그래프·내 보유)을 다시 그린다
+  const [round, setRound] = useState(0);
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState<string | null>(null);
@@ -104,6 +106,12 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
     watch.reload();
   }
 
+  // [새로고침](v0.2.2 22-6): 목록과 시세만 다시 받는다. 증권사(/holdings/sync)는 부르지 않는다
+  function reloadAll() {
+    for (const r of [watch, rules, kinds, holdings, brokers]) r.reload();
+    setRound((n) => n + 1);
+  }
+
   async function removeSelected() {
     setBulkBusy(true);
     const targets = (items ?? []).filter((w) => selected.includes(w.id));
@@ -142,6 +150,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
       <ScreenHeader
         title="감시·알림"
         lede="종목을 펼쳐 알림 규칙을 만듭니다. 조건을 새로 만족할 때만 알리고, 같은 규칙은 하루에 한 번만 알립니다."
+        end={<Button onClick={reloadAll}>새로고침</Button>}
       />
       <div className={common.twoUp}>
         <div className={common.twoUpGrid}>
@@ -287,6 +296,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
                             rules.mutate((list) => list?.map((r) => (r.id === rule.id ? rule : r)))
                           }
                           onRemoved={() => removed(item)}
+                          round={round}
                           selected={selected.includes(item.id)}
                           onSelect={(on) =>
                             setSelected((prev) =>
@@ -330,7 +340,7 @@ export function AlertsScreen({ focus }: AlertsScreenProps) {
               </p>
             </Dialog>
           ) : null}
-          <AlertHistory watchItems={items} kinds={kinds.data} focusKey={focusKey} />
+          <AlertHistory key={round} watchItems={items} kinds={kinds.data} focusKey={focusKey} />
         </div>
       </div>
     </>

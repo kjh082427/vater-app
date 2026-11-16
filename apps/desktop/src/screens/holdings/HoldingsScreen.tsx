@@ -143,6 +143,11 @@ export function HoldingsScreen() {
   const unsupported = summary.data?.unsupported ?? 0;
   const missing = summary.data?.missing_prices ?? 0;
 
+  // [새로고침](v0.2.2 22-6): 저장된 자료와 시세만 다시 받는다. 증권사(/holdings/sync)는 부르지 않는다
+  function reloadAll() {
+    for (const r of [brokers, connections, holdings, summary, quotes, watch, kinds]) r.reload();
+  }
+
   function reloadHoldings() {
     holdings.reload();
     summary.reload();
@@ -160,6 +165,7 @@ export function HoldingsScreen() {
       <ScreenHeader
         title="보유 종목"
         lede="증권사에서 불러오거나 직접 넣은 보유 내역입니다. 수량과 평단가는 이 PC에만 있고 AI로 보내지 않습니다."
+        end={<Button onClick={reloadAll}>새로고침</Button>}
       />
       <div className={common.stack}>
         <Card
