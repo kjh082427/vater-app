@@ -170,3 +170,15 @@ def test_dynamic_name_is_indexed_before_its_value_is_written(tmp_path: Path) -> 
 
     Recording(tmp_path / ".env").set(broker_secret(1, "TOKEN"), "abcd")
     assert written == ["BROKER_SECRET_NAMES", "BROKER_1_TOKEN"]
+
+
+def test_known_values_include_inner_token_fields_and_account_forms(tmp_path: Path) -> None:
+    s = EnvFileSecretStore(tmp_path / ".env")
+    blob = '{"server":"real","token":"fake-access-token","expires_at":"2026-01-01 00:00:00"}'
+    s.set(SecretName.KIS_ACCESS_TOKEN, blob)
+    s.set(SecretName.KIS_WS_APPROVAL_KEY, '{"server":"real","key":"fake-ws-key","issued_at":"x"}')
+    s.set(broker_secret(1, "ACCOUNT"), "12345678-01")
+    known = s.known_values()
+    for part in ("fake-access-token", "fake-ws-key", "1234567801", "12345678"):
+        assert part in known
+    assert "real" not in known

@@ -54,7 +54,9 @@ def recover_analyses(db: sqlite3.Connection) -> int:
 def main() -> None:
     runtime = load_runtime()
     secrets = select_secret_store(os.environ, sys.platform)
-    setup_logging(runtime.data_dir, secrets.known_values)  # 가장 먼저: 이후 모든 로그를 마스킹
+    setup_logging(
+        runtime.data_dir, lambda: [*secrets.known_values(), runtime.token]
+    )  # 가장 먼저: 이후 모든 로그를 마스킹
     deps = AppDeps(
         token=runtime.token,
         dev=runtime.dev,

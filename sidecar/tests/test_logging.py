@@ -119,3 +119,9 @@ def test_error_messages_sent_to_the_ui_are_masked(tmp_path: Path) -> None:
     error = VaterError("X", "거부: super-secret-key", "힌트 super-secret-key")
     assert "super-secret-key" not in error.message
     assert error.hint is not None and "super-secret-key" not in error.hint
+
+
+def test_runtime_token_is_masked(tmp_path: Path) -> None:
+    setup_logging(tmp_path, lambda: ["run-token-123"])
+    logging.getLogger("x").info("auth failed for run-token-123")
+    assert "run-token-123" not in read_log(tmp_path)
