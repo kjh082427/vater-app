@@ -178,7 +178,7 @@ describe('내 보유 카드', () => {
     expect(screen.queryByRole('region', { name: '내 보유' })).not.toBeInTheDocument();
   });
 
-  it('[새로 고침]은 보유를 다시 받고 값을 다시 그린다', async () => {
+  it('[새로 고침]은 저장된 보유와 시세를 다시 받고, 증권사(/holdings/sync)는 부르지 않는다(v0.2.2 22-9)', async () => {
     held();
     const syncs: unknown[] = [];
     server.events.on('request:start', async ({ request }) => {
@@ -192,7 +192,7 @@ describe('내 보유 카드', () => {
     mock.db.prices['KR:005930'] = 72000;
     await userEvent.click(within(c).getByRole('button', { name: '새로 고침' }));
     expect(await within(c).findByText('1,080,000원')).toBeInTheDocument();
-    expect(syncs).toEqual([{}]);
+    expect(syncs).toEqual([]);
   });
 
   it('평단가 알림은 기본이 꺼짐, 켜면 기본값(−10%)으로 규칙을 만든다', async () => {

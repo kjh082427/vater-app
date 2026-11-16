@@ -351,7 +351,7 @@ test('V3 평가금액·손익: 종목별과 통화별 합계, 시세 없는 종�
   expect(log.errors).toEqual([]);
 });
 
-test('V4 주기 설정: 화면에서 주가 30초·보유 30분으로 바꾸면 저장되고 새로 열어도 남고, 주가 주기가 시세 재조회에 쓰인다', async ({
+test('V4 주기 설정: 화면에서 주가 30초로 바꾸면(보유 수량 주기는 없다) 저장되고 새로 열어도 남고, 주가 주기가 시세 재조회에 쓰인다', async ({
   page,
   stack,
   shell,
@@ -363,21 +363,19 @@ test('V4 주기 설정: 화면에서 주가 30초·보유 30분으로 바꾸면 
   await openApp(page, '#/settings');
   const general = asset(page, '일반');
   await expect(general.getByRole('button', { name: /^주가 갱신 주기/ })).toContainText('10분');
-  await expect(general.getByRole('button', { name: /^보유 수량 갱신 주기/ })).toContainText('끔');
+  // 보유 수량은 [올리기]로만 받는다: 주기 설정이 없다(v0.2.2 22-9)
+  await expect(general.getByRole('button', { name: /^보유 수량 갱신 주기/ })).toHaveCount(0);
   await general.getByRole('button', { name: /^주가 갱신 주기/ }).click();
   await page.getByRole('option', { name: '30초' }).click();
-  await general.getByRole('button', { name: /^보유 수량 갱신 주기/ }).click();
-  await page.getByRole('option', { name: '30분' }).click();
   await expect
     .poll(async () => {
       const s = await stack.json<Record<string, unknown>>('/settings');
-      return [s['quotes.refresh_sec'], s['holdings.sync_minutes']];
+      return s['quotes.refresh_sec'];
     })
-    .toEqual([30, 30]);
+    .toBe(30);
   await page.reload();
   const again = asset(page, '일반');
   await expect(again.getByRole('button', { name: /^주가 갱신 주기/ })).toContainText('30초');
-  await expect(again.getByRole('button', { name: /^보유 수량 갱신 주기/ })).toContainText('30분');
 
   // 주기 안에서는 받아 둔 시세를 쓰고, 주기가 지나면 다시 받는다
   const first = await summary(stack);

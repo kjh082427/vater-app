@@ -56,7 +56,7 @@ export function MyHoldingsCard({
 }: MyHoldingsCardProps) {
   const api = useApi();
   const [mode, setMode] = useState<Mode>(readMode);
-  const [busy, setBusy] = useState<'refresh' | 'rule' | null>(null);
+  const [busy, setBusy] = useState<'rule' | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const currency = currencyOf(market);
   const shares = holdings.brokers;
@@ -75,7 +75,7 @@ export function MyHoldingsCard({
     }
   }
 
-  async function run<T>(what: 'refresh' | 'rule', job: () => Promise<T>): Promise<void> {
+  async function run<T>(what: 'rule', job: () => Promise<T>): Promise<void> {
     setBusy(what);
     setError(null);
     try {
@@ -86,12 +86,6 @@ export function MyHoldingsCard({
       setBusy(null);
     }
   }
-
-  const refresh = () =>
-    run('refresh', async () => {
-      await api.request('/holdings/sync', { method: 'POST', body: {} });
-      onRefreshed();
-    });
 
   const toggleRule = (on: boolean) =>
     run('rule', async () => {
@@ -119,7 +113,8 @@ export function MyHoldingsCard({
       title="내 보유"
       headingLevel={3}
       actions={
-        <Button size="sm" variant="quiet" busy={busy === 'refresh'} onClick={() => void refresh()}>
+        // 저장된 보유와 시세만 다시 받는다. 증권사 보유 내역은 [올리기]로만 받는다(v0.2.2 22-9)
+        <Button size="sm" variant="quiet" onClick={onRefreshed}>
           새로 고침
         </Button>
       }

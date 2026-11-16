@@ -33,27 +33,23 @@ function capture(method: string, pathPrefix: string) {
 }
 
 describe('갱신 주기', () => {
-  it('주가 주기는 기본 10분, 보유 주기는 기본 끔', async () => {
+  it('주가 주기는 기본 10분. 보유 수량 주기는 없다(올리기로만 받는다, v0.2.2 22-9)', async () => {
     renderSettings();
     const part = await waitFor(() => region('일반'));
     expect(await findSelectButton(part, '주가 갱신 주기')).toHaveTextContent('10분');
-    expect(selectButton(part, '보유 수량 갱신 주기')).toHaveTextContent('끔');
+    expect(within(part).queryByText(/보유 수량 갱신 주기/)).not.toBeInTheDocument();
     expect(within(part).getByText(/실시간·폴링 규칙이 없는 종목에만/)).toBeInTheDocument();
     expect(within(part).getByText(/알림 시간은 바뀌지 않습니다/)).toBeInTheDocument();
   });
 
-  it('바꾸면 숫자로 저장한다(초, 분)', async () => {
+  it('바꾸면 숫자(초)로 저장한다', async () => {
     const patches = capture('PATCH', '/settings');
     renderSettings();
     const part = await waitFor(() => region('일반'));
     await findSelectButton(part, '주가 갱신 주기');
     await choose(part, '주가 갱신 주기', '1분');
-    await choose(part, '보유 수량 갱신 주기', '30분');
     await waitFor(() =>
-      expect(patches).toEqual([
-        { path: '/settings', body: { 'quotes.refresh_sec': 60 } },
-        { path: '/settings', body: { 'holdings.sync_minutes': 30 } },
-      ]),
+      expect(patches).toEqual([{ path: '/settings', body: { 'quotes.refresh_sec': 60 } }]),
     );
   });
 
