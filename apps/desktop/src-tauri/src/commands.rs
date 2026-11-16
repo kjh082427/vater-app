@@ -131,7 +131,9 @@ pub fn open_log_folder() -> Result<(), String> {
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     #[cfg(windows)]
     {
-        std::process::Command::new("explorer.exe")
+        // PATH 탐색에 기대지 않고 시스템 폴더의 explorer.exe를 직접 지정한다.
+        let root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+        std::process::Command::new(std::path::PathBuf::from(root).join("explorer.exe"))
             .arg(&dir)
             .spawn()
             .map(|_| ())
