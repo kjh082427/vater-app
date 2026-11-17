@@ -36,7 +36,7 @@ def _timeout_types() -> tuple[type[BaseException], ...]:
     """google-genai는 httpx와 그 포크(httpx2) 중 설치된 것으로 보낸다. 둘 다 잡는다."""
     found: list[type[BaseException]] = [httpx.TimeoutException]
     try:
-        import httpx2  # type: ignore[import-not-found]
+        import httpx2
     except ImportError:
         pass
     else:
