@@ -8,11 +8,15 @@ TradingAgents가 만든 Gemini 모델의 `client.models`만 바꿔 끼운다. La
 from collections.abc import Callable
 from typing import Any
 
+import httpx
 from google.genai import errors
 
 from vater_core.api.errors import VaterError
 
 BUDGET_SEC = 180.0  # 한 모델에서 기다리는 최대 시간
+# 요청 하나의 시간 한도. 혼잡하면 구글은 오류 대신 응답을 붙잡고 있어서(실측 150초 넘게 무응답)
+# TradingAgents 기본값(600초)이면 분석이 10분씩 멈춘다. 넘으면 혼잡으로 보고 다음 모델로 간다.
+REQUEST_TIMEOUT_SEC = 180.0
 BACKOFF_SEC = (5.0, 10.0, 20.0, 40.0, 60.0)  # 구글이 대기 시간을 알려 주지 않을 때
 WAIT_MESSAGE = {
     "busy": "구글 AI 서버가 혼잡합니다. 잠시 후 자동으로 다시 시도합니다.",
@@ -24,6 +28,23 @@ GAVE_UP_HINT = {
     "rate": "무료 사용량의 분당 한도에 계속 걸렸습니다.",
 }
 DAILY = "오늘 무료 사용량을 다 썼습니다. 내일 다시 시도하거나 로컬 AI로 바꿔 주세요."
+NO_MODEL = "쓸 수 있는 Gemini 모델이 없습니다."
+NO_MODEL_HINT = "구글이 옛 모델을 닫았을 수 있습니다. 앱을 최신 버전으로 업데이트해 주세요."
+
+
+def _timeout_types() -> tuple[type[BaseException], ...]:
+    """google-genai는 httpx와 그 포크(httpx2) 중 설치된 것으로 보낸다. 둘 다 잡는다."""
+    found: list[type[BaseException]] = [httpx.TimeoutException]
+    try:
+        import httpx2  # type: ignore[import-not-found]
+    except ImportError:
+        pass
+    else:
+        found.append(httpx2.TimeoutException)
+    return tuple(found)
+
+
+TIMEOUTS = _timeout_types()
 
 OnWait = Callable[[str, str, float], None]  # (사유 busy|rate, 모델, 초)
 
@@ -35,7 +56,10 @@ def _details(e: errors.APIError) -> list[dict[str, Any]]:
 
 
 def kind_of(e: errors.APIError) -> str | None:
-    """busy(혼잡) | rate(분당 한도) | daily(하루 한도) | key(키·권한) | None(그 밖: 그대로 낸다)."""
+    """busy(혼잡) | rate(분당 한도) | daily(하루 한도) | gone(닫힌 모델) | key(키·권한)
+    | None(그 밖: 그대로 낸다)."""
+    if e.code == 404:  # 모델 이름만 바꿔 보내므로 404는 그 모델이 없다는 뜻이다
+        return "gone"
     if e.code in (500, 502, 503, 504):
         return "busy"
     if e.code == 429:
@@ -60,7 +84,9 @@ def retry_delay(e: errors.APIError) -> float | None:
 
 
 def _gave_up(kinds: dict[str, str]) -> VaterError:
-    rest = [k for k in kinds.values() if k != "daily"]
+    if all(k == "gone" for k in kinds.values()):
+        return VaterError("LLM_MODEL_UNAVAILABLE", NO_MODEL, hint=NO_MODEL_HINT, status=503)
+    rest = [k for k in kinds.values() if k not in ("daily", "gone")]
     if not rest:
         return VaterError("LLM_DAILY_LIMIT", DAILY, status=429)
     code = "LLM_BUSY" if rest[-1] == "busy" else "LLM_RATE_LIMITED"
@@ -98,6 +124,9 @@ class GeminiFallback:
                     raise self._failed
                 try:
                     out = self._models.generate_content(model=name, **request)
+                except TIMEOUTS:  # 이미 요청 한도만큼 기다렸다: 혼잡으로 보고 다음 모델로
+                    self._kinds[name] = "busy"
+                    break
                 except errors.APIError as e:
                     kind = kind_of(e)
                     if kind is None:
@@ -110,7 +139,7 @@ class GeminiFallback:
                         ) from e
                     self._kinds[name] = kind
                     delay = retry_delay(e) or BACKOFF_SEC[min(tries, len(BACKOFF_SEC) - 1)]
-                    if kind == "daily" or waited + delay > BUDGET_SEC:
+                    if kind in ("daily", "gone") or waited + delay > BUDGET_SEC:
                         break
                     self._on_wait(kind, name, delay)
                     self._wait(delay)
@@ -141,4 +170,5 @@ def install(
     llm.client = _Client(llm.client, fb)
     # SDK의 짧은 재시도는 끈다: 알려 준 대기 시간을 무시하고 분당 한도만 더 쓴다.
     llm.max_retries = 1
+    llm.timeout = REQUEST_TIMEOUT_SEC  # 호출할 때마다 읽는 값이다(langchain-google-genai)
     return fb

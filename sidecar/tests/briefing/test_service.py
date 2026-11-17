@@ -568,7 +568,9 @@ async def test_stopping_the_service_stops_the_llm_thread(
     assert seen and seen[0].is_set()
 
 
-@pytest.mark.parametrize("code", ["LLM_LOCAL_MODEL_MISSING", "LLM_MODEL_UNKNOWN"])
+@pytest.mark.parametrize(
+    "code", ["LLM_LOCAL_MODEL_MISSING", "LLM_MODEL_UNKNOWN", "LLM_MODEL_UNAVAILABLE"]
+)
 async def test_tick_does_not_retry_a_model_the_user_must_fix(
     db: sqlite3.Connection, code: str
 ) -> None:

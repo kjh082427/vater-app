@@ -162,13 +162,28 @@ def test_google_fallback_chains_follow_catalog(tmp_path: Path) -> None:
     """v2 설계 20장: 설정한 모델을 먼저, 그다음 카탈로그 순서. 같은 모델은 한 번만."""
     run = build_run(settings(), load_catalog(), store(tmp_path, SecretName.LLM_GOOGLE_KEY))
     assert run.chains == {
-        "deep": ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash"),
-        "quick": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"),
+        "deep": ("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"),
+        "quick": ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash"),
     }
     s = settings(llm__cloud_deep_model="gemini-3.5-flash", llm__cloud_quick_model="my-model")
     run = build_run(s, load_catalog(), store(tmp_path, SecretName.LLM_GOOGLE_KEY))
-    assert run.chains["deep"] == ("gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash")
+    assert run.chains["deep"] == (
+        "gemini-3.5-flash",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+    )
     assert run.chains["quick"][0] == "my-model" and len(run.chains["quick"]) == 4
+
+
+# 2026-11-18 실측: 새 사용자에게 404("no longer available to new users")
+RETIRED = {"gemini-2.5-flash", "gemini-2.5-flash-lite"}
+
+
+def test_catalog_has_no_retired_google_models() -> None:
+    google = load_catalog().cloud["google"]
+    names = {google.deep, google.quick, *(m for ms in google.fallback.values() for m in ms)}
+    assert not names & RETIRED
 
 
 def test_fallback_only_for_google_tiers(tmp_path: Path) -> None:

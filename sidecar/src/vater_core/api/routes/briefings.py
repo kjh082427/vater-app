@@ -53,7 +53,8 @@ class MyAssets(BaseModel):
 
 class InterpretError(BaseModel):
     """AI 해석이 없는 이유. 분석과 같은 구분이다: LLM_BUSY(혼잡), LLM_RATE_LIMITED(분당 한도),
-    LLM_DAILY_LIMIT(하루 한도), LLM_KEY_INVALID·LLM_KEY_MISSING(키), BRIEFING_LLM_FAILED(그 밖)."""
+    LLM_DAILY_LIMIT(하루 한도), LLM_MODEL_UNAVAILABLE(닫힌 모델), LLM_KEY_INVALID·LLM_KEY_MISSING(키),
+    BRIEFING_LLM_FAILED(그 밖)."""
 
     code: str
     message: str

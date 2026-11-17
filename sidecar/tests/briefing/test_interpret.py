@@ -185,7 +185,7 @@ def test_null_for_a_section_means_empty() -> None:
 
 # ---- 재시도와 대체 모델 (v2 설계 21장 5번, 20장) ------------------------------------
 
-DEEP = ("gemini-3.8-flash", "gemini-3.5-flash", "gemini-2.5-flash")
+DEEP = ("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash")
 
 
 def gemini_run(

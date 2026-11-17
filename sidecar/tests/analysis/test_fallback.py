@@ -4,12 +4,18 @@ import threading
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
 from google.genai import errors, types
 from pydantic import BaseModel
 
 from vater_core.analysis.engine import Cancelled
-from vater_core.analysis.fallback import BUDGET_SEC, GeminiFallback, install
+from vater_core.analysis.fallback import (
+    BUDGET_SEC,
+    REQUEST_TIMEOUT_SEC,
+    GeminiFallback,
+    install,
+)
 from vater_core.api.errors import VaterError
 
 QUICK = ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite")
@@ -171,6 +177,63 @@ def test_key_errors_are_not_retried(error: Any) -> None:
         fallback(models, rec).generate_content(model=QUICK[0], contents="hi")
     assert e.value.code == "LLM_KEY_INVALID"
     assert called(models) == [QUICK[0]] and rec.slept == []
+
+
+def retired() -> errors.APIError:
+    # 2026-11-18 실제 응답: 구글이 옛 모델을 새 사용자에게 닫으면 404를 낸다
+    body = {
+        "code": 404,
+        "message": "This model models/gemini-2.5-flash is no longer available to new users.",
+        "status": "NOT_FOUND",
+    }
+    return errors.ClientError(404, {"error": body})
+
+
+def test_retired_model_is_skipped_without_waiting() -> None:
+    models, rec = FakeModels({QUICK[0]: [retired()]}), Recorder()
+    fb = fallback(models, rec)
+    assert fb.generate_content(model=QUICK[0], contents="hi") is models.reply
+    assert called(models) == [QUICK[0], QUICK[1]] and rec.slept == [] and fb.used == [QUICK[1]]
+
+
+def test_retired_last_model_reports_the_earlier_reason() -> None:
+    # 실제로 겪은 실패: 앞 모델들은 혼잡, 마지막 모델은 폐기 → 혼잡으로 알려야 한다
+    script: dict[str, list[Exception]] = {m: [busy() for _ in range(50)] for m in QUICK[:-1]}
+    script[QUICK[-1]] = [retired()]
+    with pytest.raises(VaterError) as e:
+        fallback(FakeModels(script), Recorder()).generate_content(model=QUICK[0], contents="hi")
+    assert e.value.code == "LLM_BUSY"
+
+
+def test_all_retired_says_update_the_app() -> None:
+    models = FakeModels({m: [retired()] for m in QUICK})
+    with pytest.raises(VaterError) as e:
+        fallback(models, Recorder()).generate_content(model=QUICK[0], contents="hi")
+    assert e.value.code == "LLM_MODEL_UNAVAILABLE"
+    assert e.value.hint is not None and "업데이트" in e.value.hint
+
+
+def test_timeout_moves_to_next_model_like_busy() -> None:
+    # 혼잡할 때 구글은 오류 대신 응답을 붙잡고 있다(실측 150초 넘게 무응답)
+    timeout = httpx.ReadTimeout("The read operation timed out")
+    models, rec = FakeModels({QUICK[0]: [timeout]}), Recorder()
+    fb = fallback(models, rec)
+    assert fb.generate_content(model=QUICK[0], contents="hi") is models.reply
+    assert called(models) == [QUICK[0], QUICK[1]] and fb.used == [QUICK[1]]
+    assert rec.slept == []  # 이미 요청 시간 한도만큼 기다렸다
+
+
+def test_all_timing_out_is_busy() -> None:
+    models = FakeModels({m: [httpx.ReadTimeout("t")] for m in QUICK})
+    with pytest.raises(VaterError) as e:
+        fallback(models, Recorder()).generate_content(model=QUICK[0], contents="hi")
+    assert e.value.code == "LLM_BUSY"
+
+
+def test_install_caps_each_request() -> None:
+    llm = SimpleNamespace(client=SimpleNamespace(models=FakeModels({})), timeout=600)
+    install(llm, QUICK, Recorder().wait, Recorder().on_wait)
+    assert llm.timeout == REQUEST_TIMEOUT_SEC <= BUDGET_SEC
 
 
 def test_other_errors_pass_through() -> None:
