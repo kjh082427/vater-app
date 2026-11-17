@@ -91,7 +91,7 @@ async def test_live_check_mixed(http: httpx.AsyncClient, tmp_path: Path) -> None
     SettingsRepo(deps.db).update({"llm.local_model": MODEL})
     transport = httpx.ASGITransport(app=create_app(deps))
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers={"Authorization": "Bearer t"}
+        transport=transport, base_url="http://127.0.0.1", headers={"Authorization": "Bearer t"}
     ) as c:
         r = await c.get("/llm/check", params={"preset": "mixed"})
     print(r.json())

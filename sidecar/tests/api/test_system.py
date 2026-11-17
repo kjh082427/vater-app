@@ -61,10 +61,41 @@ async def test_docs_hidden_in_production(anon_client: httpx.AsyncClient) -> None
 
 async def test_docs_available_in_dev_mode(tmp_path: Path) -> None:
     app = create_app(AppDeps(token="t", dev=True, data_dir=tmp_path))
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
+    ) as c:
         assert (await c.get("/openapi.json")).status_code == 200
 
 
 async def test_unknown_route_uses_error_shape(client: httpx.AsyncClient) -> None:
     r = await client.get("/nope")
     assert r.status_code == 404 and set(r.json()) == {"code", "message", "hint"}
+
+
+async def test_foreign_host_header_rejected(client: httpx.AsyncClient) -> None:
+    # DNS 리바인딩: 악성 사이트 이름이 127.0.0.1을 가리켜도 Host가 다르면 거절한다
+    r = await client.get("/health", headers={"Host": "evil.example"})
+    assert r.status_code == 400 and r.json()["code"] == "HOST_INVALID"
+
+
+async def test_loopback_hosts_allowed(client: httpx.AsyncClient) -> None:
+    for host in ("127.0.0.1", "127.0.0.1:51234", "localhost:8000"):
+        r = await client.get("/health", headers={"Host": host})
+        assert r.status_code == 200, host
+
+
+async def test_oversized_body_rejected_before_reading(client: httpx.AsyncClient) -> None:
+    from vater_core.api.app import MAX_BODY_BYTES
+
+    big = b"A" * (MAX_BODY_BYTES + 1)
+    r = await client.put(
+        "/ui/dashboards", content=big, headers={"content-type": "application/json"}
+    )
+    assert r.status_code == 413 and r.json()["code"] == "BODY_TOO_LARGE"
+
+    async def chunks():  # Content-Length 없이 흘려보내도 상한에서 끊는다
+        for _ in range(MAX_BODY_BYTES // 65536 + 2):
+            yield b"A" * 65536
+
+    r = await client.put("/ui/dashboards", content=chunks())
+    assert r.status_code == 413 and r.json()["code"] == "BODY_TOO_LARGE"

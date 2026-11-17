@@ -84,7 +84,7 @@ async def deps(tmp_path: Path) -> AsyncIterator[AppDeps]:
 def api(deps: AppDeps) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         transport=httpx.ASGITransport(app=create_app(deps)),
-        base_url="http://sidecar",
+        base_url="http://127.0.0.1",
         headers={"Authorization": f"Bearer {TOKEN}"},
     )
 
