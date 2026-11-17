@@ -111,7 +111,7 @@ class World:
         self.deps.alerts = self.monitor
         self.api = httpx.AsyncClient(
             transport=httpx.ASGITransport(app=create_app(self.deps)),
-            base_url="http://sidecar",
+            base_url="http://127.0.0.1",
             headers={"Authorization": f"Bearer {TOKEN}"},
         )
 

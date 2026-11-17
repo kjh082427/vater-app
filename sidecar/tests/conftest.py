@@ -80,14 +80,16 @@ def app(deps: AppDeps) -> FastAPI:
 async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=app)
     headers = {"Authorization": f"Bearer {TEST_TOKEN}"}
-    async with httpx.AsyncClient(transport=transport, base_url="http://test", headers=headers) as c:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://127.0.0.1", headers=headers
+    ) as c:
         yield c
 
 
 @pytest.fixture
 async def anon_client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as c:
         yield c
 
 

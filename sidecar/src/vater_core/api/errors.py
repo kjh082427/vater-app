@@ -13,8 +13,12 @@ from vater_core.logging_setup import mask
 
 logger = logging.getLogger(__name__)
 
-_HTTP_CODES = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED"}
-_HTTP_MESSAGES = {404: "요청한 경로가 없습니다.", 405: "허용되지 않은 요청 방식입니다."}
+_HTTP_CODES = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED", 413: "BODY_TOO_LARGE"}
+_HTTP_MESSAGES = {
+    404: "요청한 경로가 없습니다.",
+    405: "허용되지 않은 요청 방식입니다.",
+    413: "요청 본문이 너무 큽니다.",
+}
 
 
 class VaterError(Exception):
