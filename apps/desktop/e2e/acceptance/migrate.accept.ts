@@ -1,11 +1,11 @@
 /**
  * V11: 0.1.0에서 업데이트한 사용자(v2 확인 계획 검토 포인트 1).
  * `v0.1.0` 태그의 마이그레이션(001~003)으로 만든 DB에 감시 종목·규칙·이력·분석·브리핑·대시보드를 넣고,
- * 지금 코드의 사이드카(stack.py)를 그 폴더로 띄운다. DB가 올라가고(004~006) 데이터가 그대로이며,
+ * 지금 코드의 사이드카(stack.py)를 그 폴더로 띄운다. DB가 최신으로 올라가고(004~) 데이터가 그대로이며,
  * 올라간 DB에서 v2 기능(연결, 보유, 평가)이 돈다. 태그가 없으면(얕은 clone) 실패한다.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { templateRoot } from '../../src/dashboard/layout/templates';
@@ -15,6 +15,10 @@ const DESKTOP = resolve(import.meta.dirname, '../..');
 const SIDECAR = resolve(DESKTOP, '../../sidecar');
 const MIGRATIONS = 'sidecar/src/vater_core/store/migrations';
 const HELPER = join(import.meta.dirname, 'v010_db.py');
+// 지금 코드의 최신 스키마 버전. 마이그레이션을 더해도 이 테스트를 고치지 않게 파일 수로 센다
+const LATEST = readdirSync(resolve(SIDECAR, 'src/vater_core/store/migrations')).filter((f) =>
+  /^\d{3}_.*\.sql$/.test(f),
+).length;
 
 const git = (...args: string[]) =>
   execFileSync('git', args, { cwd: DESKTOP, encoding: 'utf8', maxBuffer: 1 << 24 });
@@ -106,7 +110,7 @@ test('V11 0.1.0 DB 올리기: 감시 종목·규칙·이력·분석·브리핑·
     // 2) 지금 코드로 올린다
     stack = await Stack.start(dataDir);
     shell.stack = stack; // 화면이 이 사이드카에 붙는다
-    expect(schemaVersion(dataDir)).toBe(6);
+    expect(schemaVersion(dataDir)).toBe(LATEST);
 
     // 3) 데이터가 그대로다
     const watch = await stack.json<{ id: number; code: string; name: string }[]>('/watchlist');
@@ -200,7 +204,7 @@ test('V11 0.1.0 DB 올리기: 감시 종목·규칙·이력·분석·브리핑·
     // 6) 한 번 더 시작해도 그대로(이미 올라간 DB)
     await stack.stop();
     stack = await Stack.start(dataDir);
-    expect(schemaVersion(dataDir)).toBe(6);
+    expect(schemaVersion(dataDir)).toBe(LATEST);
     expect((await stack.json<unknown[]>('/watchlist')).length).toBe(3);
     expect((await stack.json<unknown[]>('/holdings')).length).toBe(3);
   } finally {

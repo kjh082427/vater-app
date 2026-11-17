@@ -19,6 +19,7 @@ const INTERPRET_REASON: Record<string, string> = {
   LLM_KEY_INVALID: 'AI 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.',
   LLM_KEY_MISSING: 'AI 키가 없습니다. 설정에서 키를 넣어 주세요.',
   BRIEFING_LLM_FAILED: 'AI 해석을 끝내지 못했습니다. 잠시 뒤 [AI 해석 다시 만들기]를 눌러 주세요.',
+  LLM_MODEL_UNAVAILABLE: '쓸 수 있는 Gemini 모델이 없습니다. 앱을 최신 버전으로 업데이트해 주세요.',
 };
 // 키 문제는 설정 링크도 함께 둔다(키를 고친 뒤 다시 만들 수 있게)
 const KEY_CODES = new Set(['LLM_KEY_INVALID', 'LLM_KEY_MISSING']);
