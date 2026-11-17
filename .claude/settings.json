@@ -1,5 +1,19 @@
 {
   "enabledPlugins": {
     "impeccable@impeccable": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/.env)",
+      "Edit(**/.env)",
+      "Read(~/.local/share/vater/**)",
+      "Read(//mnt/c/Users/*/AppData/Roaming/Vater/**)",
+      "Bash(cat *.env*)",
+      "Bash(less *.env*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)",
+      "Bash(grep * *.env*)",
+      "Bash(sqlite3 *)"
+    ]
   }
 }
