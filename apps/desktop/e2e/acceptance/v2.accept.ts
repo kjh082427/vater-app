@@ -958,7 +958,7 @@ test('V12 주문 경로 0: 세 어댑터가 부른 호출, 한투 TR, 화면이 
       0,
     );
   }
-  await page.getByRole('button', { name: '종목 추가' }).count(); // 화면을 한 바퀴 더 돌린 뒤 요청을 모은다
+  await page.getByRole('button', { name: '종목 검색으로 추가' }).count(); // 화면을 한 바퀴 더 돌린 뒤 요청을 모은다
 
   const paths = new Set(
     log.requests

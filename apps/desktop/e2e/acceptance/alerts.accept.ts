@@ -41,7 +41,7 @@ test('U3 알림 끝까지: 화면에서 만든 목표가 규칙이 실시간 틱
   await openApp(page, '#/alerts');
 
   // 화면에서 감시 종목과 목표가 규칙을 만든다
-  await page.getByRole('button', { name: '종목 추가' }).click();
+  await page.getByRole('button', { name: '종목 검색으로 추가' }).click();
   await page.getByRole('searchbox', { name: '종목 검색' }).fill('삼성');
   await page.getByRole('button', { name: '삼성전자 추가' }).click();
   await expect(page).toHaveURL(/#\/symbols\/KR\/005930$/);

@@ -452,6 +452,10 @@ describe('브리핑 상세: AI 해석이 없을 때(v0.2.1 21장 5번)', () => {
       'BRIEFING_LLM_FAILED',
       'AI 해석을 끝내지 못했습니다. 잠시 뒤 [AI 해석 다시 만들기]를 눌러 주세요.',
     ],
+    [
+      'LLM_MODEL_UNAVAILABLE',
+      '쓸 수 있는 Gemini 모델이 없습니다. 앱을 최신 버전으로 업데이트해 주세요.',
+    ],
   ])('%s: 이유를 보이고 [AI 해석 다시 만들기]를 둔다', async (code, text) => {
     failWith(code);
     renderAt('#/briefings/20');
