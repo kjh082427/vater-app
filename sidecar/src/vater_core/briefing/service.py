@@ -57,6 +57,7 @@ NO_AUTO_RETRY = frozenset(
         "LLM_KEY_MISSING",
         "LLM_LOCAL_MODEL_MISSING",
         "LLM_MODEL_UNKNOWN",
+        "LLM_MODEL_UNAVAILABLE",  # 구글이 대체 순서의 모델을 모두 닫았다: 앱 업데이트가 필요하다
     }
 )
 LLM_TIMEOUT_SEC = 900.0  # Gemini 무료 등급 실측 약 6분
